@@ -17,7 +17,7 @@ This component serves git repositories dynamically over HTTPS, generating conten
 **Request Flow:**
 
 ```
-Client: git clone https://skaas.com/me/marketplace.git
+Client: git clone https://skills.supply/me/marketplace.git
                            │
                            ▼
 ┌─────────────────────────────────────────────────────┐
@@ -50,12 +50,12 @@ Contains a single file listing all available plugins:
     {
       "name": "code-reviewer",
       "description": "AI code review",
-      "source": { "source": "url", "url": "https://skaas.com/me/plugins/code-reviewer.git" }
+      "source": { "source": "url", "url": "https://skills.supply/me/plugins/code-reviewer.git" }
     },
     {
       "name": "tdd-helper",
       "description": "TDD workflow [NOT PURCHASED]",
-      "source": { "source": "url", "url": "https://skaas.com/me/plugins/tdd-helper.git" }
+      "source": { "source": "url", "url": "https://skills.supply/me/plugins/tdd-helper.git" }
     }
   ]
 }
@@ -234,7 +234,7 @@ async function getOrCreateRepo(user: User, repoName: string): Promise<string> {
   }
 
   // 3. Content changed - create new commit
-  const repoPath = `/tmp/skaas-repos/${user.username}/${repoName}`;
+  const repoPath = `/tmp/sksup-repos/${user.username}/${repoName}`;
 
   if (state) {
     // Incremental: add commit on top of existing
@@ -271,7 +271,7 @@ async function addCommit(
   parentSha: string | null
 ): Promise<void> {
   // Create temp worktree
-  const tmpDir = mkdtempSync('/tmp/skaas-worktree-');
+  const tmpDir = mkdtempSync('/tmp/sksup-worktree-');
 
   try {
     // Write files
@@ -315,7 +315,7 @@ async function getHeadSha(repoPath: string): Promise<string> {
 
 ```bash
 # Cron job: delete repos older than 24 hours (orphaned entries)
-find /tmp/skaas-repos -type d -mindepth 3 -mtime +1 -exec rm -rf {} +
+find /tmp/sksup-repos -type d -mindepth 3 -mtime +1 -exec rm -rf {} +
 ```
 
 ---
@@ -323,7 +323,7 @@ find /tmp/skaas-repos -type d -mindepth 3 -mtime +1 -exec rm -rf {} +
 ## File Structure
 
 ```
-packages/skills-supply/
+packages/api/
 ├── src/
 │   ├── index.ts              # Hono app entry point
 │   ├── routes/

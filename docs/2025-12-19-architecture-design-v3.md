@@ -57,7 +57,7 @@ Skills Supply enables creators to monetize their Claude Code plugins and distrib
 
 Each user gets a personalized marketplace URL:
 ```
-https://skaas.com/me/marketplace.git
+https://skills.supply/me/marketplace.git
 ```
 
 The token identifies the user — no username needed in the URL. This single marketplace contains ALL plugins from ALL creators:
@@ -94,7 +94,7 @@ We chose HTTPS-based git serving over SSH. See **Appendix: Why Not SSH?** for de
 
 Users authenticate via API tokens stored in git's credential helper:
 ```
-https://alice:sk_live_abc123@skaas.com
+https://alice:ss_live_abc123@skills.supply
 ```
 
 Git automatically sends credentials on every request. Server validates token and serves appropriate content.
@@ -119,9 +119,9 @@ This is more secure than plaintext storage and meets user expectations.
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │  $ skaas auth                                                        │    │
+│  │  $ sksup auth                                                        │    │
 │  │                                                                      │    │
-│  │  1. Opens browser: https://skaas.com/auth/cli?session=xyz           │    │
+│  │  1. Opens browser: https://skills.supply/auth/cli?session=xyz           │    │
 │  │  2. User logs in (or signs up)                                      │    │
 │  │  3. Browser shows: "CLI authenticated!"                             │    │
 │  │  4. CLI polls /auth/cli/status?session=xyz → gets token             │    │
@@ -130,15 +130,15 @@ This is more secure than plaintext storage and meets user expectations.
 │  │  7. CLI outputs:                                                    │    │
 │  │     ✓ Authenticated as alice@example.com                            │    │
 │  │     Add your marketplace to Claude Code:                            │    │
-│  │     /plugin marketplace add https://skaas.com/me/marketplace        │    │
+│  │     /plugin marketplace add https://skills.supply/me/marketplace        │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │  User in Claude Code:                                                │    │
-│  │  /plugin marketplace add https://skaas.com/me/marketplace           │    │
+│  │  /plugin marketplace add https://skills.supply/me/marketplace           │    │
 │  │                                                                      │    │
-│  │  Claude Code runs: git clone https://skaas.com/me/marketplace.git   │    │
-│  │  Git credential helper provides: alice:sk_live_abc                  │    │
+│  │  Claude Code runs: git clone https://skills.supply/me/marketplace.git   │    │
+│  │  Git credential helper provides: alice:ss_live_abc                  │    │
 │  │  Server authenticates, returns personalized marketplace.json        │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 │                                                                              │
@@ -148,7 +148,7 @@ This is more secure than plaintext storage and meets user expectations.
 │                              CREATOR FLOW                                    │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  1. Creator signs up on skaas.com                                           │
+│  1. Creator signs up on skills.supply                                           │
 │  2. Connects private GitHub repo containing plugin                          │
 │  3. Configures: pricing, description                                        │
 │  4. Completes Stripe Connect onboarding (KYC, bank verification)           │
@@ -164,7 +164,7 @@ This is more secure than plaintext storage and meets user expectations.
 │  1. User sees unpurchased plugin in their marketplace                       │
 │  2. Plugin is a "stub" with /buy command                                    │
 │  3. User runs /buy in Claude Code                                           │
-│  4. Browser opens: https://skaas.com/buy/plugin-name?user=alice             │
+│  4. Browser opens: https://skills.supply/buy/plugin-name?user=alice             │
 │  5. User completes payment (Stripe)                                         │
 │  6. Server records purchase, splits payment to creator                      │
 │  7. Next marketplace fetch → plugin serves full content                     │
@@ -176,12 +176,12 @@ This is more secure than plaintext storage and meets user expectations.
 
 ## Git HTTP Smart Protocol
 
-When Claude Code runs `git clone https://skaas.com/me/marketplace.git`:
+When Claude Code runs `git clone https://skills.supply/me/marketplace.git`:
 
 ### Request 1: Discover refs
 ```http
 GET /me/marketplace.git/info/refs?service=git-upload-pack HTTP/1.1
-Host: skaas.com
+Host: skills.supply
 Authorization: Basic YWxpY2U6c2tfbGl2ZV9hYmMxMjM=
 ```
 
@@ -200,7 +200,7 @@ Content-Type: application/x-git-upload-pack-advertisement
 ### Request 2: Fetch pack data
 ```http
 POST /me/marketplace.git/git-upload-pack HTTP/1.1
-Host: skaas.com
+Host: skills.supply
 Authorization: Basic YWxpY2U6c2tfbGl2ZV9hYmMxMjM=
 Content-Type: application/x-git-upload-pack-request
 
@@ -232,12 +232,12 @@ Contains a single file listing all available plugins:
     {
       "name": "code-reviewer",
       "description": "AI code review",
-      "source": { "source": "url", "url": "https://skaas.com/me/plugins/code-reviewer.git" }
+      "source": { "source": "url", "url": "https://skills.supply/me/plugins/code-reviewer.git" }
     },
     {
       "name": "tdd-helper",
       "description": "TDD workflow [NOT PURCHASED]",
-      "source": { "source": "url", "url": "https://skaas.com/me/plugins/tdd-helper.git" }
+      "source": { "source": "url", "url": "https://skills.supply/me/plugins/tdd-helper.git" }
     }
   ]
 }
@@ -279,7 +279,7 @@ This plugin provides powerful capabilities for your coding workflow.
 ## Get Access
 
 Run the `/buy` command to purchase this plugin, or visit:
-https://skaas.com/plugins/plugin-name
+https://skills.supply/plugins/plugin-name
 ```
 
 **commands/buy.md:**
@@ -296,7 +296,7 @@ Opening browser to complete purchase...
 
 ---
 
-## CLI Tool: `skaas`
+## CLI Tool: `sksup`
 
 The CLI authenticates users and configures git credentials.
 
@@ -304,18 +304,18 @@ The CLI authenticates users and configures git credentials.
 
 | Command | Purpose |
 |---------|---------|
-| `skaas auth` | Authenticate and configure git credentials |
-| `skaas status` | Show current auth status and account info |
-| `skaas logout` | Remove credentials and deauthorize |
-| `skaas whoami` | Show current user |
+| `sksup auth` | Authenticate and configure git credentials |
+| `sksup status` | Show current auth status and account info |
+| `sksup logout` | Remove credentials and deauthorize |
+| `sksup whoami` | Show current user |
 
 ### Auth Flow (Conceptual)
 
-1. CLI opens browser to `https://skaas.com/auth/cli?session=xyz`
+1. CLI opens browser to `https://skills.supply/auth/cli?session=xyz`
 2. User logs in or signs up
 3. CLI polls `/auth/cli/status?session=xyz` for completion
 4. On success, CLI receives API token
-5. CLI configures OS-native credential helper for `skaas.com`
+5. CLI configures OS-native credential helper for `skills.supply`
 6. CLI stores credentials in system keychain
 7. Future git operations automatically authenticate
 
@@ -333,7 +333,7 @@ The CLI authenticates users and configures git credentials.
 | Built with | Bun (`bun build --compile` → standalone binary) |
 | Binary hosting | GitHub Releases |
 | Install: macOS | Homebrew (homebrew-core preferred) |
-| Install: Linux/Windows | curl script (`curl -fsSL https://skaas.com/install.sh \| sh`) |
+| Install: Linux/Windows | curl script (`curl -fsSL https://skills.supply/install.sh \| sh`) |
 
 **Platform targets:**
 - darwin-arm64 (macOS Apple Silicon)
@@ -456,7 +456,7 @@ Only platform that supports multi-vendor marketplace model:
 2. **Multi-agent support** — Different formats for Amp, Cursor? Transform on-the-fly?
 3. **Plugin updates** — How to notify users of updates? Webhook to Claude Code?
 4. **Refund policy** — Time-limited refunds? Automatic or manual?
-5. **Platform fee** — What percentage does skaas take? (Industry standard: 15-30%)
+5. **Platform fee** — What percentage does Skills Supply take? (Industry standard: 15-30%)
 6. **Free tier** — Free plugins allowed? Freemium model for creators?
 
 ---

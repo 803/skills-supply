@@ -1,12 +1,12 @@
 # CLI Design for Skills Supply
 
-> Implementation details for the `skaas` CLI tool
+> Implementation details for the `sksup` CLI tool
 
 ---
 
 ## Overview
 
-The `skaas` CLI authenticates users and configures git credentials so that `git clone` operations against Skills Supply repositories work seamlessly. This document covers the full implementation: commands, auth flow, credential management, distribution, and error handling.
+The `sksup` CLI authenticates users and configures git credentials so that `git clone` operations against Skills Supply repositories work seamlessly. This document covers the full implementation: commands, auth flow, credential management, distribution, and error handling.
 
 ---
 
@@ -14,10 +14,10 @@ The `skaas` CLI authenticates users and configures git credentials so that `git 
 
 | Command | Purpose |
 |---------|---------|
-| `skaas auth` | Authenticate and configure git credentials |
-| `skaas status` | Show current auth status and account info |
-| `skaas logout` | Remove credentials and deauthorize |
-| `skaas whoami` | Show current user |
+| `sksup auth` | Authenticate and configure git credentials |
+| `sksup status` | Show current auth status and account info |
+| `sksup logout` | Remove credentials and deauthorize |
+| `sksup whoami` | Show current user |
 
 ---
 
@@ -38,7 +38,7 @@ import { execSync } from 'child_process';
 import * as crypto from 'crypto';
 import open from 'open';
 
-const API_BASE = 'https://skaas.com';
+const API_BASE = 'https://skills.supply';
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_ATTEMPTS = 150; // 5 minutes
 
@@ -150,7 +150,7 @@ function getCredentialHelper(): string {
 function configureCredentialHelper(): void {
   const helper = getCredentialHelper();
 
-  // Configure credential helper for skaas.com only
+  // Configure credential helper for skills.supply only
   // This doesn't affect the user's other git operations
   execSync(`git config --global credential.${API_BASE}.helper ${helper}`);
 }
@@ -182,7 +182,7 @@ function storeCredentialsNative(username: string, token: string): void {
   });
 
   proc.stdin.write(`protocol=https\n`);
-  proc.stdin.write(`host=skaas.com\n`);
+  proc.stdin.write(`host=skills.supply\n`);
   proc.stdin.write(`username=${username}\n`);
   proc.stdin.write(`password=${token}\n`);
   proc.stdin.write(`\n`);
@@ -195,7 +195,7 @@ function storeCredentialsFile(username: string, token: string): void {
   import * as path from 'path';
 
   const credentialsPath = path.join(os.homedir(), '.git-credentials');
-  const credLine = `https://${username}:${token}@skaas.com\n`;
+  const credLine = `https://${username}:${token}@skills.supply\n`;
 
   // Read existing credentials
   let creds = '';
@@ -203,8 +203,8 @@ function storeCredentialsFile(username: string, token: string): void {
     creds = fs.readFileSync(credentialsPath, 'utf8');
   }
 
-  // Remove any existing skaas.com credential
-  const lines = creds.split('\n').filter(line => !line.includes('skaas.com'));
+  // Remove any existing skills.supply credential
+  const lines = creds.split('\n').filter(line => !line.includes('skills.supply'));
 
   // Add new credential
   lines.push(credLine.trim());
@@ -218,7 +218,7 @@ function storeCredentialsFile(username: string, token: string): void {
 
 ## Other Commands
 
-### `skaas status`
+### `sksup status`
 
 ```typescript
 export async function status(): Promise<void> {
@@ -226,7 +226,7 @@ export async function status(): Promise<void> {
 
   if (!creds) {
     console.log('Not authenticated.');
-    console.log('Run `skaas auth` to authenticate.');
+    console.log('Run `sksup auth` to authenticate.');
     return;
   }
 
@@ -239,7 +239,7 @@ export async function status(): Promise<void> {
 
     if (!response.ok) {
       console.log('Token is invalid or expired.');
-      console.log('Run `skaas auth` to re-authenticate.');
+      console.log('Run `sksup auth` to re-authenticate.');
       return;
     }
 
@@ -256,7 +256,7 @@ function getStoredCredentials(): { username: string; token: string } | null {
   // Use git credential fill to retrieve stored credentials
   try {
     const result = execSync(
-      'echo "protocol=https\nhost=skaas.com\n" | git credential fill',
+      'echo "protocol=https\nhost=skills.supply\n" | git credential fill',
       { encoding: 'utf8' }
     );
 
@@ -284,7 +284,7 @@ function getStoredCredentials(): { username: string; token: string } | null {
 }
 ```
 
-### `skaas logout`
+### `sksup logout`
 
 ```typescript
 export async function logout(): Promise<void> {
@@ -319,13 +319,13 @@ function removeCredentials(): void {
   });
 
   proc.stdin.write(`protocol=https\n`);
-  proc.stdin.write(`host=skaas.com\n`);
+  proc.stdin.write(`host=skills.supply\n`);
   proc.stdin.write(`\n`);
   proc.stdin.end();
 }
 ```
 
-### `skaas whoami`
+### `sksup whoami`
 
 ```typescript
 export async function whoami(): Promise<void> {
@@ -379,10 +379,10 @@ async function main() {
 
 function printHelp(): void {
   console.log(`
-skaas - Skills Supply CLI
+sksup - Skills Supply CLI
 
 Usage:
-  skaas <command>
+  sksup <command>
 
 Commands:
   auth      Authenticate and configure git credentials
@@ -391,9 +391,9 @@ Commands:
   whoami    Show current username
 
 Examples:
-  skaas auth          # Open browser to authenticate
-  skaas status        # Check if logged in
-  skaas logout        # Log out and remove credentials
+  sksup auth          # Open browser to authenticate
+  sksup status        # Check if logged in
+  sksup logout        # Log out and remove credentials
 `);
 }
 
@@ -487,20 +487,20 @@ Written in TypeScript, compiled to standalone binary with Bun:
 
 ```bash
 # Build for all platforms
-bun build --compile --target=bun-darwin-arm64 ./src/cli.ts --outfile=dist/skaas-darwin-arm64
-bun build --compile --target=bun-darwin-x64 ./src/cli.ts --outfile=dist/skaas-darwin-x64
-bun build --compile --target=bun-linux-x64 ./src/cli.ts --outfile=dist/skaas-linux-x64
-bun build --compile --target=bun-windows-x64 ./src/cli.ts --outfile=dist/skaas-windows-x64.exe
+bun build --compile --target=bun-darwin-arm64 ./src/cli.ts --outfile=dist/sksup-darwin-arm64
+bun build --compile --target=bun-darwin-x64 ./src/cli.ts --outfile=dist/sksup-darwin-x64
+bun build --compile --target=bun-linux-x64 ./src/cli.ts --outfile=dist/sksup-linux-x64
+bun build --compile --target=bun-windows-x64 ./src/cli.ts --outfile=dist/sksup-windows-x64.exe
 ```
 
 ### Platform Targets
 
 | Target | Filename |
 |--------|----------|
-| macOS Apple Silicon | `skaas-darwin-arm64` |
-| macOS Intel | `skaas-darwin-x64` |
-| Linux x64 | `skaas-linux-x64` |
-| Windows x64 | `skaas-windows-x64.exe` |
+| macOS Apple Silicon | `sksup-darwin-arm64` |
+| macOS Intel | `sksup-darwin-x64` |
+| Linux x64 | `sksup-linux-x64` |
+| Windows x64 | `sksup-windows-x64.exe` |
 
 ### GitHub Releases
 
@@ -524,24 +524,24 @@ jobs:
 
       - name: Build binaries
         run: |
-          bun build --compile --target=bun-darwin-arm64 ./src/cli.ts --outfile=dist/skaas-darwin-arm64
-          bun build --compile --target=bun-darwin-x64 ./src/cli.ts --outfile=dist/skaas-darwin-x64
-          bun build --compile --target=bun-linux-x64 ./src/cli.ts --outfile=dist/skaas-linux-x64
-          bun build --compile --target=bun-windows-x64 ./src/cli.ts --outfile=dist/skaas-windows-x64.exe
+          bun build --compile --target=bun-darwin-arm64 ./src/cli.ts --outfile=dist/sksup-darwin-arm64
+          bun build --compile --target=bun-darwin-x64 ./src/cli.ts --outfile=dist/sksup-darwin-x64
+          bun build --compile --target=bun-linux-x64 ./src/cli.ts --outfile=dist/sksup-linux-x64
+          bun build --compile --target=bun-windows-x64 ./src/cli.ts --outfile=dist/sksup-windows-x64.exe
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/skaas-darwin-arm64
-            dist/skaas-darwin-x64
-            dist/skaas-linux-x64
-            dist/skaas-windows-x64.exe
+            dist/sksup-darwin-arm64
+            dist/sksup-darwin-x64
+            dist/sksup-linux-x64
+            dist/sksup-windows-x64.exe
 ```
 
 ### Install Script
 
-`https://skaas.com/install.sh`:
+`https://skills.supply/install.sh`:
 
 ```bash
 #!/bin/sh
@@ -567,31 +567,31 @@ case "$OS" in
     ;;
   *)
     echo "Unsupported OS: $OS"
-    echo "For Windows, download from: https://github.com/skills-supply/cli/releases"
+    echo "For Windows, download from: https://github.com/803/skills-supply/releases"
     exit 1
     ;;
 esac
 
 # Get latest release URL
-RELEASE_URL="https://github.com/skills-supply/cli/releases/latest/download/skaas-${TARGET}"
+RELEASE_URL="https://github.com/803/skills-supply/releases/latest/download/sksup-${TARGET}"
 
 # Download and install
-echo "Downloading skaas for ${TARGET}..."
-curl -fsSL "$RELEASE_URL" -o /tmp/skaas
-chmod +x /tmp/skaas
+echo "Downloading sksup for ${TARGET}..."
+curl -fsSL "$RELEASE_URL" -o /tmp/sksup
+chmod +x /tmp/sksup
 
 # Install to /usr/local/bin (may need sudo)
 INSTALL_DIR="/usr/local/bin"
 if [ -w "$INSTALL_DIR" ]; then
-  mv /tmp/skaas "$INSTALL_DIR/skaas"
+  mv /tmp/sksup "$INSTALL_DIR/sksup"
 else
   echo "Installing to $INSTALL_DIR (requires sudo)..."
-  sudo mv /tmp/skaas "$INSTALL_DIR/skaas"
+  sudo mv /tmp/sksup "$INSTALL_DIR/sksup"
 fi
 
-echo "✓ skaas installed successfully!"
+echo "✓ sksup installed successfully!"
 echo ""
-echo "Run 'skaas auth' to get started."
+echo "Run 'sksup auth' to get started."
 ```
 
 ### Homebrew Formula
@@ -599,35 +599,35 @@ echo "Run 'skaas auth' to get started."
 For homebrew-core submission:
 
 ```ruby
-class Skaas < Formula
+class Sksup < Formula
   desc "CLI for Skills Supply - marketplace for Claude Code plugins"
-  homepage "https://skaas.com"
+  homepage "https://skills.supply"
   version "0.1.0"
 
   on_macos do
     on_arm do
-      url "https://github.com/skills-supply/cli/releases/download/v0.1.0/skaas-darwin-arm64"
+      url "https://github.com/803/skills-supply/releases/download/v0.1.0/sksup-darwin-arm64"
       sha256 "..." # SHA256 of darwin-arm64 binary
     end
     on_intel do
-      url "https://github.com/skills-supply/cli/releases/download/v0.1.0/skaas-darwin-x64"
+      url "https://github.com/803/skills-supply/releases/download/v0.1.0/sksup-darwin-x64"
       sha256 "..." # SHA256 of darwin-x64 binary
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/skills-supply/cli/releases/download/v0.1.0/skaas-linux-x64"
+      url "https://github.com/803/skills-supply/releases/download/v0.1.0/sksup-linux-x64"
       sha256 "..." # SHA256 of linux-x64 binary
     end
   end
 
   def install
-    bin.install "skaas-#{OS.mac? ? "darwin" : "linux"}-#{Hardware::CPU.arm? ? "arm64" : "x64"}" => "skaas"
+    bin.install "sksup-#{OS.mac? ? "darwin" : "linux"}-#{Hardware::CPU.arm? ? "arm64" : "x64"}" => "sksup"
   end
 
   test do
-    assert_match "skaas", shell_output("#{bin}/skaas --help")
+    assert_match "sksup", shell_output("#{bin}/sksup --help")
   end
 end
 ```
@@ -663,14 +663,14 @@ packages/cli/
 
 ```json
 {
-  "name": "@skills-supply/cli",
+  "name": "@skills-supply/sksup",
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "skaas": "./dist/cli.js"
+    "sksup": "./dist/cli.js"
   },
   "scripts": {
-    "build": "bun build --compile ./src/cli.ts --outfile=dist/skaas",
+    "build": "bun build --compile ./src/cli.ts --outfile=dist/sksup",
     "build:all": "./scripts/build-all.sh"
   },
   "dependencies": {
@@ -689,11 +689,11 @@ packages/cli/
 
 ### Multiple Accounts
 
-Currently not supported. Running `skaas auth` overwrites the existing credential. Future enhancement: support multiple accounts with `skaas auth --profile work`.
+Currently not supported. Running `sksup auth` overwrites the existing credential. Future enhancement: support multiple accounts with `sksup auth --profile work`.
 
 ### Expired Token
 
-If the stored token is expired, git operations will fail with 401. User should run `skaas auth` again. The server may return a specific error message prompting re-authentication.
+If the stored token is expired, git operations will fail with 401. User should run `sksup auth` again. The server may return a specific error message prompting re-authentication.
 
 ### Concurrent Auth Sessions
 
@@ -711,7 +711,7 @@ On systems without a display (CI, SSH sessions), `open` will fail. The CLI print
 Couldn't open browser automatically.
 Please visit this URL to authenticate:
 
-  https://skaas.com/auth/cli?session=abc123
+  https://skills.supply/auth/cli?session=abc123
 ```
 
 ---
@@ -750,18 +750,18 @@ import { execSync } from 'child_process';
 
 describe('CLI', () => {
   it('shows help with no args', () => {
-    const output = execSync('./dist/skaas', { encoding: 'utf8' });
+    const output = execSync('./dist/sksup', { encoding: 'utf8' });
     expect(output).toContain('Usage:');
     expect(output).toContain('auth');
   });
 
   it('shows help with --help', () => {
-    const output = execSync('./dist/skaas --help', { encoding: 'utf8' });
+    const output = execSync('./dist/sksup --help', { encoding: 'utf8' });
     expect(output).toContain('Usage:');
   });
 
   it('exits with error for unknown command', () => {
-    expect(() => execSync('./dist/skaas unknown')).toThrow();
+    expect(() => execSync('./dist/sksup unknown')).toThrow();
   });
 });
 ```

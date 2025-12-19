@@ -2,7 +2,7 @@
 	"dependencies": {
 		"@ai-sdk/react": "^2.0.117",
 		"@awesome.me/kit-e146ba5a27": "^1.0.2",
-		"@skillsupply/shared": "*",
+		"@skills-supply/shared": "*",
 		"ai": "^5.0.115",
 		"clsx": "^2.1.1",
 		"next": "16.0.10",
@@ -24,7 +24,7 @@
 		"tailwindcss": "^4",
 		"typescript": "^5"
 	},
-	"name": "@skillsupply/web",
+	"name": "@skills-supply/web",
 	"private": true,
 	"scripts": {
 		"build": "next build",

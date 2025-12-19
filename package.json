@@ -19,7 +19,7 @@
 	"engines": {
 		"node": ">=20.0.0"
 	},
-	"name": "@skillsupply",
+	"name": "@skills-supply",
 	"packageManager": "npm@11.7.0",
 	"private": true,
 	"scripts": {

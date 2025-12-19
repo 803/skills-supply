@@ -2,7 +2,7 @@
 
 import faBars from "@fa/utility-semibold/bars.svg?react"
 import faXmark from "@fa/utility-semibold/xmark.svg?react"
-import { FontAwesomeIcon } from "@skillsupply/shared/fontawesome"
+import { FontAwesomeIcon } from "@skills-supply/shared/fontawesome"
 import Link from "next/link"
 import { useState } from "react"
 import { Drawer } from "vaul"

@@ -22,7 +22,7 @@
 		}
 	},
 	"main": "./dist/index.js",
-	"name": "@skillsupply/shared",
+	"name": "@skills-supply/shared",
 	"peerDependencies": {
 		"@tailwindcss/vite": ">=4.0.0",
 		"next": ">=15.0.0",
