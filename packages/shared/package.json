@@ -1,0 +1,40 @@
+{
+	"dependencies": {
+		"clsx": "^2.1.1",
+		"tailwind-merge": "^3.4.0"
+	},
+	"exports": {
+		".": {
+			"default": "./dist/index.js",
+			"types": "./src/index.ts"
+		},
+		"./fontawesome": {
+			"default": "./dist/fontawesome.js",
+			"types": "./src/fontawesome.tsx"
+		},
+		"./next-config-base": {
+			"default": "./dist/next-config-base.js",
+			"types": "./src/next-config-base.ts"
+		},
+		"./utils": {
+			"default": "./dist/utils.js",
+			"types": "./src/utils.ts"
+		}
+	},
+	"main": "./dist/index.js",
+	"name": "@skillsupply/shared",
+	"peerDependencies": {
+		"@tailwindcss/vite": ">=4.0.0",
+		"next": ">=15.0.0",
+		"react": "^19.0.0",
+		"webpack": ">=5.0.0"
+	},
+	"private": true,
+	"scripts": {
+		"build": "tsc --build",
+		"clean": "rm -rf dist"
+	},
+	"type": "module",
+	"types": "./src/index.ts",
+	"version": "0.1.0"
+}

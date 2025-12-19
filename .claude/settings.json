@@ -1,0 +1,13 @@
+{
+	"permissions": {
+		"allow": [
+			"Bash(npx tsc:*)",
+			"Bash(npm run build:*)",
+			"Bash(npm view:*)",
+			"WebSearch",
+			"WebFetch(domain:clerk.com)"
+		],
+		"ask": [],
+		"deny": []
+	}
+}

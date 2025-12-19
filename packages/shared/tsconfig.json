@@ -1,0 +1,12 @@
+{
+	"compilerOptions": {
+		"composite": true,
+		"declaration": true,
+		"declarationMap": true,
+		"noEmit": false,
+		"outDir": "./dist",
+		"rootDir": "./src"
+	},
+	"extends": "../../tsconfig.base.json",
+	"include": ["src/**/*"]
+}

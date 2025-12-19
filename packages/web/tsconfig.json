@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"paths": {
+			"@/*": ["./*"]
+		}
+	},
+	"exclude": ["node_modules", ".next"],
+	"extends": "../../tsconfig.nextjs.json",
+	"include": [
+		"next-env.d.ts",
+		"**/*.ts",
+		"**/*.tsx",
+		".next/types/**/*.ts",
+		".next/dev/types/**/*.ts",
+		"global.d.ts"
+	]
+}
