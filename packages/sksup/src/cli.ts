@@ -1,56 +1,45 @@
 #!/usr/bin/env node
 
-import { auth } from "./commands/auth"
-import { logout } from "./commands/logout"
-import { status } from "./commands/status"
-import { whoami } from "./commands/whoami"
-
-const command = process.argv[2]
+import { cac } from "cac"
+import { auth } from "@/commands/auth"
+import { logout } from "@/commands/logout"
+import { status } from "@/commands/status"
+import { whoami } from "@/commands/whoami"
 
 async function main(): Promise<void> {
-	switch (command) {
-		case "auth":
-			await auth()
-			return
-		case "status":
+	const cli = cac("sksup")
+
+	cli.command("auth", "Authenticate and configure git credentials").action(async () => {
+		await auth()
+	})
+
+	cli.command("status", "Show current auth status and account info").action(
+		async () => {
 			await status()
-			return
-		case "logout":
-			await logout()
-			return
-		case "whoami":
-			await whoami()
-			return
-		case "--help":
-		case "-h":
-		case undefined:
-			printHelp()
-			return
-		default:
-			console.error(`Unknown command: ${command}`)
-			printHelp()
-			process.exit(1)
+		},
+	)
+
+	cli.command("logout", "Remove credentials and deauthorize").action(async () => {
+		await logout()
+	})
+
+	cli.command("whoami", "Show current username").action(async () => {
+		await whoami()
+	})
+
+	cli.on("command:*", () => {
+		const unknown = cli.args.length > 0 ? cli.args.join(" ") : "unknown"
+		console.error(`Unknown command: ${unknown}`)
+		cli.outputHelp()
+		process.exit(1)
+	})
+
+	cli.help()
+	const parsed = cli.parse()
+
+	if (parsed.args.length === 0 && !parsed.options.help && !parsed.options.h) {
+		cli.outputHelp()
 	}
-}
-
-function printHelp(): void {
-	console.log(`
-SKSUP - Skills Supply CLI
-
-Usage:
-  sksup <command>
-
-Commands:
-  auth      Authenticate and configure git credentials
-  status    Show current auth status and account info
-  logout    Remove credentials and deauthorize
-  whoami    Show current username
-
-Examples:
-  sksup auth
-  sksup status
-  sksup logout
-`)
 }
 
 main().catch((error) => {

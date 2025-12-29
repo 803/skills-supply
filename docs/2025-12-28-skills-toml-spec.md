@@ -16,6 +16,52 @@
 
 ---
 
+## Agents
+
+The `[agents]` section declares which AI coding agents sksup should install packages for. All packages are installed to all enabled agents.
+
+```toml
+[agents]
+claude-code = true
+cursor = true
+windsurf = false
+```
+
+### Supported Agents
+
+| Agent | Key | Install Location |
+|-------|-----|------------------|
+| Claude Code | `claude-code` | `~/.claude/skills/` |
+| Cursor | `cursor` | TBD |
+| Windsurf | `windsurf` | TBD |
+
+### Default Behavior
+
+If no `[agents]` section is present, sksup auto-detects installed agents and enables them. Explicit configuration overrides auto-detection.
+
+### Inheritance
+
+Agent settings follow the same merge semantics as packages: all files are merged, and when the same agent key appears in multiple files, the closest (highest-priority) value wins.
+
+```
+~/.sksup/skills.toml:
+    [agents]
+    claude-code = true
+    cursor = true
+
+~/projects/skills.toml:
+    [agents]
+    windsurf = true
+    cursor = false
+
+# Running sksup in ~/projects/:
+# claude-code = true   (inherited from ~/.sksup/)
+# cursor = false       (overridden by ~/projects/)
+# windsurf = true      (added by ~/projects/)
+```
+
+---
+
 ## File Locations & Inheritance
 
 ### Discovery
@@ -219,6 +265,14 @@ A comprehensive `skills.toml` demonstrating all features:
 ```toml
 # skills.toml
 
+# ─────────────────────────────────────────────────────────────
+# Agent configuration
+# ─────────────────────────────────────────────────────────────
+
+[agents]
+claude-code = true
+cursor = true
+
 [packages]
 # ─────────────────────────────────────────────────────────────
 # Registry packages (Skills Supply)
@@ -297,6 +351,10 @@ Projects can override these by defining the same package with a different versio
 
 ## Summary
 
+| Section | Syntax |
+|---------|--------|
+| Enable agent | `[agents]` then `claude-code = true` |
+
 | Source | Syntax |
 |--------|--------|
 | Registry (unscoped) | `name = "^1.0.0"` |
@@ -318,6 +376,7 @@ Projects can override these by defining the same package with a different versio
 
 The following are explicitly out of scope for v1 but may be added later:
 
+- **Per-package agent targeting** — `my-pkg = { version = "^1.0", agents = ["cursor"] }` for packages that should only install to specific agents
 - **Lock file** (`skills.lock`) for reproducible installs
 - **Workspaces** for monorepo support
 - **Private registries** beyond Skills Supply

@@ -25,6 +25,9 @@ typedoc/
 .dev.vars*
 worker-configuration.d.ts
 
+# Bun
+*.bun-build
+
 
 
 
