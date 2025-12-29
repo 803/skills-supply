@@ -1,6 +1,10 @@
+import { type ClassValue, clsx } from "clsx"
 import type { FC, HTMLAttributes, SVGProps } from "react"
+import { twMerge } from "tailwind-merge"
 
-import { cn } from "./utils"
+function cn(...inputs: ClassValue[]) {
+	return twMerge(clsx(inputs))
+}
 
 export function FontAwesomeIcon({
 	icon,
