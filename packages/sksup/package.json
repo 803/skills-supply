@@ -1,0 +1,19 @@
+{
+	"bin": {
+		"sksup": "./dist/cli.js"
+	},
+	"dependencies": {
+		"open": "^10.0.0"
+	},
+	"devDependencies": {
+		"@types/node": "^25"
+	},
+	"name": "@skills-supply/sksup",
+	"private": true,
+	"scripts": {
+		"build": "tsc --build",
+		"clean": "rm -rf dist"
+	},
+	"type": "module",
+	"version": "0.1.0"
+}

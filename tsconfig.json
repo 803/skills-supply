@@ -19,6 +19,15 @@
 		},
 		{
 			"path": "./packages/shared"
+		},
+		{
+			"path": "./packages/database"
+		},
+		{
+			"path": "./packages/api"
+		},
+		{
+			"path": "./packages/sksup"
 		}
 	]
 }
