@@ -34,6 +34,89 @@ export interface LocalPackage {
 
 export type CanonicalPackage = RegistryPackage | GithubPackage | GitPackage | LocalPackage
 
+export interface FetchedPackage {
+	canonical: CanonicalPackage
+	repoPath: string
+	packagePath: string
+}
+
+export interface ManifestPackageDetection {
+	type: "manifest"
+	rootPath: string
+	manifestPath: string
+}
+
+export interface PluginPackageDetection {
+	type: "plugin"
+	rootPath: string
+	pluginPath: string
+}
+
+export interface SubdirPackageDetection {
+	type: "subdir"
+	rootPath: string
+	skillDirs: string[]
+}
+
+export interface SinglePackageDetection {
+	type: "single"
+	rootPath: string
+	skillDir: string
+}
+
+export type DetectedPackage =
+	| ManifestPackageDetection
+	| PluginPackageDetection
+	| SubdirPackageDetection
+	| SinglePackageDetection
+
+export type PackageDetectionErrorType = "invalid_package" | "io_error"
+
+export interface PackageDetectionError {
+	type: PackageDetectionErrorType
+	message: string
+	path: string
+}
+
+export type PackageDetectionResult =
+	| { ok: true; value: DetectedPackage }
+	| { ok: false; error: PackageDetectionError }
+
+export interface Skill {
+	name: string
+	sourcePath: string
+}
+
+export type PackageExtractionErrorType = "invalid_skill" | "io_error"
+
+export interface PackageExtractionError {
+	type: PackageExtractionErrorType
+	message: string
+	path: string
+}
+
+export type PackageExtractionResult =
+	| { ok: true; value: Skill[] }
+	| { ok: false; error: PackageExtractionError }
+
+export type PackageFetchErrorType =
+	| "invalid_source"
+	| "invalid_ref"
+	| "invalid_repo"
+	| "io_error"
+	| "git_error"
+
+export interface PackageFetchError {
+	type: PackageFetchErrorType
+	message: string
+	alias: string
+	source: string
+}
+
+export type PackageFetchResult =
+	| { ok: true; value: FetchedPackage }
+	| { ok: false; error: PackageFetchError }
+
 export type PackageResolutionErrorType =
 	| "invalid_alias"
 	| "invalid_registry_name"

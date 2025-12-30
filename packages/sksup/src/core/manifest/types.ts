@@ -61,3 +61,26 @@ export interface ManifestDiscoveryError {
 export type ManifestDiscoveryResult =
 	| { ok: true; value: string[] }
 	| { ok: false; error: ManifestDiscoveryError }
+
+export interface ManifestPackageEntry {
+	declaration: PackageDeclaration
+	sourcePath: string
+}
+
+export interface MergedManifest {
+	agents: Record<string, boolean>
+	packages: Record<string, ManifestPackageEntry>
+}
+
+export type ManifestMergeErrorType = "alias_conflict" | "invalid_package"
+
+export interface ManifestMergeError {
+	type: ManifestMergeErrorType
+	message: string
+	alias: string
+	sourcePath: string
+}
+
+export type ManifestMergeResult =
+	| { ok: true; value: MergedManifest }
+	| { ok: false; error: ManifestMergeError }
