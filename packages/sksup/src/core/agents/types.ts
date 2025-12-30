@@ -1,3 +1,5 @@
+import type { CanonicalPackage, Skill } from "@/core/packages/types"
+
 export type AgentId = "claude-code" | "codex" | "opencode"
 
 export interface AgentDefinition {
@@ -27,3 +29,33 @@ export type AgentLookupResult =
 export type AgentListResult =
 	| { ok: true; value: AgentDefinition[] }
 	| { ok: false; error: AgentRegistryError }
+
+export interface InstallablePackage {
+	canonical: CanonicalPackage
+	prefix: string
+	skills: Skill[]
+}
+
+export interface InstalledSkill {
+	agentId: AgentId
+	name: string
+	sourcePath: string
+	targetPath: string
+}
+
+export type AgentInstallErrorType =
+	| "invalid_input"
+	| "invalid_target"
+	| "conflict"
+	| "io_error"
+
+export interface AgentInstallError {
+	type: AgentInstallErrorType
+	message: string
+	agentId: AgentId
+	path?: string
+}
+
+export type AgentInstallResult =
+	| { ok: true; value: InstalledSkill[] }
+	| { ok: false; error: AgentInstallError }

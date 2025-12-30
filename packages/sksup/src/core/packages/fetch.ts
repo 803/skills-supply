@@ -22,6 +22,10 @@ type SlugResult =
 	| { ok: true; value: { owner: string; repo: string } }
 	| { ok: false; error: PackageFetchError }
 
+type SparsePathResult =
+	| { ok: true; value?: string }
+	| { ok: false; error: PackageFetchError }
+
 export async function fetchGithubPackage(
 	canonical: GithubPackage,
 ): Promise<PackageFetchResult> {
@@ -31,6 +35,12 @@ export async function fetchGithubPackage(
 	if (!parsed.ok) {
 		return parsed
 	}
+
+	const sparsePathResult = resolveSparsePath(canonical.path, alias, source)
+	if (!sparsePathResult.ok) {
+		return sparsePathResult
+	}
+	const sparsePath = sparsePathResult.value
 
 	try {
 		ensureGitAvailable()
@@ -43,12 +53,13 @@ export async function fetchGithubPackage(
 		)
 	}
 
-	const repoDir = path.join(
+	const baseRepoDir = path.join(
 		CACHE_ROOT,
 		"github.com",
 		parsed.value.owner,
 		parsed.value.repo,
 	)
+	const repoDir = sparsePath ? buildSparseRepoDir(baseRepoDir, sparsePath) : baseRepoDir
 	const repoParent = path.dirname(repoDir)
 	const remoteUrl = `https://github.com/${parsed.value.owner}/${parsed.value.repo}.git`
 
@@ -59,12 +70,13 @@ export async function fetchGithubPackage(
 		canonical.ref,
 		alias,
 		source,
+		sparsePath,
 	)
 	if (!syncResult.ok) {
 		return syncResult
 	}
 
-	const packagePath = canonical.path ? path.join(repoDir, canonical.path) : repoDir
+	const packagePath = sparsePath ? joinRepoPath(repoDir, sparsePath) : repoDir
 
 	return {
 		ok: true,
@@ -86,6 +98,12 @@ export async function fetchGitPackage(
 		return repoDirResult
 	}
 
+	const sparsePathResult = resolveSparsePath(canonical.path, alias, source)
+	if (!sparsePathResult.ok) {
+		return sparsePathResult
+	}
+	const sparsePath = sparsePathResult.value
+
 	try {
 		ensureGitAvailable()
 	} catch (error) {
@@ -97,7 +115,8 @@ export async function fetchGitPackage(
 		)
 	}
 
-	const repoDir = repoDirResult.value
+	const baseRepoDir = repoDirResult.value
+	const repoDir = sparsePath ? buildSparseRepoDir(baseRepoDir, sparsePath) : baseRepoDir
 	const repoParent = path.dirname(repoDir)
 	const syncResult = await syncRepository(
 		canonical.url,
@@ -106,12 +125,13 @@ export async function fetchGitPackage(
 		canonical.ref,
 		alias,
 		source,
+		sparsePath,
 	)
 	if (!syncResult.ok) {
 		return syncResult
 	}
 
-	const packagePath = canonical.path ? path.join(repoDir, canonical.path) : repoDir
+	const packagePath = sparsePath ? joinRepoPath(repoDir, sparsePath) : repoDir
 
 	return {
 		ok: true,
@@ -168,6 +188,7 @@ async function syncRepository(
 	ref: GitRef | undefined,
 	alias: string,
 	source: string,
+	sparsePath?: string,
 ): Promise<ActionResult> {
 	const ensureDirResult = await ensureDir(repoParent, alias, source)
 	if (!ensureDirResult.ok) {
@@ -180,7 +201,13 @@ async function syncRepository(
 	}
 
 	if (repoStatus.value === "missing") {
-		const cloneResult = await runGit(["clone", remoteUrl, repoDir], alias, source)
+		const cloneArgs = ["clone"]
+		if (sparsePath) {
+			cloneArgs.push("--filter=blob:none", "--sparse")
+		}
+		cloneArgs.push(remoteUrl, repoDir)
+
+		const cloneResult = await runGit(cloneArgs, alias, source)
 		if (!cloneResult.ok) {
 			return cloneResult
 		}
@@ -195,7 +222,16 @@ async function syncRepository(
 		}
 	}
 
-	return checkoutRef(repoDir, ref, alias, source)
+	const checkoutResult = await checkoutRef(repoDir, ref, alias, source)
+	if (!checkoutResult.ok) {
+		return checkoutResult
+	}
+
+	if (sparsePath) {
+		return ensureSparseCheckout(repoDir, sparsePath, alias, source)
+	}
+
+	return { ok: true }
 }
 
 function buildCachePathFromUrl(
@@ -225,6 +261,51 @@ function buildCachePathFromUrl(
 			source,
 		)
 	}
+}
+
+function buildSparseRepoDir(baseRepoDir: string, sparsePath: string): string {
+	return path.join(baseRepoDir, "sparse", encodeSparsePath(sparsePath))
+}
+
+function resolveSparsePath(
+	value: string | undefined,
+	alias: string,
+	source: string,
+): SparsePathResult {
+	if (value === undefined) {
+		return { ok: true, value: undefined }
+	}
+
+	const trimmed = value.trim()
+	if (!trimmed) {
+		return failure("invalid_source", "Package path cannot be empty.", alias, source)
+	}
+
+	const cleaned = trimmed.replace(/\\/g, "/")
+	if (cleaned.startsWith("/")) {
+		return failure("invalid_source", "Package path must be relative.", alias, source)
+	}
+
+	const segments = cleaned.split("/")
+	if (segments.some((segment) => segment === "..")) {
+		return failure(
+			"invalid_source",
+			"Package path must not escape the repository.",
+			alias,
+			source,
+		)
+	}
+
+	const normalized = path.posix.normalize(cleaned).replace(/^\.\/+/, "")
+	if (!normalized || normalized === ".") {
+		return { ok: true, value: undefined }
+	}
+
+	return { ok: true, value: normalized }
+}
+
+function joinRepoPath(repoDir: string, sparsePath: string): string {
+	return path.join(repoDir, ...sparsePath.split("/"))
 }
 
 async function checkoutRef(
@@ -286,6 +367,32 @@ async function checkoutBranch(
 	}
 
 	return runGit(["-C", repoDir, "reset", "--hard", `origin/${branch}`], alias, source)
+}
+
+async function ensureSparseCheckout(
+	repoDir: string,
+	sparsePath: string,
+	alias: string,
+	source: string,
+): Promise<ActionResult> {
+	const initResult = await runGit(
+		["-C", repoDir, "sparse-checkout", "init", "--cone"],
+		alias,
+		source,
+	)
+	if (!initResult.ok) {
+		return initResult
+	}
+
+	return runGit(["-C", repoDir, "sparse-checkout", "set", sparsePath], alias, source)
+}
+
+function encodeSparsePath(input: string): string {
+	return Buffer.from(input, "utf8")
+		.toString("base64")
+		.replace(/\+/g, "-")
+		.replace(/\//g, "_")
+		.replace(/=+$/, "")
 }
 
 async function resolveDefaultBranch(

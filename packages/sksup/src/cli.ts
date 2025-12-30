@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { cac } from "cac"
+import { agentAdd } from "@/commands/agent/add"
+import { agentRemove } from "@/commands/agent/remove"
 import { auth } from "@/commands/auth"
 import { logout } from "@/commands/logout"
 import { status } from "@/commands/status"
@@ -11,6 +13,14 @@ async function main(): Promise<void> {
 
 	cli.command("auth", "Authenticate and configure git credentials").action(async () => {
 		await auth()
+	})
+
+	cli.command("agent add <name>", "Enable an agent").action(async (name) => {
+		await agentAdd(name)
+	})
+
+	cli.command("agent remove <name>", "Disable an agent").action(async (name) => {
+		await agentRemove(name)
 	})
 
 	cli.command("status", "Show current auth status and account info").action(
