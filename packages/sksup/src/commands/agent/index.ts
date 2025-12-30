@@ -103,7 +103,7 @@ async function loadManifestForUpdate() {
 		}
 
 		const shouldCreate = await confirm({
-			message: "skills.toml not found. Create it?",
+			message: "package.toml not found. Create it?",
 		})
 		if (isCancel(shouldCreate) || !shouldCreate) {
 			throw new Error("Canceled.")

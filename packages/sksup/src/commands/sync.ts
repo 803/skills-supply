@@ -20,7 +20,9 @@ export async function syncCommand(options: { dryRun: boolean }): Promise<void> {
 
 		action.stop(options.dryRun ? "Plan complete." : "Sync complete.")
 		log.info(`Found ${result.value.manifests} manifest(s).`)
-		log.info(`Resolved ${result.value.packages} package(s).`)
+		log.info(
+			`Resolved ${result.value.dependencies} dependenc${result.value.dependencies === 1 ? "y" : "ies"}.`,
+		)
 		log.info(`Enabled agents: ${result.value.agents.join(", ")}`)
 
 		const installVerb = options.dryRun ? "Would install" : "Installed"

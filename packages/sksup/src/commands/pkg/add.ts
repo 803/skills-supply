@@ -7,7 +7,7 @@ import {
 } from "@/commands/manifest"
 import type { AddOptions } from "@/commands/pkg/spec"
 import { buildPackageSpec } from "@/commands/pkg/spec"
-import type { PackageDeclaration } from "@/core/manifest/types"
+import type { DependencyDeclaration } from "@/core/manifest/types"
 import { formatError } from "@/utils/errors"
 
 export async function pkgAdd(
@@ -18,37 +18,37 @@ export async function pkgAdd(
 	intro("sksup pkg add")
 
 	const action = spinner()
-	action.start("Updating packages...")
+	action.start("Updating dependencies...")
 
 	try {
 		const pkgSpec = buildPackageSpec(type, spec, options)
 		const manifestResult = await loadManifestForUpdate()
 
-		const current = manifestResult.manifest.packages[pkgSpec.alias]
+		const current = manifestResult.manifest.dependencies[pkgSpec.alias]
 		const changed = !areDeclarationsEqual(current, pkgSpec.declaration)
 
 		if (changed) {
-			manifestResult.manifest.packages[pkgSpec.alias] = pkgSpec.declaration
+			manifestResult.manifest.dependencies[pkgSpec.alias] = pkgSpec.declaration
 			await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
 		}
 
-		action.stop("Package settings updated.")
+		action.stop("Dependency settings updated.")
 		if (manifestResult.created) {
 			log.info(`Created ${manifestResult.manifestPath}.`)
 		}
 
 		if (!changed) {
-			log.info(`Package already present: ${pkgSpec.alias}.`)
+			log.info(`Dependency already present: ${pkgSpec.alias}.`)
 			note(`Manifest: ${manifestResult.manifestPath}`, "No changes")
 			outro("Done.")
 			return
 		}
 
-		log.success(`Added package: ${pkgSpec.alias}.`)
+		log.success(`Added dependency: ${pkgSpec.alias}.`)
 		note(`Manifest: ${manifestResult.manifestPath}`, "Updated")
 		outro("Done.")
 	} catch (error) {
-		action.stop("Failed to update packages.")
+		action.stop("Failed to update dependencies.")
 		process.exitCode = 1
 		log.error(formatError(error))
 		outro("Package update failed.")
@@ -64,7 +64,7 @@ async function loadManifestForUpdate(): Promise<ManifestLoadResult> {
 		}
 
 		const shouldCreate = await confirm({
-			message: "skills.toml not found. Create it?",
+			message: "package.toml not found. Create it?",
 		})
 		if (isCancel(shouldCreate) || !shouldCreate) {
 			throw new Error("Canceled.")
@@ -75,8 +75,8 @@ async function loadManifestForUpdate(): Promise<ManifestLoadResult> {
 }
 
 function areDeclarationsEqual(
-	current: PackageDeclaration | undefined,
-	next: PackageDeclaration,
+	current: DependencyDeclaration | undefined,
+	next: DependencyDeclaration,
 ): boolean {
 	if (current === undefined) {
 		return false

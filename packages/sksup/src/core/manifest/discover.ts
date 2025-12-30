@@ -6,7 +6,7 @@ import type {
 	ManifestDiscoveryResult,
 } from "@/core/manifest/types"
 
-const MANIFEST_FILENAME = "skills.toml"
+const MANIFEST_FILENAME = "package.toml"
 const USER_MANIFEST_DIR = ".sksup"
 
 type FileExistsResult =

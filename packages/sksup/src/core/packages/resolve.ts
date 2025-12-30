@@ -1,13 +1,15 @@
 import path from "node:path"
 import type {
+	ClaudePluginDeclaration,
+	DependencyDeclaration,
 	GithubPackageDeclaration,
 	GitPackageDeclaration,
 	LocalPackageDeclaration,
 	Manifest,
-	PackageDeclaration,
 } from "@/core/manifest/types"
 import type {
 	CanonicalPackage,
+	ClaudePluginPackage,
 	GitPackage,
 	GitRef,
 	PackageResolutionError,
@@ -30,7 +32,7 @@ export function resolveManifestPackages(
 ): ResolveManifestPackagesResult {
 	const resolved: CanonicalPackage[] = []
 
-	for (const [alias, declaration] of Object.entries(manifest.packages)) {
+	for (const [alias, declaration] of Object.entries(manifest.dependencies)) {
 		const result = resolvePackageDeclaration(alias, declaration, manifest.sourcePath)
 		if (!result.ok) {
 			return result
@@ -44,7 +46,7 @@ export function resolveManifestPackages(
 
 export function resolvePackageDeclaration(
 	alias: string,
-	declaration: PackageDeclaration,
+	declaration: DependencyDeclaration,
 	sourcePath: string,
 ): PackageResolutionResult {
 	if (!alias.trim()) {
@@ -70,6 +72,10 @@ export function resolvePackageDeclaration(
 
 	if ("path" in declaration) {
 		return resolveLocal(alias, declaration, sourcePath)
+	}
+
+	if ("type" in declaration && declaration.type === "claude-plugin") {
+		return resolveClaudePlugin(alias, declaration, sourcePath)
 	}
 
 	return failure(
@@ -228,6 +234,42 @@ function resolveGit(
 		ref: ref.value,
 		type: "git",
 		url,
+	}
+
+	return { ok: true, value }
+}
+
+function resolveClaudePlugin(
+	alias: string,
+	declaration: ClaudePluginDeclaration,
+	sourcePath: string,
+): PackageResolutionResult {
+	const plugin = declaration.plugin.trim()
+	if (!plugin) {
+		return failure(
+			"invalid_value",
+			`Package "${alias}" plugin name cannot be empty.`,
+			alias,
+			sourcePath,
+		)
+	}
+
+	const marketplace = declaration.marketplace.trim()
+	if (!marketplace) {
+		return failure(
+			"invalid_value",
+			`Package "${alias}" marketplace cannot be empty.`,
+			alias,
+			sourcePath,
+		)
+	}
+
+	const value: ClaudePluginPackage = {
+		alias,
+		marketplace,
+		plugin,
+		sourcePath,
+		type: "claude-plugin",
 	}
 
 	return { ok: true, value }

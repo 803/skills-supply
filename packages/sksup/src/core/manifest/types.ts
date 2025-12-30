@@ -20,24 +20,44 @@ export interface LocalPackageDeclaration {
 	path: string
 }
 
-export type PackageDeclaration =
+export interface ClaudePluginDeclaration {
+	type: "claude-plugin"
+	plugin: string
+	marketplace: string
+}
+
+export type DependencyDeclaration =
 	| RegistryPackageDeclaration
 	| GithubPackageDeclaration
 	| GitPackageDeclaration
 	| LocalPackageDeclaration
+	| ClaudePluginDeclaration
+
+export interface PackageMetadata {
+	name: string
+	version: string
+	description?: string
+	license?: string
+	org?: string
+}
+
+export interface ManifestExportsAutoDiscover {
+	skills: string | false
+}
+
+export interface ManifestExports {
+	autoDiscover: ManifestExportsAutoDiscover
+}
 
 export interface Manifest {
+	package?: PackageMetadata
 	agents: Record<string, boolean>
-	packages: Record<string, PackageDeclaration>
+	dependencies: Record<string, DependencyDeclaration>
+	exports?: ManifestExports
 	sourcePath: string
 }
 
-export type ManifestParseErrorType =
-	| "invalid_toml"
-	| "invalid_root"
-	| "invalid_agents"
-	| "invalid_packages"
-	| "invalid_package"
+export type ManifestParseErrorType = "invalid_toml" | "invalid_manifest"
 
 export interface ManifestParseError {
 	type: ManifestParseErrorType
@@ -62,17 +82,17 @@ export type ManifestDiscoveryResult =
 	| { ok: true; value: string[] }
 	| { ok: false; error: ManifestDiscoveryError }
 
-export interface ManifestPackageEntry {
-	declaration: PackageDeclaration
+export interface ManifestDependencyEntry {
+	declaration: DependencyDeclaration
 	sourcePath: string
 }
 
 export interface MergedManifest {
 	agents: Record<string, boolean>
-	packages: Record<string, ManifestPackageEntry>
+	dependencies: Record<string, ManifestDependencyEntry>
 }
 
-export type ManifestMergeErrorType = "alias_conflict" | "invalid_package"
+export type ManifestMergeErrorType = "alias_conflict" | "invalid_dependency"
 
 export interface ManifestMergeError {
 	type: ManifestMergeErrorType

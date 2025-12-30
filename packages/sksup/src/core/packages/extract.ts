@@ -1,5 +1,7 @@
-import { readFile } from "node:fs/promises"
+import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
+import { parseManifest } from "@/core/manifest/parse"
+import type { Manifest } from "@/core/manifest/types"
 import type {
 	DetectedPackage,
 	PackageExtractionError,
@@ -8,6 +10,7 @@ import type {
 } from "@/core/packages/types"
 
 const SKILL_FILENAME = "SKILL.md"
+const PLUGIN_SKILLS_DIR = "skills"
 
 type SkillResult =
 	| { ok: true; value: Skill }
@@ -15,28 +18,134 @@ type SkillResult =
 type SkillNameResult =
 	| { ok: true; value: string }
 	| { ok: false; error: PackageExtractionError }
+type SkillDirResult =
+	| { ok: true; value: string[] }
+	| { ok: false; error: PackageExtractionError }
 
 export async function extractSkills(
 	detected: DetectedPackage,
 ): Promise<PackageExtractionResult> {
 	switch (detected.type) {
 		case "manifest":
-			return failure(
-				"invalid_skill",
-				"Package skills.toml manifests are not supported yet.",
-				detected.manifestPath,
-			)
+			return extractFromManifest(detected.manifestPath)
 		case "plugin":
-			return failure(
-				"invalid_skill",
-				"Claude plugin packages are not supported yet.",
-				detected.pluginPath,
-			)
+			return extractFromPlugin(detected.rootPath)
 		case "single":
 			return buildSkillList([detected.skillDir])
 		case "subdir":
 			return buildSkillList(detected.skillDirs)
 	}
+}
+
+async function extractFromManifest(
+	manifestPath: string,
+): Promise<PackageExtractionResult> {
+	let contents: string
+
+	try {
+		contents = await readFile(manifestPath, "utf8")
+	} catch (error) {
+		return failure(
+			"io_error",
+			formatErrorMessage(error, `Unable to read ${manifestPath}.`),
+			manifestPath,
+		)
+	}
+
+	const parsed = parseManifest(contents, manifestPath)
+	if (!parsed.ok) {
+		return failure("invalid_skill", parsed.error.message, manifestPath)
+	}
+
+	const skillsSetting = resolveAutoDiscoverSkills(parsed.value)
+	if (skillsSetting === false) {
+		return failure(
+			"invalid_skill",
+			"Skill auto-discovery is disabled in package.toml.",
+			manifestPath,
+		)
+	}
+
+	const skillsRoot = path.resolve(path.dirname(manifestPath), skillsSetting)
+	const skillDirs = await discoverSkillDirs(skillsRoot)
+	if (!skillDirs.ok) {
+		return skillDirs
+	}
+
+	return buildSkillList(skillDirs.value)
+}
+
+async function extractFromPlugin(rootPath: string): Promise<PackageExtractionResult> {
+	const skillsRoot = path.join(rootPath, PLUGIN_SKILLS_DIR)
+	const skillDirs = await discoverSkillDirs(skillsRoot)
+	if (!skillDirs.ok) {
+		return skillDirs
+	}
+
+	return buildSkillList(skillDirs.value)
+}
+
+function resolveAutoDiscoverSkills(manifest: Manifest): string | false {
+	const value = manifest.exports?.autoDiscover.skills
+	if (value === false) {
+		return false
+	}
+
+	if (typeof value === "string") {
+		return value
+	}
+
+	return "./skills"
+}
+
+async function discoverSkillDirs(rootDir: string): Promise<SkillDirResult> {
+	const stats = await safeStat(rootDir)
+	if (!stats.ok) {
+		return stats
+	}
+
+	if (!stats.value) {
+		return failure("invalid_skill", `Skills directory not found: ${rootDir}`, rootDir)
+	}
+
+	if (!stats.value.isDirectory()) {
+		return failure("invalid_skill", `Expected directory at ${rootDir}.`, rootDir)
+	}
+
+	let entries: Awaited<ReturnType<typeof readdir>>
+	try {
+		entries = await readdir(rootDir, { encoding: "utf8", withFileTypes: true })
+	} catch (error) {
+		return failure(
+			"io_error",
+			formatErrorMessage(error, `Unable to read ${rootDir}.`),
+			rootDir,
+		)
+	}
+
+	const skillDirs: string[] = []
+	for (const entry of entries) {
+		if (!entry.isDirectory()) {
+			continue
+		}
+
+		const skillDir = path.join(rootDir, entry.name)
+		const skillFile = path.join(skillDir, SKILL_FILENAME)
+		const exists = await fileExists(skillFile)
+		if (!exists.ok) {
+			return exists
+		}
+
+		if (exists.value) {
+			skillDirs.push(skillDir)
+		}
+	}
+
+	if (skillDirs.length === 0) {
+		return failure("invalid_skill", `No skills found in ${rootDir}.`, rootDir)
+	}
+
+	return { ok: true, value: skillDirs }
 }
 
 async function buildSkillList(skillDirs: string[]): Promise<PackageExtractionResult> {
@@ -190,6 +299,57 @@ function formatErrorMessage(error: unknown, fallback: string): string {
 	}
 
 	return fallback
+}
+
+type StatResult =
+	| { ok: true; value: Awaited<ReturnType<typeof stat>> | null }
+	| { ok: false; error: PackageExtractionError }
+
+type ExistsResult =
+	| { ok: true; value: boolean }
+	| { ok: false; error: PackageExtractionError }
+
+async function safeStat(targetPath: string): Promise<StatResult> {
+	try {
+		const stats = await stat(targetPath)
+		return { ok: true, value: stats }
+	} catch (error) {
+		if (isNotFound(error)) {
+			return { ok: true, value: null }
+		}
+
+		return failure(
+			"io_error",
+			formatErrorMessage(error, `Unable to access ${targetPath}.`),
+			targetPath,
+		)
+	}
+}
+
+async function fileExists(targetPath: string): Promise<ExistsResult> {
+	const stats = await safeStat(targetPath)
+	if (!stats.ok) {
+		return stats
+	}
+
+	if (!stats.value) {
+		return { ok: true, value: false }
+	}
+
+	if (!stats.value.isFile()) {
+		return failure("invalid_skill", `Expected file at ${targetPath}.`, targetPath)
+	}
+
+	return { ok: true, value: true }
+}
+
+function isNotFound(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		(error as { code?: string }).code === "ENOENT"
+	)
 }
 
 function failure(

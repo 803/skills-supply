@@ -133,30 +133,30 @@ async function handleAdd(): Promise<void> {
 
 	const manifestResult = await loadManifestForUpdate()
 	const pkgSpec = buildPackageSpec(type, spec, options)
-	if (pkgSpec.alias in manifestResult.manifest.packages) {
+	if (pkgSpec.alias in manifestResult.manifest.dependencies) {
 		const overwrite = await confirm({
-			message: `Package ${pkgSpec.alias} already exists. Overwrite it?`,
+			message: `Dependency ${pkgSpec.alias} already exists. Overwrite it?`,
 		})
 		if (isCancel(overwrite) || !overwrite) {
 			log.info("No changes made.")
 			return
 		}
 	}
-	manifestResult.manifest.packages[pkgSpec.alias] = pkgSpec.declaration
+	manifestResult.manifest.dependencies[pkgSpec.alias] = pkgSpec.declaration
 	await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
 	log.success(`Updated ${manifestResult.manifestPath}.`)
 }
 
 async function handleRemove(): Promise<void> {
 	const manifestResult = await loadManifestFromCwd({ createIfMissing: false })
-	const aliases = Object.keys(manifestResult.manifest.packages).sort()
+	const aliases = Object.keys(manifestResult.manifest.dependencies).sort()
 	if (aliases.length === 0) {
-		log.info("No packages to remove.")
+		log.info("No dependencies to remove.")
 		return
 	}
 
 	const choice = await select({
-		message: "Select a package to remove",
+		message: "Select a dependency to remove",
 		options: aliases.map((alias) => ({ label: alias, value: alias })),
 	})
 
@@ -164,9 +164,9 @@ async function handleRemove(): Promise<void> {
 		throw new Error("Canceled.")
 	}
 
-	delete manifestResult.manifest.packages[choice]
+	delete manifestResult.manifest.dependencies[choice]
 	await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
-	log.success(`Removed package: ${choice}.`)
+	log.success(`Removed dependency: ${choice}.`)
 }
 
 async function loadManifestForUpdate() {
@@ -178,7 +178,7 @@ async function loadManifestForUpdate() {
 		}
 
 		const shouldCreate = await confirm({
-			message: "skills.toml not found. Create it?",
+			message: "package.toml not found. Create it?",
 		})
 		if (isCancel(shouldCreate) || !shouldCreate) {
 			throw new Error("Canceled.")

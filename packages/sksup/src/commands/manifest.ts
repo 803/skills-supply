@@ -20,7 +20,7 @@ export class ManifestNotFoundError extends Error {
 export async function loadManifestFromCwd(options: {
 	createIfMissing: boolean
 }): Promise<ManifestLoadResult> {
-	const manifestPath = path.join(process.cwd(), "skills.toml")
+	const manifestPath = path.join(process.cwd(), "package.toml")
 	let manifest: Manifest
 	let created = false
 
@@ -36,13 +36,13 @@ export async function loadManifestFromCwd(options: {
 		if (isNotFound(error)) {
 			if (!options.createIfMissing) {
 				throw new ManifestNotFoundError(
-					"skills.toml not found in the current directory.",
+					"package.toml not found in the current directory.",
 				)
 			}
 
 			manifest = {
 				agents: {},
-				packages: {},
+				dependencies: {},
 				sourcePath: manifestPath,
 			}
 			created = true

@@ -3,7 +3,7 @@ import { readdir, stat } from "node:fs/promises"
 import path from "node:path"
 import type { PackageDetectionError, PackageDetectionResult } from "@/core/packages/types"
 
-const MANIFEST_FILENAME = "skills.toml"
+const MANIFEST_FILENAME = "package.toml"
 const SKILL_FILENAME = "SKILL.md"
 const PLUGIN_DIR = ".claude-plugin"
 const PLUGIN_FILENAME = "plugin.json"
@@ -81,11 +81,14 @@ export async function detectPackageType(
 			)
 		}
 
-		return failure(
-			"invalid_package",
-			"Claude plugin packages are not supported yet.",
-			pluginPath,
-		)
+		return {
+			ok: true,
+			value: {
+				pluginPath,
+				rootPath,
+				type: "plugin",
+			},
+		}
 	}
 
 	const subdirSkills = await detectSubdirSkills(rootPath)
@@ -123,7 +126,7 @@ export async function detectPackageType(
 
 	return failure(
 		"invalid_package",
-		"No skills.toml, plugin.json, or SKILL.md found in package.",
+		"No package.toml, plugin.json, or SKILL.md found in package.",
 		rootPath,
 	)
 }

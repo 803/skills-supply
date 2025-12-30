@@ -26,7 +26,7 @@ export type SyncResult<T> = { ok: true; value: T } | { ok: false; error: SyncErr
 export interface ResolvedManifest {
 	manifests: Manifest[]
 	merged: MergedManifest
-	packages: CanonicalPackage[]
+	dependencies: CanonicalPackage[]
 	agents: AgentDefinition[]
 }
 
@@ -41,7 +41,7 @@ export interface SyncSummary {
 	dryRun: boolean
 	installed: number
 	manifests: number
-	packages: number
+	dependencies: number
 	removed: number
 	warnings: string[]
 }

@@ -90,15 +90,13 @@ review = { type = "claude-plugin", plugin = "review", marketplace = "github:owne
 ```
 
 Semantics:
-- `marketplace` is any Claude marketplace source spec string.
+- `marketplace` is any Claude marketplace source spec string (GitHub slug, git URL, local path, or marketplace URL).
 - `plugin` is the Claude plugin name.
 - `review` is the local alias used for display and mapping.
 
 Install behavior:
-- Target agent `claude-code`: use Claude native `/plugin marketplace add` + `/plugin install` with the marketplace source spec and plugin name.
-- Target agent non-Claude: resolve the plugin source from the marketplace, require `.claude-plugin/plugin.json`, and scan `./skills` at the plugin root. Ignore commands/hooks/agents in v1.
-
-Assumption: marketplace name for Claude Code installs is derived from the dependency alias (e.g., `sksup-review`) and bound to the provided marketplace source. If the existing name maps to a different source, error loudly. This keeps v1 simple without adding more manifest fields.
+- Target agent `claude-code`: run `/plugin marketplace add <marketplace-spec>` and `/plugin install <plugin>@<marketplace-name>`, where `<marketplace-name>` comes from the marketplace’s `marketplace.json`.
+- Target agent non-Claude: resolve the plugin source from the marketplace’s `marketplace.json` (`source` string for relative paths, or `{ source = "github" | "url", ... }` for remote sources), respect `metadata.pluginRoot` for relative paths, require `.claude-plugin/plugin.json`, and scan `./skills` at the plugin root. Ignore commands/hooks/agents in v1.
 
 ## Validation with Zod
 
@@ -134,4 +132,3 @@ Zod transforms the parsed TOML into internal data models; downstream logic only 
 - Commands/hooks/agents exports.
 - Plugin marketplace overrides (custom skills path).
 - Transitive dependency resolution.
-

@@ -32,7 +32,20 @@ export interface LocalPackage {
 	alias: string
 }
 
-export type CanonicalPackage = RegistryPackage | GithubPackage | GitPackage | LocalPackage
+export interface ClaudePluginPackage {
+	type: "claude-plugin"
+	alias: string
+	plugin: string
+	marketplace: string
+	sourcePath: string
+}
+
+export type CanonicalPackage =
+	| RegistryPackage
+	| GithubPackage
+	| GitPackage
+	| LocalPackage
+	| ClaudePluginPackage
 
 export interface FetchedPackage {
 	canonical: CanonicalPackage

@@ -1,9 +1,9 @@
 import type {
+	DependencyDeclaration,
 	Manifest,
+	ManifestDependencyEntry,
 	ManifestMergeError,
 	ManifestMergeResult,
-	ManifestPackageEntry,
-	PackageDeclaration,
 } from "@/core/manifest/types"
 import { resolvePackageDeclaration } from "@/core/packages/resolve"
 import type { CanonicalPackage } from "@/core/packages/types"
@@ -14,7 +14,7 @@ type DedupeKeyResult =
 
 export function mergeManifests(manifests: Manifest[]): ManifestMergeResult {
 	const mergedAgents: Record<string, boolean> = {}
-	const mergedPackages: Record<string, ManifestPackageEntry> = {}
+	const mergedDependencies: Record<string, ManifestDependencyEntry> = {}
 	const aliasToDedupe = new Map<string, string>()
 	const aliasSources = new Map<string, string>()
 	const dedupeToAlias = new Map<string, string>()
@@ -26,7 +26,7 @@ export function mergeManifests(manifests: Manifest[]): ManifestMergeResult {
 			}
 		}
 
-		for (const [alias, declaration] of Object.entries(manifest.packages)) {
+		for (const [alias, declaration] of Object.entries(manifest.dependencies)) {
 			const dedupeResult = buildDedupeKey(alias, declaration, manifest.sourcePath)
 			if (!dedupeResult.ok) {
 				return dedupeResult
@@ -39,7 +39,7 @@ export function mergeManifests(manifests: Manifest[]): ManifestMergeResult {
 					const existingSource = aliasSources.get(alias) ?? "unknown"
 					return failure(
 						"alias_conflict",
-						`Alias "${alias}" refers to different packages (first: ${existingSource}, next: ${manifest.sourcePath}).`,
+						`Alias "${alias}" refers to different dependencies (first: ${existingSource}, next: ${manifest.sourcePath}).`,
 						alias,
 						manifest.sourcePath,
 					)
@@ -55,7 +55,7 @@ export function mergeManifests(manifests: Manifest[]): ManifestMergeResult {
 			aliasToDedupe.set(alias, dedupeKey)
 			aliasSources.set(alias, manifest.sourcePath)
 			dedupeToAlias.set(dedupeKey, alias)
-			mergedPackages[alias] = {
+			mergedDependencies[alias] = {
 				declaration,
 				sourcePath: manifest.sourcePath,
 			}
@@ -66,19 +66,19 @@ export function mergeManifests(manifests: Manifest[]): ManifestMergeResult {
 		ok: true,
 		value: {
 			agents: mergedAgents,
-			packages: mergedPackages,
+			dependencies: mergedDependencies,
 		},
 	}
 }
 
 function buildDedupeKey(
 	alias: string,
-	declaration: PackageDeclaration,
+	declaration: DependencyDeclaration,
 	sourcePath: string,
 ): DedupeKeyResult {
 	const resolved = resolvePackageDeclaration(alias, declaration, sourcePath)
 	if (!resolved.ok) {
-		return failure("invalid_package", resolved.error.message, alias, sourcePath)
+		return failure("invalid_dependency", resolved.error.message, alias, sourcePath)
 	}
 
 	return { ok: true, value: dedupeKeyFromCanonical(resolved.value) }
@@ -96,6 +96,8 @@ function dedupeKeyFromCanonical(canonical: CanonicalPackage): string {
 			return ["git", canonical.normalizedUrl, canonical.path ?? ""].join("|")
 		case "local":
 			return ["local", canonical.absolutePath].join("|")
+		case "claude-plugin":
+			return ["claude-plugin", canonical.marketplace, canonical.plugin].join("|")
 	}
 }
 

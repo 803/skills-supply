@@ -1,9 +1,9 @@
 import path from "node:path"
 import type {
+	DependencyDeclaration,
 	GithubPackageDeclaration,
 	GitPackageDeclaration,
 	LocalPackageDeclaration,
-	PackageDeclaration,
 } from "@/core/manifest/types"
 
 export interface AddOptions {
@@ -16,7 +16,7 @@ export interface AddOptions {
 
 export interface PackageSpec {
 	alias: string
-	declaration: PackageDeclaration
+	declaration: DependencyDeclaration
 }
 
 export function buildPackageSpec(
@@ -43,6 +43,38 @@ export function buildPackageSpec(
 	const subPath = resolveSubPath(options)
 
 	switch (normalizedType) {
+		case "claude-plugin":
+		case "claude":
+		case "plugin": {
+			if (ref || options.path) {
+				throw new Error(
+					"--tag/--branch/--rev/--path are not valid for Claude plugins.",
+				)
+			}
+
+			const atIndex = trimmedSpec.indexOf("@")
+			if (atIndex <= 0 || atIndex === trimmedSpec.length - 1) {
+				throw new Error(
+					'Claude plugin specs must be in the form "<plugin>@<marketplace>".',
+				)
+			}
+
+			const plugin = trimmedSpec.slice(0, atIndex).trim()
+			const marketplace = trimmedSpec.slice(atIndex + 1).trim()
+			if (!plugin || !marketplace) {
+				throw new Error(
+					'Claude plugin specs must be in the form "<plugin>@<marketplace>".',
+				)
+			}
+
+			const alias = aliasOverride ?? plugin
+			const declaration = {
+				marketplace,
+				plugin,
+				type: "claude-plugin" as const,
+			}
+			return { alias, declaration }
+		}
 		case "gh":
 		case "github": {
 			const alias = aliasOverride ?? deriveAliasFromGithub(trimmedSpec)

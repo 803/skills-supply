@@ -6,7 +6,8 @@
 		"@clack/prompts": "^0.7.0",
 		"cac": "^6.7.14",
 		"open": "^11.0.0",
-		"smol-toml": "^1.6.0"
+		"smol-toml": "^1.6.0",
+		"zod": "^3.25.76"
 	},
 	"devDependencies": {
 		"@types/node": "^25"

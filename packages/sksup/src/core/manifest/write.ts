@@ -1,42 +1,59 @@
 import { stringify } from "smol-toml"
 import type {
+	ClaudePluginDeclaration,
+	DependencyDeclaration,
 	GithubPackageDeclaration,
 	GitPackageDeclaration,
 	LocalPackageDeclaration,
 	Manifest,
-	PackageDeclaration,
 } from "@/core/manifest/types"
 
 export function serializeManifest(manifest: Manifest): string {
 	const output: Record<string, unknown> = {}
 
+	if (manifest.package) {
+		output.package = manifest.package
+	}
+
 	if (Object.keys(manifest.agents).length > 0) {
 		output.agents = manifest.agents
 	}
 
-	if (Object.keys(manifest.packages).length > 0) {
-		output.packages = serializePackages(manifest.packages)
+	if (Object.keys(manifest.dependencies).length > 0) {
+		output.dependencies = serializeDependencies(manifest.dependencies)
+	}
+
+	if (manifest.exports) {
+		output.exports = {
+			auto_discover: {
+				skills: manifest.exports.autoDiscover.skills,
+			},
+		}
 	}
 
 	const toml = stringify(output)
 	return toml.endsWith("\n") ? toml : `${toml}\n`
 }
 
-function serializePackages(
-	packages: Record<string, PackageDeclaration>,
+function serializeDependencies(
+	dependencies: Record<string, DependencyDeclaration>,
 ): Record<string, unknown> {
 	const output: Record<string, unknown> = {}
 
-	for (const [alias, declaration] of Object.entries(packages)) {
-		output[alias] = serializePackageDeclaration(declaration)
+	for (const [alias, declaration] of Object.entries(dependencies)) {
+		output[alias] = serializeDependencyDeclaration(declaration)
 	}
 
 	return output
 }
 
-function serializePackageDeclaration(declaration: PackageDeclaration): unknown {
+function serializeDependencyDeclaration(declaration: DependencyDeclaration): unknown {
 	if (typeof declaration === "string") {
 		return declaration
+	}
+
+	if ("type" in declaration && declaration.type === "claude-plugin") {
+		return serializeClaudePlugin(declaration)
 	}
 
 	if ("gh" in declaration) {
@@ -64,6 +81,16 @@ function serializeLocalPackage(
 	declaration: LocalPackageDeclaration,
 ): Record<string, string> {
 	return { path: declaration.path }
+}
+
+function serializeClaudePlugin(
+	declaration: ClaudePluginDeclaration,
+): Record<string, string> {
+	return {
+		marketplace: declaration.marketplace,
+		plugin: declaration.plugin,
+		type: declaration.type,
+	}
 }
 
 function serializeRefPackage(
