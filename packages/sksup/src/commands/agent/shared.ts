@@ -1,11 +1,7 @@
-import { readFile, writeFile } from "node:fs/promises"
-import path from "node:path"
 import { intro, log, note, outro, spinner } from "@clack/prompts"
+import { loadManifestFromCwd, saveManifest } from "@/commands/manifest"
 import { getAgentById } from "@/core/agents/registry"
 import type { AgentDefinition } from "@/core/agents/types"
-import { parseManifest } from "@/core/manifest/parse"
-import type { Manifest } from "@/core/manifest/types"
-import { serializeManifest } from "@/core/manifest/write"
 import { formatError } from "@/utils/errors"
 
 type AgentAction = "enable" | "disable"
@@ -65,42 +61,15 @@ async function updateAgentManifest(
 		throw new Error(lookup.error.message)
 	}
 
-	const manifestPath = path.join(process.cwd(), "skills.toml")
 	const desired = action === "enable"
-	let manifest: Manifest
-	let created = false
-
-	try {
-		const contents = await readFile(manifestPath, "utf8")
-		const parsed = parseManifest(contents, manifestPath)
-		if (!parsed.ok) {
-			throw new Error(parsed.error.message)
-		}
-
-		manifest = parsed.value
-	} catch (error) {
-		if (isNotFound(error)) {
-			if (!desired) {
-				throw new Error("skills.toml not found in the current directory.")
-			}
-
-			manifest = {
-				agents: {},
-				packages: {},
-				sourcePath: manifestPath,
-			}
-			created = true
-		} else {
-			throw error
-		}
-	}
+	const manifestResult = await loadManifestFromCwd({ createIfMissing: desired })
+	const { manifest, created, manifestPath } = manifestResult
 
 	const currentValue = manifest.agents[lookup.value.id]
 	const changed = currentValue !== desired
 	if (changed) {
 		manifest.agents[lookup.value.id] = desired
-		const serialized = serializeManifest(manifest)
-		await writeFile(manifestPath, serialized, "utf8")
+		await saveManifest(manifest, manifestPath)
 	}
 
 	return {
@@ -110,13 +79,4 @@ async function updateAgentManifest(
 		created,
 		manifestPath,
 	}
-}
-
-function isNotFound(error: unknown): boolean {
-	return (
-		typeof error === "object" &&
-		error !== null &&
-		"code" in error &&
-		(error as { code?: string }).code === "ENOENT"
-	)
 }

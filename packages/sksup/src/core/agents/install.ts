@@ -10,16 +10,27 @@ import type {
 
 type InstallMode = "copy" | "symlink"
 
-interface InstallTask {
+export interface InstallTask {
 	agentId: AgentDefinition["id"]
 	sourcePath: string
+	targetName: string
 	targetPath: string
 	skillName: string
 	mode: InstallMode
 }
 
+export interface AgentInstallPlan {
+	agentId: AgentDefinition["id"]
+	basePath: string
+	tasks: InstallTask[]
+}
+
+export interface InstallGuard {
+	trackedPaths: Set<string>
+}
+
 type PlanResult =
-	| { ok: true; value: { basePath: string; tasks: InstallTask[] } }
+	| { ok: true; value: AgentInstallPlan }
 	| { ok: false; error: AgentInstallError }
 
 type StatResult =
@@ -33,41 +44,54 @@ type LStatResult =
 export async function installPackagesForAgent(
 	agent: AgentDefinition,
 	packages: InstallablePackage[],
+	guard?: InstallGuard,
 ): Promise<AgentInstallResult> {
-	const planResult = buildPlan(agent, packages)
+	const planResult = planAgentInstall(agent, packages)
 	if (!planResult.ok) {
 		return planResult
 	}
 
-	const { basePath, tasks } = planResult.value
-	const baseReady = await ensureDirectory(basePath, agent.id)
+	return applyAgentInstall(planResult.value, guard)
+}
+
+export async function applyAgentInstall(
+	plan: AgentInstallPlan,
+	guard?: InstallGuard,
+): Promise<AgentInstallResult> {
+	const { basePath, tasks } = plan
+	const baseReady = await ensureDirectory(basePath, plan.agentId)
 	if (!baseReady.ok) {
 		return baseReady
+	}
+
+	const preflight = await validateTargets(tasks, plan.agentId, guard)
+	if (!preflight.ok) {
+		return preflight
 	}
 
 	const installed: InstalledSkill[] = []
 
 	for (const task of tasks) {
-		const sourceReady = await ensureExistingDirectory(task.sourcePath, agent.id)
+		const sourceReady = await ensureExistingDirectory(task.sourcePath, plan.agentId)
 		if (!sourceReady.ok) {
 			return sourceReady
 		}
 
-		const removeResult = await removeTarget(task.targetPath, agent.id)
-		if (!removeResult.ok) {
-			return removeResult
+		const targetReady = await prepareTarget(task.targetPath, plan.agentId, guard)
+		if (!targetReady.ok) {
+			return targetReady
 		}
 
 		const installResult =
 			task.mode === "symlink"
-				? await createSymlink(task.sourcePath, task.targetPath, agent.id)
-				: await copyDirectory(task.sourcePath, task.targetPath, agent.id)
+				? await createSymlink(task.sourcePath, task.targetPath, plan.agentId)
+				: await copyDirectory(task.sourcePath, task.targetPath, plan.agentId)
 		if (!installResult.ok) {
 			return installResult
 		}
 
 		installed.push({
-			agentId: agent.id,
+			agentId: plan.agentId,
 			name: task.skillName,
 			sourcePath: task.sourcePath,
 			targetPath: task.targetPath,
@@ -77,7 +101,19 @@ export async function installPackagesForAgent(
 	return { ok: true, value: installed }
 }
 
-function buildPlan(agent: AgentDefinition, packages: InstallablePackage[]): PlanResult {
+export function buildInstalledSkills(plan: AgentInstallPlan): InstalledSkill[] {
+	return plan.tasks.map((task) => ({
+		agentId: plan.agentId,
+		name: task.skillName,
+		sourcePath: task.sourcePath,
+		targetPath: task.targetPath,
+	}))
+}
+
+export function planAgentInstall(
+	agent: AgentDefinition,
+	packages: InstallablePackage[],
+): PlanResult {
 	const basePath = path.resolve(agent.skillsPath)
 	if (!basePath.trim()) {
 		return failure(
@@ -140,12 +176,13 @@ function buildPlan(agent: AgentDefinition, packages: InstallablePackage[]): Plan
 				mode,
 				skillName: skillResult.value,
 				sourcePath: skill.sourcePath,
+				targetName,
 				targetPath,
 			})
 		}
 	}
 
-	return { ok: true, value: { basePath: baseNormalized, tasks } }
+	return { ok: true, value: { agentId: agent.id, basePath: baseNormalized, tasks } }
 }
 
 function normalizeSegment(
@@ -246,9 +283,10 @@ async function ensureExistingDirectory(
 	return { ok: true }
 }
 
-async function removeTarget(
+async function prepareTarget(
 	targetPath: string,
 	agentId: AgentDefinition["id"],
+	guard?: InstallGuard,
 ): Promise<{ ok: true } | { ok: false; error: AgentInstallError }> {
 	const stats = await safeLstat(targetPath, agentId)
 	if (!stats.ok) {
@@ -259,6 +297,50 @@ async function removeTarget(
 		return { ok: true }
 	}
 
+	if (!guard || !guard.trackedPaths.has(targetPath)) {
+		return failure(
+			"conflict",
+			`Target path already exists: ${targetPath}`,
+			agentId,
+			targetPath,
+		)
+	}
+
+	return removeTarget(targetPath, agentId)
+}
+
+async function validateTargets(
+	tasks: InstallTask[],
+	agentId: AgentDefinition["id"],
+	guard?: InstallGuard,
+): Promise<{ ok: true } | { ok: false; error: AgentInstallError }> {
+	for (const task of tasks) {
+		const stats = await safeLstat(task.targetPath, agentId)
+		if (!stats.ok) {
+			return stats
+		}
+
+		if (!stats.value) {
+			continue
+		}
+
+		if (!guard || !guard.trackedPaths.has(task.targetPath)) {
+			return failure(
+				"conflict",
+				`Target path already exists: ${task.targetPath}`,
+				agentId,
+				task.targetPath,
+			)
+		}
+	}
+
+	return { ok: true }
+}
+
+async function removeTarget(
+	targetPath: string,
+	agentId: AgentDefinition["id"],
+): Promise<{ ok: true } | { ok: false; error: AgentInstallError }> {
 	try {
 		await rm(targetPath, { force: true, recursive: true })
 		return { ok: true }

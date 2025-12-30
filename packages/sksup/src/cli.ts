@@ -2,10 +2,15 @@
 
 import { cac } from "cac"
 import { agentAdd } from "@/commands/agent/add"
+import { agentInteractive } from "@/commands/agent/index"
 import { agentRemove } from "@/commands/agent/remove"
 import { auth } from "@/commands/auth"
 import { logout } from "@/commands/logout"
+import { pkgAdd } from "@/commands/pkg/add"
+import { pkgInteractive } from "@/commands/pkg/index"
+import { pkgRemove } from "@/commands/pkg/remove"
 import { status } from "@/commands/status"
+import { syncCommand } from "@/commands/sync"
 import { whoami } from "@/commands/whoami"
 
 async function main(): Promise<void> {
@@ -13,6 +18,42 @@ async function main(): Promise<void> {
 
 	cli.command("auth", "Authenticate and configure git credentials").action(async () => {
 		await auth()
+	})
+
+	cli.command("sync", "Sync skills across agents")
+		.option("--dry-run", "Plan changes without modifying files")
+		.action(async (options) => {
+			await syncCommand({ dryRun: Boolean(options.dryRun) })
+		})
+
+	cli.command("pkg", "Manage packages interactively").action(async () => {
+		await pkgInteractive()
+	})
+
+	cli.command("pkg add <type> <spec>", "Add a package to skills.toml")
+		.option("--tag <tag>", "Use a specific git tag")
+		.option("--branch <branch>", "Use a specific git branch")
+		.option("--rev <rev>", "Use a specific git commit")
+		.option("--path <path>", "Use a subdirectory inside the repository")
+		.option("--as <alias>", "Override the package alias")
+		.action(async (type, spec, options) => {
+			await pkgAdd(type, spec, {
+				as: options.as,
+				branch: options.branch,
+				path: options.path,
+				rev: options.rev,
+				tag: options.tag,
+			})
+		})
+
+	cli.command("pkg remove <alias>", "Remove a package from skills.toml").action(
+		async (alias) => {
+			await pkgRemove(alias)
+		},
+	)
+
+	cli.command("agent", "Manage agents interactively").action(async () => {
+		await agentInteractive()
 	})
 
 	cli.command("agent add <name>", "Enable an agent").action(async (name) => {
