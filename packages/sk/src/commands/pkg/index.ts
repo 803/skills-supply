@@ -1,4 +1,5 @@
-import { confirm, intro, isCancel, log, outro, select, text } from "@clack/prompts"
+import { confirm, isCancel, select, text } from "@clack/prompts"
+import { consola } from "consola"
 import {
 	isManifestNotFoundError,
 	loadManifestFromCwd,
@@ -9,7 +10,7 @@ import { buildPackageSpec } from "@/commands/pkg/spec"
 import { formatError } from "@/utils/errors"
 
 export async function pkgInteractive(): Promise<void> {
-	intro("sksup pkg")
+	consola.info("sk pkg")
 
 	try {
 		const action = await select({
@@ -22,22 +23,22 @@ export async function pkgInteractive(): Promise<void> {
 		})
 
 		if (isCancel(action) || action === "exit") {
-			outro("Canceled.")
+			consola.info("Canceled.")
 			return
 		}
 
 		if (action === "add") {
 			await handleAdd()
-			outro("Done.")
+			consola.success("Done.")
 			return
 		}
 
 		await handleRemove()
-		outro("Done.")
+		consola.success("Done.")
 	} catch (error) {
 		process.exitCode = 1
-		log.error(formatError(error))
-		outro("Package update failed.")
+		consola.error(formatError(error))
+		consola.error("Package update failed.")
 	}
 }
 
@@ -138,20 +139,20 @@ async function handleAdd(): Promise<void> {
 			message: `Dependency ${pkgSpec.alias} already exists. Overwrite it?`,
 		})
 		if (isCancel(overwrite) || !overwrite) {
-			log.info("No changes made.")
+			consola.info("No changes made.")
 			return
 		}
 	}
 	manifestResult.manifest.dependencies[pkgSpec.alias] = pkgSpec.declaration
 	await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
-	log.success(`Updated ${manifestResult.manifestPath}.`)
+	consola.success(`Updated ${manifestResult.manifestPath}.`)
 }
 
 async function handleRemove(): Promise<void> {
 	const manifestResult = await loadManifestFromCwd({ createIfMissing: false })
 	const aliases = Object.keys(manifestResult.manifest.dependencies).sort()
 	if (aliases.length === 0) {
-		log.info("No dependencies to remove.")
+		consola.info("No dependencies to remove.")
 		return
 	}
 
@@ -166,7 +167,7 @@ async function handleRemove(): Promise<void> {
 
 	delete manifestResult.manifest.dependencies[choice]
 	await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
-	log.success(`Removed dependency: ${choice}.`)
+	consola.success(`Removed dependency: ${choice}.`)
 }
 
 async function loadManifestForUpdate() {

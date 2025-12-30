@@ -419,7 +419,7 @@ async function syncAgent(
 
 async function createTempRoot(agentId: string): Promise<SyncResult<string>> {
 	try {
-		const prefix = path.join(tmpdir(), `sksup-${agentId}-`)
+		const prefix = path.join(tmpdir(), `sk-${agentId}-`)
 		const tempRoot = await mkdtemp(prefix)
 		return { ok: true, value: tempRoot }
 	} catch (error) {
@@ -1392,7 +1392,7 @@ async function preflightTargets(
 			return failSync(
 				"install",
 				new Error(
-					`Skill target already exists and is not managed by sksup: ${task.targetName}`,
+					`Skill target already exists and is not managed by sk: ${task.targetName}`,
 				),
 			)
 		}

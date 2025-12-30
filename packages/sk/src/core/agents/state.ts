@@ -9,7 +9,7 @@ export interface AgentInstallState {
 	updatedAt: string
 }
 
-const STATE_FILENAME = ".sksup-state.json"
+const STATE_FILENAME = ".sk-state.json"
 const STATE_VERSION = 1
 
 type StateResult = IoResult<AgentInstallState | null>

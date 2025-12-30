@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process"
+import { consola } from "consola"
 
 export function getCredentialHelper(): string {
 	switch (process.platform) {
@@ -23,7 +24,7 @@ function resolveWindowsHelper(): string {
 		execSync("git credential-manager-core --version", { stdio: "ignore" })
 		return "manager-core"
 	} catch {
-		console.warn(
+		consola.warn(
 			"Git Credential Manager not found; falling back to plaintext credential store.",
 		)
 		return "store"

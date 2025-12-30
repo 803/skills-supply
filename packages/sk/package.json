@@ -1,10 +1,11 @@
 {
 	"bin": {
-		"sksup": "./dist/cli.js"
+		"sk": "./dist/cli.js"
 	},
 	"dependencies": {
 		"@clack/prompts": "^0.7.0",
-		"cac": "^6.7.14",
+		"commander": "^14.0.2",
+		"consola": "^3.4.2",
 		"open": "^11.0.0",
 		"smol-toml": "^1.6.0",
 		"zod": "^3.25.76"
@@ -12,11 +13,11 @@
 	"devDependencies": {
 		"@types/node": "^25"
 	},
-	"name": "@skills-supply/sksup",
+	"name": "@skills-supply/sk",
 	"private": true,
 	"scripts": {
 		"build": "bun build ./src/cli.ts --outdir ./dist --target node",
-		"bundle": "bun build ./src/cli.ts --compile --outfile ./bin/sksup",
+		"bundle": "bun build ./src/cli.ts --compile --outfile ./bin/sk",
 		"clean": "rm -rf dist bin"
 	},
 	"type": "module",

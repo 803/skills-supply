@@ -1,7 +1,7 @@
-import { intro, log, note, outro, spinner } from "@clack/prompts"
+import { consola } from "consola"
 import { configureCredentialHelper } from "@/credentials/helper"
 import { storeCredentials } from "@/credentials/store"
-import { SKSUP_BASE_URL } from "@/env"
+import { SK_BASE_URL } from "@/env"
 import { openBrowser } from "@/utils/browser"
 import { formatError } from "@/utils/errors"
 import { fetchWithRetry } from "@/utils/fetch"
@@ -35,43 +35,40 @@ interface AuthState {
 }
 
 export async function auth(): Promise<void> {
-	intro("sksup auth")
+	consola.info("sk auth")
 
 	try {
 		ensureGitAvailable()
 	} catch (error) {
 		process.exitCode = 1
-		log.error(formatError(error))
-		outro("Authentication failed.")
+		consola.error(formatError(error))
+		consola.error("Authentication failed.")
 		return
 	}
 
-	const sessionSpinner = spinner()
-	sessionSpinner.start("Starting authentication...")
+	consola.start("Starting authentication...")
 
 	let state: AuthState = { phase: "starting" }
 	try {
 		const session = await createDeviceSession()
 		state = { phase: "waiting", session }
-		sessionSpinner.stop("Device session created.")
+		consola.success("Device session created.")
 	} catch (error) {
-		sessionSpinner.stop("Failed to start authentication.")
 		process.exitCode = 1
-		log.error(formatError(error))
-		outro("Authentication failed.")
+		consola.error(formatError(error))
+		consola.error("Authentication failed.")
 		return
 	}
 
 	if (!state.session) {
 		process.exitCode = 1
-		log.error("Authentication session missing.")
-		outro("Authentication failed.")
+		consola.error("Authentication session missing.")
+		consola.error("Authentication failed.")
 		return
 	}
 
-	note(
-		`Code: ${state.session.user_code}\nOpen: ${state.session.verification_url}`,
-		"Authenticate",
+	consola.info(
+		`Authenticate\nCode: ${state.session.user_code}\nOpen: ${state.session.verification_url}`,
 	)
 
 	let opened = false
@@ -82,11 +79,10 @@ export async function auth(): Promise<void> {
 	}
 
 	if (!opened) {
-		log.warn("Couldn't open browser automatically.")
+		consola.warn("Couldn't open browser automatically.")
 	}
 
-	const authSpinner = spinner()
-	authSpinner.start("Waiting for authentication...")
+	consola.start("Waiting for authentication...")
 
 	let tokenResult: Required<TokenResponse> | null = null
 	try {
@@ -95,35 +91,32 @@ export async function auth(): Promise<void> {
 			state.session.interval,
 		)
 	} catch (error) {
-		authSpinner.stop("Authentication failed.")
 		process.exitCode = 1
-		log.error(formatError(error))
-		outro("Authentication failed.")
+		consola.error(formatError(error))
+		consola.error("Authentication failed.")
 		return
 	}
 
 	if (!tokenResult) {
-		authSpinner.stop("Authentication timed out.")
 		process.exitCode = 1
-		log.error("Authentication timed out.")
-		outro("Authentication failed.")
+		consola.error("Authentication timed out.")
+		consola.error("Authentication failed.")
 		return
 	}
 
-	authSpinner.stop("Authentication complete.")
-	configureCredentialHelper(SKSUP_BASE_URL)
-	storeCredentials(SKSUP_BASE_URL, tokenResult.user_id, tokenResult.token)
+	consola.success("Authentication complete.")
+	configureCredentialHelper(SK_BASE_URL)
+	storeCredentials(SK_BASE_URL, tokenResult.user_id, tokenResult.token)
 
-	log.success(`Authenticated as ${tokenResult.email}`)
-	note(
-		`Add your marketplace to Claude Code:\n  /plugin marketplace add ${SKSUP_BASE_URL}/me/marketplace`,
-		"Next steps",
+	consola.success(`Authenticated as ${tokenResult.email}`)
+	consola.info(
+		`Next steps\nAdd your marketplace to Claude Code:\n  /plugin marketplace add ${SK_BASE_URL}/me/marketplace`,
 	)
-	outro("Done.")
+	consola.success("Done.")
 }
 
 async function createDeviceSession(): Promise<DeviceSessionResponse> {
-	const response = await fetchWithRetry(`${SKSUP_BASE_URL}/auth/cli`, {
+	const response = await fetchWithRetry(`${SK_BASE_URL}/auth/cli`, {
 		method: "POST",
 	})
 
@@ -147,7 +140,7 @@ async function pollForToken(
 
 		let response: Response
 		try {
-			response = await fetchWithRetry(`${SKSUP_BASE_URL}/auth/cli/token`, {
+			response = await fetchWithRetry(`${SK_BASE_URL}/auth/cli/token`, {
 				body: JSON.stringify({ device_code: deviceCode }),
 				headers: { "Content-Type": "application/json" },
 				method: "POST",

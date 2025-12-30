@@ -1,12 +1,10 @@
-import { intro, log, note, outro, spinner } from "@clack/prompts"
+import { consola } from "consola"
 import { loadManifestFromCwd, saveManifest } from "@/commands/manifest"
 import { formatError } from "@/utils/errors"
 
 export async function pkgRemove(alias: string): Promise<void> {
-	intro("sksup pkg remove")
-
-	const action = spinner()
-	action.start("Updating dependencies...")
+	consola.info("sk pkg remove")
+	consola.start("Updating dependencies...")
 
 	try {
 		const trimmed = alias.trim()
@@ -22,14 +20,13 @@ export async function pkgRemove(alias: string): Promise<void> {
 		delete manifestResult.manifest.dependencies[trimmed]
 		await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
 
-		action.stop("Dependency settings updated.")
-		log.success(`Removed dependency: ${trimmed}.`)
-		note(`Manifest: ${manifestResult.manifestPath}`, "Updated")
-		outro("Done.")
+		consola.success("Dependency settings updated.")
+		consola.success(`Removed dependency: ${trimmed}.`)
+		consola.info(`Manifest: ${manifestResult.manifestPath} (updated).`)
+		consola.success("Done.")
 	} catch (error) {
-		action.stop("Failed to update dependencies.")
 		process.exitCode = 1
-		log.error(formatError(error))
-		outro("Package update failed.")
+		consola.error(formatError(error))
+		consola.error("Package update failed.")
 	}
 }

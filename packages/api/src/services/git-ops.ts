@@ -29,7 +29,7 @@ export async function addCommit(
 	files: FileMap,
 	parentSha: string | null,
 ): Promise<void> {
-	const worktree = await fs.mkdtemp(path.join(tmpdir(), "sksup-worktree-"))
+	const worktree = await fs.mkdtemp(path.join(tmpdir(), "sk-worktree-"))
 	try {
 		await writeFiles(worktree, files)
 

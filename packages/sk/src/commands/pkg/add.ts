@@ -1,4 +1,5 @@
-import { confirm, intro, isCancel, log, note, outro, spinner } from "@clack/prompts"
+import { confirm, isCancel } from "@clack/prompts"
+import { consola } from "consola"
 import {
 	isManifestNotFoundError,
 	loadManifestFromCwd,
@@ -15,10 +16,8 @@ export async function pkgAdd(
 	spec: string,
 	options: AddOptions,
 ): Promise<void> {
-	intro("sksup pkg add")
-
-	const action = spinner()
-	action.start("Updating dependencies...")
+	consola.info("sk pkg add")
+	consola.start("Updating dependencies...")
 
 	try {
 		const pkgSpec = buildPackageSpec(type, spec, options)
@@ -32,26 +31,25 @@ export async function pkgAdd(
 			await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
 		}
 
-		action.stop("Dependency settings updated.")
+		consola.success("Dependency settings updated.")
 		if (manifestResult.created) {
-			log.info(`Created ${manifestResult.manifestPath}.`)
+			consola.info(`Created ${manifestResult.manifestPath}.`)
 		}
 
 		if (!changed) {
-			log.info(`Dependency already present: ${pkgSpec.alias}.`)
-			note(`Manifest: ${manifestResult.manifestPath}`, "No changes")
-			outro("Done.")
+			consola.info(`Dependency already present: ${pkgSpec.alias}.`)
+			consola.info(`Manifest: ${manifestResult.manifestPath} (no changes).`)
+			consola.success("Done.")
 			return
 		}
 
-		log.success(`Added dependency: ${pkgSpec.alias}.`)
-		note(`Manifest: ${manifestResult.manifestPath}`, "Updated")
-		outro("Done.")
+		consola.success(`Added dependency: ${pkgSpec.alias}.`)
+		consola.info(`Manifest: ${manifestResult.manifestPath} (updated).`)
+		consola.success("Done.")
 	} catch (error) {
-		action.stop("Failed to update dependencies.")
 		process.exitCode = 1
-		log.error(formatError(error))
-		outro("Package update failed.")
+		consola.error(formatError(error))
+		consola.error("Package update failed.")
 	}
 }
 

@@ -182,7 +182,7 @@ async function clonePurchasedRepo(plugin: Plugin): Promise<ResolvedRepo> {
 	}
 
 	await fs.mkdir(env.REPO_CACHE_DIR, { recursive: true })
-	const tempDir = await fs.mkdtemp(path.join(env.REPO_CACHE_DIR, "sksup-clone-"))
+	const tempDir = await fs.mkdtemp(path.join(env.REPO_CACHE_DIR, "sk-clone-"))
 	const repoPath = path.join(tempDir, "repo.git")
 
 	try {

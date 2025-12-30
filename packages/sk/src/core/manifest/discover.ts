@@ -7,7 +7,7 @@ import type {
 } from "@/core/manifest/types"
 
 const MANIFEST_FILENAME = "package.toml"
-const USER_MANIFEST_DIR = ".sksup"
+const USER_MANIFEST_DIR = ".sk"
 
 type FileExistsResult =
 	| { ok: true; value: boolean }

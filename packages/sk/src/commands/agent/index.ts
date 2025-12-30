@@ -1,13 +1,5 @@
-import {
-	confirm,
-	intro,
-	isCancel,
-	log,
-	multiselect,
-	note,
-	outro,
-	spinner,
-} from "@clack/prompts"
+import { confirm, isCancel, multiselect } from "@clack/prompts"
+import { consola } from "consola"
 import {
 	isManifestNotFoundError,
 	loadManifestFromCwd,
@@ -17,13 +9,12 @@ import { listAgents } from "@/core/agents/registry"
 import { formatError } from "@/utils/errors"
 
 export async function agentInteractive(): Promise<void> {
-	intro("sksup agent")
+	consola.info("sk agent")
 
 	try {
 		const manifestResult = await loadManifestForUpdate()
 		const agents = listAgents()
-		const detection = spinner()
-		detection.start("Detecting installed agents...")
+		consola.start("Detecting installed agents...")
 
 		const installed = []
 		for (const agent of agents) {
@@ -37,11 +28,11 @@ export async function agentInteractive(): Promise<void> {
 			}
 		}
 
-		detection.stop("Agent detection complete.")
+		consola.success("Agent detection complete.")
 
 		if (installed.length === 0) {
-			log.info("No installed agents detected.")
-			outro("Nothing to update.")
+			consola.info("No installed agents detected.")
+			consola.info("Nothing to update.")
 			return
 		}
 		const enabled = new Set(
@@ -62,7 +53,7 @@ export async function agentInteractive(): Promise<void> {
 		})
 
 		if (isCancel(selected)) {
-			outro("Canceled.")
+			consola.info("Canceled.")
 			return
 		}
 
@@ -77,20 +68,20 @@ export async function agentInteractive(): Promise<void> {
 		}
 
 		if (!changed) {
-			log.info("No agent changes needed.")
-			note(`Manifest: ${manifestResult.manifestPath}`, "No changes")
-			outro("Done.")
+			consola.info("No agent changes needed.")
+			consola.info(`Manifest: ${manifestResult.manifestPath} (no changes).`)
+			consola.success("Done.")
 			return
 		}
 
 		await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
-		log.success("Updated agent selections.")
-		note(`Manifest: ${manifestResult.manifestPath}`, "Updated")
-		outro("Done.")
+		consola.success("Updated agent selections.")
+		consola.info(`Manifest: ${manifestResult.manifestPath} (updated).`)
+		consola.success("Done.")
 	} catch (error) {
 		process.exitCode = 1
-		log.error(formatError(error))
-		outro("Agent update failed.")
+		consola.error(formatError(error))
+		consola.error("Agent update failed.")
 	}
 }
 

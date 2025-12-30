@@ -1,4 +1,4 @@
-import { intro, log, note, outro, spinner } from "@clack/prompts"
+import { consola } from "consola"
 import { loadManifestFromCwd, saveManifest } from "@/commands/manifest"
 import { getAgentById } from "@/core/agents/registry"
 import type { AgentDefinition } from "@/core/agents/types"
@@ -18,37 +18,34 @@ export async function runAgentUpdate(
 	agentId: string,
 	action: AgentAction,
 ): Promise<void> {
-	intro(`sksup agent ${action === "enable" ? "add" : "remove"}`)
-
-	const actionSpinner = spinner()
-	actionSpinner.start("Updating agents...")
+	consola.info(`sk agent ${action === "enable" ? "add" : "remove"}`)
+	consola.start("Updating agents...")
 
 	try {
 		const result = await updateAgentManifest(agentId, action)
-		actionSpinner.stop("Agent settings updated.")
+		consola.success("Agent settings updated.")
 
 		if (result.created) {
-			log.info(`Created ${result.manifestPath}.`)
+			consola.info(`Created ${result.manifestPath}.`)
 		}
 
 		const agentLabel = `${result.agent.displayName} (${result.agent.id})`
 
 		if (!result.changed) {
-			log.info(`Agent already ${result.action}d: ${agentLabel}.`)
-			note(`Manifest: ${result.manifestPath}`, "No changes")
-			outro("Done.")
+			consola.info(`Agent already ${result.action}d: ${agentLabel}.`)
+			consola.info(`Manifest: ${result.manifestPath} (no changes).`)
+			consola.success("Done.")
 			return
 		}
 
 		const actionLabel = result.action === "enable" ? "Enabled" : "Disabled"
-		log.success(`${actionLabel} agent: ${agentLabel}.`)
-		note(`Manifest: ${result.manifestPath}`, "Updated")
-		outro("Done.")
+		consola.success(`${actionLabel} agent: ${agentLabel}.`)
+		consola.info(`Manifest: ${result.manifestPath} (updated).`)
+		consola.success("Done.")
 	} catch (error) {
-		actionSpinner.stop("Failed to update agents.")
 		process.exitCode = 1
-		log.error(formatError(error))
-		outro("Agent update failed.")
+		consola.error(formatError(error))
+		consola.error("Agent update failed.")
 	}
 }
 

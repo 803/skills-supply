@@ -24,7 +24,7 @@
 			"path": "./packages/api"
 		},
 		{
-			"path": "./packages/sksup"
+			"path": "./packages/sk"
 		}
 	]
 }
