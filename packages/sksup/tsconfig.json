@@ -7,7 +7,7 @@
 			"@/*": ["./src/*"]
 		},
 		"rootDir": "./src",
-		"types": ["node", "react"]
+		"types": ["node"]
 	},
 	"exclude": ["dist", "node_modules"],
 	"extends": "../../tsconfig.base.json",

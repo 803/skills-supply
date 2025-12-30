@@ -1,7 +1,22 @@
 import type { NextConfig } from "next"
-import type { Configuration } from "webpack"
 
 type NextConfigReducer = (config: NextConfig) => NextConfig
+
+// Inline webpack types we actually use (avoids @types/webpack dependency)
+type WebpackRuleSetRule = {
+	test?: RegExp
+	resourceQuery?: unknown
+	issuer?: unknown
+	exclude?: RegExp
+	use?: string[]
+	type?: string
+}
+
+type WebpackConfiguration = {
+	module?: {
+		rules?: (WebpackRuleSetRule | "..." | 0 | false | null | undefined)[]
+	}
+}
 
 /**
  * Adds SVGR support for SVG imports.
@@ -32,7 +47,7 @@ export const withSvgr: NextConfigReducer = (config) => {
 		},
 		webpack: (webpackConfig, options) => {
 			const config = prevWebpack?.(webpackConfig, options) ?? webpackConfig
-			return configureSvgrWebpack(config)
+			return configureSvgrWebpack(config as WebpackConfiguration)
 		},
 	}
 }
@@ -58,31 +73,29 @@ export const withAssetLoaders: NextConfigReducer = (config) => {
 	}
 }
 
-function configureSvgrWebpack(config: Configuration): Configuration {
+function configureSvgrWebpack(config: WebpackConfiguration): WebpackConfiguration {
 	if (!config.module?.rules) {
 		return config
 	}
 
-	const fileLoaderRule = config.module.rules.find((rule) => {
-		if (typeof rule === "object" && rule && "test" in rule) {
-			const test = rule.test
-			return test instanceof RegExp && test.test(".svg")
-		}
-		return false
-	})
+	const fileLoaderRule = config.module.rules.find(
+		(rule): rule is WebpackRuleSetRule => {
+			if (typeof rule === "object" && rule && "test" in rule) {
+				const test = rule.test
+				return test instanceof RegExp && test.test(".svg")
+			}
+			return false
+		},
+	)
 
-	if (
-		fileLoaderRule &&
-		typeof fileLoaderRule === "object" &&
-		"test" in fileLoaderRule
-	) {
+	if (fileLoaderRule) {
 		const resourceQuery = fileLoaderRule.resourceQuery
 		const not =
 			resourceQuery &&
 			typeof resourceQuery === "object" &&
 			"not" in resourceQuery &&
-			Array.isArray(resourceQuery.not)
-				? resourceQuery.not
+			Array.isArray((resourceQuery as { not?: unknown[] }).not)
+				? (resourceQuery as { not: unknown[] }).not
 				: []
 
 		config.module.rules.push(

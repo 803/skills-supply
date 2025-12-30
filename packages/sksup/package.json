@@ -3,15 +3,13 @@
 		"sksup": "./dist/cli.js"
 	},
 	"dependencies": {
+		"@clack/prompts": "^0.7.0",
 		"cac": "^6.7.14",
-		"ink": "^6.6.0",
 		"open": "^11.0.0",
-		"react": "^19.2.3",
 		"smol-toml": "^1.6.0"
 	},
 	"devDependencies": {
-		"@types/node": "^25",
-		"@types/react": "^19"
+		"@types/node": "^25"
 	},
 	"name": "@skills-supply/sksup",
 	"private": true,

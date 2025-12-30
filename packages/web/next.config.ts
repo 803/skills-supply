@@ -1,5 +1,5 @@
-import { withAssetLoaders, withSvgr } from "@skills-supply/shared/next-config-base"
 import type { NextConfig } from "next"
+import { withAssetLoaders, withSvgr } from "./lib/next-config"
 
 const BASE_CONFIG: NextConfig = {
 	reactCompiler: true,

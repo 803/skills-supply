@@ -1,1 +1,0 @@
-export { FontAwesomeIcon } from "./fontawesome"

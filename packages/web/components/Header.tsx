@@ -2,10 +2,10 @@
 
 import faBars from "@fa/utility-semibold/bars.svg?react"
 import faXmark from "@fa/utility-semibold/xmark.svg?react"
-import { FontAwesomeIcon } from "@skills-supply/shared/fontawesome"
 import Link from "next/link"
 import { useState } from "react"
 import { Drawer } from "vaul"
+import { FontAwesomeIcon } from "./FontAwesomeIcon"
 
 export interface NavItem {
 	label: string
