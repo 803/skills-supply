@@ -1,7 +1,9 @@
+import type { Dirent } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
-import { parseManifest } from "@/core/manifest/parse"
-import type { Manifest } from "@/core/manifest/types"
+import type { AbsolutePath } from "@/core/types/branded"
+import { coerceAbsolutePathDirect, coerceNonEmpty } from "@/core/types/coerce"
+import { parseLegacyManifest } from "@/core/manifest/parse"
 import type {
 	DetectedPackage,
 	PackageExtractionError,
@@ -10,7 +12,6 @@ import type {
 } from "@/core/packages/types"
 
 const SKILL_FILENAME = "SKILL.md"
-const PLUGIN_SKILLS_DIR = "skills"
 
 type SkillResult =
 	| { ok: true; value: Skill }
@@ -19,26 +20,31 @@ type SkillNameResult =
 	| { ok: true; value: string }
 	| { ok: false; error: PackageExtractionError }
 type SkillDirResult =
-	| { ok: true; value: string[] }
+	| { ok: true; value: AbsolutePath[] }
 	| { ok: false; error: PackageExtractionError }
 
+/**
+ * Extract skills from a detected package.
+ * For manifest packages, discovers skills based on exports.auto_discover setting.
+ * For other packages, uses pre-computed skillPaths from detection.
+ */
 export async function extractSkills(
 	detected: DetectedPackage,
 ): Promise<PackageExtractionResult> {
-	switch (detected.type) {
-		case "manifest":
-			return extractFromManifest(detected.manifestPath)
-		case "plugin":
-			return extractFromPlugin(detected.rootPath)
-		case "single":
-			return buildSkillList([detected.skillDir])
-		case "subdir":
-			return buildSkillList(detected.skillDirs)
+	const origin = detected.canonical.origin
+
+	// For manifest packages, we need to read the manifest to get skill discovery settings
+	if (detected.detection.method === "manifest" && detected.detection.manifestPath) {
+		return extractFromManifest(detected.detection.manifestPath, origin)
 	}
+
+	// For other detection methods, use pre-computed skillPaths
+	return buildSkillList(detected.skillPaths as AbsolutePath[], origin)
 }
 
 async function extractFromManifest(
-	manifestPath: string,
+	manifestPath: AbsolutePath,
+	origin: Skill["origin"],
 ): Promise<PackageExtractionResult> {
 	let contents: string
 
@@ -49,44 +55,40 @@ async function extractFromManifest(
 			"io_error",
 			formatErrorMessage(error, `Unable to read ${manifestPath}.`),
 			manifestPath,
+			origin,
 		)
 	}
 
-	const parsed = parseManifest(contents, manifestPath)
+	const parsed = parseLegacyManifest(contents, manifestPath)
 	if (!parsed.ok) {
-		return failure("invalid_skill", parsed.error.message, manifestPath)
+		return failure("invalid_skill", parsed.error.message, manifestPath, origin)
 	}
 
-	const skillsSetting = resolveAutoDiscoverSkills(parsed.value)
+	const skillsSetting = resolveAutoDiscoverSkills(parsed.value.exports)
 	if (skillsSetting === false) {
 		return failure(
 			"invalid_skill",
 			"Skill auto-discovery is disabled in package.toml.",
 			manifestPath,
+			origin,
 		)
 	}
 
-	const skillsRoot = path.resolve(path.dirname(manifestPath), skillsSetting)
+	const skillsRoot = coerceAbsolutePathDirect(
+		path.resolve(path.dirname(manifestPath), skillsSetting),
+	)!
 	const skillDirs = await discoverSkillDirs(skillsRoot)
 	if (!skillDirs.ok) {
 		return skillDirs
 	}
 
-	return buildSkillList(skillDirs.value)
+	return buildSkillList(skillDirs.value, origin)
 }
 
-async function extractFromPlugin(rootPath: string): Promise<PackageExtractionResult> {
-	const skillsRoot = path.join(rootPath, PLUGIN_SKILLS_DIR)
-	const skillDirs = await discoverSkillDirs(skillsRoot)
-	if (!skillDirs.ok) {
-		return skillDirs
-	}
-
-	return buildSkillList(skillDirs.value)
-}
-
-function resolveAutoDiscoverSkills(manifest: Manifest): string | false {
-	const value = manifest.exports?.autoDiscover.skills
+function resolveAutoDiscoverSkills(
+	exports: { autoDiscover: { skills: string | false } } | undefined,
+): string | false {
+	const value = exports?.autoDiscover.skills
 	if (value === false) {
 		return false
 	}
@@ -98,7 +100,7 @@ function resolveAutoDiscoverSkills(manifest: Manifest): string | false {
 	return "./skills"
 }
 
-async function discoverSkillDirs(rootDir: string): Promise<SkillDirResult> {
+async function discoverSkillDirs(rootDir: AbsolutePath): Promise<SkillDirResult> {
 	const stats = await safeStat(rootDir)
 	if (!stats.ok) {
 		return stats
@@ -112,9 +114,9 @@ async function discoverSkillDirs(rootDir: string): Promise<SkillDirResult> {
 		return failure("invalid_skill", `Expected directory at ${rootDir}.`, rootDir)
 	}
 
-	let entries: Awaited<ReturnType<typeof readdir>>
+	let entries: Dirent[]
 	try {
-		entries = await readdir(rootDir, { encoding: "utf8", withFileTypes: true })
+		entries = await readdir(rootDir, { withFileTypes: true })
 	} catch (error) {
 		return failure(
 			"io_error",
@@ -123,13 +125,13 @@ async function discoverSkillDirs(rootDir: string): Promise<SkillDirResult> {
 		)
 	}
 
-	const skillDirs: string[] = []
+	const skillDirs: AbsolutePath[] = []
 	for (const entry of entries) {
 		if (!entry.isDirectory()) {
 			continue
 		}
 
-		const skillDir = path.join(rootDir, entry.name)
+		const skillDir = coerceAbsolutePathDirect(path.join(rootDir, String(entry.name)))!
 		const skillFile = path.join(skillDir, SKILL_FILENAME)
 		const exists = await fileExists(skillFile)
 		if (!exists.ok) {
@@ -148,12 +150,15 @@ async function discoverSkillDirs(rootDir: string): Promise<SkillDirResult> {
 	return { ok: true, value: skillDirs }
 }
 
-async function buildSkillList(skillDirs: string[]): Promise<PackageExtractionResult> {
+async function buildSkillList(
+	skillDirs: readonly AbsolutePath[],
+	origin: Skill["origin"],
+): Promise<PackageExtractionResult> {
 	const skills: Skill[] = []
 	const seen = new Set<string>()
 
 	for (const skillDir of skillDirs) {
-		const skillResult = await loadSkillFromDir(skillDir)
+		const skillResult = await loadSkillFromDir(skillDir, origin)
 		if (!skillResult.ok) {
 			return skillResult
 		}
@@ -163,6 +168,7 @@ async function buildSkillList(skillDirs: string[]): Promise<PackageExtractionRes
 				"invalid_skill",
 				`Duplicate skill name "${skillResult.value.name}" found.`,
 				skillDir,
+				origin,
 			)
 		}
 
@@ -173,8 +179,11 @@ async function buildSkillList(skillDirs: string[]): Promise<PackageExtractionRes
 	return { ok: true, value: skills }
 }
 
-async function loadSkillFromDir(skillDir: string): Promise<SkillResult> {
-	const skillPath = path.join(skillDir, SKILL_FILENAME)
+async function loadSkillFromDir(
+	skillDir: AbsolutePath,
+	origin: Skill["origin"],
+): Promise<SkillResult> {
+	const skillPath = coerceAbsolutePathDirect(path.join(skillDir, SKILL_FILENAME))!
 	let contents: string
 
 	try {
@@ -184,6 +193,7 @@ async function loadSkillFromDir(skillDir: string): Promise<SkillResult> {
 			"io_error",
 			formatErrorMessage(error, `Unable to read ${skillPath}.`),
 			skillPath,
+			origin,
 		)
 	}
 
@@ -192,16 +202,22 @@ async function loadSkillFromDir(skillDir: string): Promise<SkillResult> {
 		return nameResult
 	}
 
+	const name = coerceNonEmpty(nameResult.value)
+	if (!name) {
+		return failure("invalid_skill", "Skill name must not be empty.", skillPath, origin)
+	}
+
 	return {
 		ok: true,
 		value: {
-			name: nameResult.value,
+			name,
 			sourcePath: skillDir,
+			origin,
 		},
 	}
 }
 
-function parseSkillName(contents: string, skillPath: string): SkillNameResult {
+function parseSkillName(contents: string, skillPath: AbsolutePath): SkillNameResult {
 	const normalized = contents.replace(/\r\n/g, "\n")
 	const lines = normalized.split("\n")
 
@@ -309,7 +325,7 @@ type ExistsResult =
 	| { ok: true; value: boolean }
 	| { ok: false; error: PackageExtractionError }
 
-async function safeStat(targetPath: string): Promise<StatResult> {
+async function safeStat(targetPath: AbsolutePath): Promise<StatResult> {
 	try {
 		const stats = await stat(targetPath)
 		return { ok: true, value: stats }
@@ -327,7 +343,8 @@ async function safeStat(targetPath: string): Promise<StatResult> {
 }
 
 async function fileExists(targetPath: string): Promise<ExistsResult> {
-	const stats = await safeStat(targetPath)
+	const absPath = coerceAbsolutePathDirect(targetPath)!
+	const stats = await safeStat(absPath)
 	if (!stats.ok) {
 		return stats
 	}
@@ -337,7 +354,7 @@ async function fileExists(targetPath: string): Promise<ExistsResult> {
 	}
 
 	if (!stats.value.isFile()) {
-		return failure("invalid_skill", `Expected file at ${targetPath}.`, targetPath)
+		return failure("invalid_skill", `Expected file at ${targetPath}.`, absPath)
 	}
 
 	return { ok: true, value: true }
@@ -355,13 +372,15 @@ function isNotFound(error: unknown): boolean {
 function failure(
 	type: PackageExtractionError["type"],
 	message: string,
-	pathValue: string,
+	pathValue: AbsolutePath,
+	origin?: Skill["origin"],
 ): { ok: false; error: PackageExtractionError } {
 	return {
 		error: {
 			message,
 			path: pathValue,
 			type,
+			origin,
 		},
 		ok: false,
 	}

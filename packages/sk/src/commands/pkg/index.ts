@@ -1,12 +1,17 @@
 import { confirm, isCancel, select, text } from "@clack/prompts"
 import { consola } from "consola"
-import {
-	isManifestNotFoundError,
-	loadManifestFromCwd,
-	saveManifest,
-} from "@/commands/manifest"
+import { loadManifestForUpdate } from "@/commands/manifest-prompt"
 import type { AddOptions } from "@/commands/pkg/spec"
 import { buildPackageSpec } from "@/commands/pkg/spec"
+import { coerceDependency } from "@/core/manifest/coerce"
+import { loadManifestFromCwd, saveManifest } from "@/core/manifest/fs"
+import {
+	addDependency,
+	hasDependency,
+	removeDependency,
+} from "@/core/manifest/transform"
+import type { Alias } from "@/core/types/branded"
+import { coerceAlias } from "@/core/types/coerce"
 import { formatError } from "@/utils/errors"
 
 export async function pkgInteractive(): Promise<void> {
@@ -133,8 +138,14 @@ async function handleAdd(): Promise<void> {
 	}
 
 	const manifestResult = await loadManifestForUpdate()
-	const pkgSpec = buildPackageSpec(type, spec, options)
-	if (pkgSpec.alias in manifestResult.manifest.dependencies) {
+	const pkgSpec = buildPackageSpec(type as string, spec, options)
+
+	const aliasKey = coerceAlias(pkgSpec.alias)
+	if (!aliasKey) {
+		throw new Error(`Invalid alias: ${pkgSpec.alias}`)
+	}
+
+	if (hasDependency(manifestResult.manifest, aliasKey)) {
 		const overwrite = await confirm({
 			message: `Dependency ${pkgSpec.alias} already exists. Overwrite it?`,
 		})
@@ -143,14 +154,25 @@ async function handleAdd(): Promise<void> {
 			return
 		}
 	}
-	manifestResult.manifest.dependencies[pkgSpec.alias] = pkgSpec.declaration
-	await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
+
+	// Coerce the declaration to a validated dependency
+	const coerced = coerceDependency(
+		pkgSpec.declaration,
+		pkgSpec.alias,
+		manifestResult.manifestPath,
+	)
+	if (!coerced.ok) {
+		throw new Error(coerced.error.message)
+	}
+
+	const updated = addDependency(manifestResult.manifest, aliasKey, coerced.value)
+	await saveManifest(updated, manifestResult.manifestPath)
 	consola.success(`Updated ${manifestResult.manifestPath}.`)
 }
 
 async function handleRemove(): Promise<void> {
 	const manifestResult = await loadManifestFromCwd({ createIfMissing: false })
-	const aliases = Object.keys(manifestResult.manifest.dependencies).sort()
+	const aliases = [...manifestResult.manifest.dependencies.keys()].sort()
 	if (aliases.length === 0) {
 		consola.info("No dependencies to remove.")
 		return
@@ -158,33 +180,14 @@ async function handleRemove(): Promise<void> {
 
 	const choice = await select({
 		message: "Select a dependency to remove",
-		options: aliases.map((alias) => ({ label: alias, value: alias })),
+		options: aliases.map((alias) => ({ label: String(alias), value: alias as Alias })),
 	})
 
 	if (isCancel(choice)) {
 		throw new Error("Canceled.")
 	}
 
-	delete manifestResult.manifest.dependencies[choice]
-	await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
-	consola.success(`Removed dependency: ${choice}.`)
-}
-
-async function loadManifestForUpdate() {
-	try {
-		return await loadManifestFromCwd({ createIfMissing: false })
-	} catch (error) {
-		if (!isManifestNotFoundError(error)) {
-			throw error
-		}
-
-		const shouldCreate = await confirm({
-			message: "package.toml not found. Create it?",
-		})
-		if (isCancel(shouldCreate) || !shouldCreate) {
-			throw new Error("Canceled.")
-		}
-
-		return await loadManifestFromCwd({ createIfMissing: true })
-	}
+	const updated = removeDependency(manifestResult.manifest, choice as Alias)
+	await saveManifest(updated, manifestResult.manifestPath)
+	consola.success(`Removed dependency: ${String(choice)}.`)
 }

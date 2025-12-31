@@ -1,6 +1,11 @@
 import { parse, TomlError } from "smol-toml"
 import { z } from "zod"
+import type { AbsolutePath, ManifestDiscoveredAt } from "@/core/types/branded"
+import { coerceAbsolutePathDirect } from "@/core/types/coerce"
+import { coerceManifest, type RawParsedManifest } from "./coerce.js"
 import type {
+	LegacyManifest,
+	LegacyManifestParseResult,
 	ManifestExports,
 	ManifestParseError,
 	ManifestParseResult,
@@ -111,7 +116,19 @@ const manifestSchema = z
 	})
 	.strict()
 
-export function parseManifest(contents: string, sourcePath: string): ManifestParseResult {
+/**
+ * Parse a manifest file with full validation and coercion.
+ * Returns a validated Manifest with branded types.
+ *
+ * @param contents - Raw TOML content
+ * @param sourcePath - Absolute path to the manifest file
+ * @param discoveredAt - How the manifest was discovered
+ */
+export function parseManifest(
+	contents: string,
+	sourcePath: AbsolutePath,
+	discoveredAt: ManifestDiscoveredAt,
+): ManifestParseResult {
 	let data: unknown
 
 	try {
@@ -127,6 +144,47 @@ export function parseManifest(contents: string, sourcePath: string): ManifestPar
 	const parsed = manifestSchema.safeParse(data)
 	if (!parsed.success) {
 		return failure("invalid_manifest", formatZodError(parsed.error), sourcePath)
+	}
+
+	// Coerce to validated types at the boundary
+	const raw: RawParsedManifest = {
+		agents: parsed.data.agents,
+		dependencies: parsed.data.dependencies,
+		exports: parsed.data.exports,
+		package: parsed.data.package,
+	}
+
+	return coerceManifest(raw, sourcePath, discoveredAt)
+}
+
+/**
+ * Parse a manifest file without full validation.
+ * Returns a legacy manifest with raw string types.
+ *
+ * @deprecated Use parseManifest instead for new code.
+ */
+export function parseLegacyManifest(
+	contents: string,
+	sourcePath: string,
+): LegacyManifestParseResult {
+	let data: unknown
+
+	try {
+		data = parse(contents)
+	} catch (error) {
+		const message =
+			error instanceof TomlError
+				? `Invalid TOML: ${error.message}`
+				: "Invalid TOML."
+		// Need to coerce sourcePath for error type compatibility
+		const absPath = coerceAbsolutePathDirect(sourcePath)
+		return failure("invalid_toml", message, absPath ?? (sourcePath as AbsolutePath))
+	}
+
+	const parsed = manifestSchema.safeParse(data)
+	if (!parsed.success) {
+		const absPath = coerceAbsolutePathDirect(sourcePath)
+		return failure("invalid_manifest", formatZodError(parsed.error), absPath ?? (sourcePath as AbsolutePath))
 	}
 
 	return {
@@ -152,7 +210,7 @@ function formatZodError(error: z.ZodError): string {
 function failure(
 	type: ManifestParseError["type"],
 	message: string,
-	sourcePath: string,
+	sourcePath: AbsolutePath,
 	key?: string,
 ): ParseResult<never> {
 	return {

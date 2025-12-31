@@ -41,19 +41,6 @@ type LStatResult =
 	| { ok: true; value: Awaited<ReturnType<typeof lstat>> | null }
 	| { ok: false; error: AgentInstallError }
 
-export async function installPackagesForAgent(
-	agent: AgentDefinition,
-	packages: InstallablePackage[],
-	guard?: InstallGuard,
-): Promise<AgentInstallResult> {
-	const planResult = planAgentInstall(agent, packages)
-	if (!planResult.ok) {
-		return planResult
-	}
-
-	return applyAgentInstall(planResult.value, guard)
-}
-
 export async function applyAgentInstall(
 	plan: AgentInstallPlan,
 	guard?: InstallGuard,
@@ -99,15 +86,6 @@ export async function applyAgentInstall(
 	}
 
 	return { ok: true, value: installed }
-}
-
-export function buildInstalledSkills(plan: AgentInstallPlan): InstalledSkill[] {
-	return plan.tasks.map((task) => ({
-		agentId: plan.agentId,
-		name: task.skillName,
-		sourcePath: task.sourcePath,
-		targetPath: task.targetPath,
-	}))
 }
 
 export function planAgentInstall(

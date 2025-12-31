@@ -1,7 +1,9 @@
 import { consola } from "consola"
-import { loadManifestFromCwd, saveManifest } from "@/commands/manifest"
 import { getAgentById } from "@/core/agents/registry"
 import type { AgentDefinition } from "@/core/agents/types"
+import { loadManifestFromCwd, saveManifest } from "@/core/manifest/fs"
+import { getAgent, setAgent } from "@/core/manifest/transform"
+import type { AgentId } from "@/core/types/branded"
 import { formatError } from "@/utils/errors"
 
 type AgentAction = "enable" | "disable"
@@ -62,11 +64,12 @@ async function updateAgentManifest(
 	const manifestResult = await loadManifestFromCwd({ createIfMissing: desired })
 	const { manifest, created, manifestPath } = manifestResult
 
-	const currentValue = manifest.agents[lookup.value.id]
+	const validatedAgentId = lookup.value.id as AgentId
+	const currentValue = getAgent(manifest, validatedAgentId)
 	const changed = currentValue !== desired
 	if (changed) {
-		manifest.agents[lookup.value.id] = desired
-		await saveManifest(manifest, manifestPath)
+		const updated = setAgent(manifest, validatedAgentId, desired)
+		await saveManifest(updated, manifestPath)
 	}
 
 	return {

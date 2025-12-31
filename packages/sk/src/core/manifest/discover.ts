@@ -1,6 +1,7 @@
 import { stat } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
+import type { AbsolutePath } from "@/core/types/branded"
 import type {
 	ManifestDiscoveryError,
 	ManifestDiscoveryResult,
@@ -17,10 +18,17 @@ type StatResult =
 	| { ok: true; value: Awaited<ReturnType<typeof stat>> }
 	| { ok: false; error: ManifestDiscoveryError }
 
+/**
+ * Discover all manifest files starting from a directory and walking up.
+ * Also checks ~/.sk/package.toml for user-level manifests.
+ *
+ * @param startDir - Directory to start discovery from
+ * @returns List of absolute paths to discovered manifests
+ */
 export async function discoverManifests(
 	startDir: string,
 ): Promise<ManifestDiscoveryResult> {
-	const absoluteStart = path.resolve(startDir)
+	const absoluteStart = path.resolve(startDir) as AbsolutePath
 	const startStat = await safeStat(absoluteStart)
 	if (!startStat.ok) {
 		return startStat
@@ -34,15 +42,15 @@ export async function discoverManifests(
 		)
 	}
 
-	const homeDir = path.resolve(homedir())
+	const homeDir = path.resolve(homedir()) as AbsolutePath
 	const rootDir = path.parse(absoluteStart).root
 	const stopDir = isWithinHome(absoluteStart, homeDir) ? homeDir : rootDir
-	const discovered: string[] = []
+	const discovered: AbsolutePath[] = []
 	const seen = new Set<string>()
 
-	let current = absoluteStart
+	let current = absoluteStart as string
 	while (true) {
-		const manifestPath = path.join(current, MANIFEST_FILENAME)
+		const manifestPath = path.join(current, MANIFEST_FILENAME) as AbsolutePath
 		const existsResult = await fileExists(manifestPath)
 		if (!existsResult.ok) {
 			return existsResult
@@ -65,7 +73,7 @@ export async function discoverManifests(
 		current = parent
 	}
 
-	const userManifestPath = path.join(homeDir, USER_MANIFEST_DIR, MANIFEST_FILENAME)
+	const userManifestPath = path.join(homeDir, USER_MANIFEST_DIR, MANIFEST_FILENAME) as AbsolutePath
 	const userExistsResult = await fileExists(userManifestPath)
 	if (!userExistsResult.ok) {
 		return userExistsResult
@@ -87,7 +95,7 @@ function isWithinHome(candidate: string, homeDir: string): boolean {
 	return relative.length > 0 && !relative.startsWith("..") && !path.isAbsolute(relative)
 }
 
-async function fileExists(filePath: string): Promise<FileExistsResult> {
+async function fileExists(filePath: AbsolutePath): Promise<FileExistsResult> {
 	try {
 		const stats = await stat(filePath)
 		if (!stats.isFile()) {
@@ -108,7 +116,7 @@ async function fileExists(filePath: string): Promise<FileExistsResult> {
 	}
 }
 
-async function safeStat(targetPath: string): Promise<StatResult> {
+async function safeStat(targetPath: AbsolutePath): Promise<StatResult> {
 	try {
 		const stats = await stat(targetPath)
 		return { ok: true, value: stats }
@@ -133,7 +141,7 @@ function isNotFound(error: unknown): boolean {
 function failure(
 	type: ManifestDiscoveryError["type"],
 	message: string,
-	pathValue: string,
+	pathValue: AbsolutePath,
 ): { ok: false; error: ManifestDiscoveryError } {
 	return {
 		error: {

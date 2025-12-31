@@ -1,28 +1,44 @@
 import type { Dirent } from "node:fs"
 import { readdir, stat } from "node:fs/promises"
 import path from "node:path"
-import type { PackageDetectionError, PackageDetectionResult } from "@/core/packages/types"
+import type { AbsolutePath } from "@/core/types/branded"
+import { coerceAbsolutePathDirect } from "@/core/types/coerce"
+import type {
+	CanonicalPackage,
+	DetectedPackage,
+	DetectionMethod,
+	PackageDetectionError,
+	PackageDetectionResult,
+} from "@/core/packages/types"
 
 const MANIFEST_FILENAME = "package.toml"
 const SKILL_FILENAME = "SKILL.md"
 const PLUGIN_DIR = ".claude-plugin"
 const PLUGIN_FILENAME = "plugin.json"
+const PLUGIN_SKILLS_DIR = "skills"
 
 type ExistsResult =
 	| { ok: true; value: boolean }
 	| { ok: false; error: PackageDetectionError }
 type ReadDirResult =
-	| { ok: true; value: Dirent<string>[] }
+	| { ok: true; value: Dirent[] }
 	| { ok: false; error: PackageDetectionError }
 type StatResult =
 	| { ok: true; value: Awaited<ReturnType<typeof stat>> | null }
 	| { ok: false; error: PackageDetectionError }
+type SkillPathsResult =
+	| { ok: true; value: AbsolutePath[] }
+	| { ok: false; error: PackageDetectionError }
 
+/**
+ * Detect the type of package at a given path.
+ * Returns DetectedPackage with skillPaths computed.
+ */
 export async function detectPackageType(
-	packagePath: string,
+	canonical: CanonicalPackage,
+	packagePath: AbsolutePath,
 ): Promise<PackageDetectionResult> {
-	const rootPath = path.resolve(packagePath)
-	const rootStat = await safeStat(rootPath)
+	const rootStat = await safeStat(packagePath, packagePath)
 	if (!rootStat.ok) {
 		return rootStat
 	}
@@ -30,45 +46,50 @@ export async function detectPackageType(
 	if (!rootStat.value) {
 		return failure(
 			"invalid_package",
-			`Package path does not exist: ${rootPath}`,
-			rootPath,
+			`Package path does not exist: ${packagePath}`,
+			packagePath,
 		)
 	}
 
 	if (!rootStat.value.isDirectory()) {
 		return failure(
 			"invalid_package",
-			`Package path is not a directory: ${rootPath}`,
-			rootPath,
+			`Package path is not a directory: ${packagePath}`,
+			packagePath,
 		)
 	}
 
-	const manifestPath = path.join(rootPath, MANIFEST_FILENAME)
-	const manifestExists = await fileExists(manifestPath, rootPath)
+	// Check for package.toml (manifest)
+	const manifestPath = coerceAbsolutePathDirect(path.join(packagePath, MANIFEST_FILENAME))!
+	const manifestExists = await fileExists(manifestPath, packagePath)
 	if (!manifestExists.ok) {
 		return manifestExists
 	}
 
 	if (manifestExists.value) {
+		// For manifest packages, skill discovery happens during extraction
+		// (depends on exports.auto_discover setting in the manifest)
 		return {
 			ok: true,
 			value: {
-				manifestPath,
-				rootPath,
-				type: "manifest",
+				canonical,
+				packagePath,
+				detection: { method: "manifest", manifestPath },
+				skillPaths: [], // Will be populated by extractSkills
 			},
 		}
 	}
 
-	const pluginDir = path.join(rootPath, PLUGIN_DIR)
-	const pluginDirExists = await dirExists(pluginDir, rootPath)
+	// Check for .claude-plugin directory
+	const pluginDir = path.join(packagePath, PLUGIN_DIR)
+	const pluginDirExists = await dirExists(pluginDir, packagePath)
 	if (!pluginDirExists.ok) {
 		return pluginDirExists
 	}
 
 	if (pluginDirExists.value) {
 		const pluginPath = path.join(pluginDir, PLUGIN_FILENAME)
-		const pluginFileExists = await fileExists(pluginPath, rootPath)
+		const pluginFileExists = await fileExists(pluginPath, packagePath)
 		if (!pluginFileExists.ok) {
 			return pluginFileExists
 		}
@@ -77,21 +98,39 @@ export async function detectPackageType(
 			return failure(
 				"invalid_package",
 				`Found ${PLUGIN_DIR} without ${PLUGIN_FILENAME}.`,
-				rootPath,
+				packagePath,
 			)
+		}
+
+		// Discover skills in plugin's skills directory
+		const skillsRoot = coerceAbsolutePathDirect(path.join(packagePath, PLUGIN_SKILLS_DIR))!
+		const skillPaths = await discoverSkillPaths(skillsRoot, packagePath)
+		if (!skillPaths.ok) {
+			// Plugin might not have skills dir - that's okay
+			return {
+				ok: true,
+				value: {
+					canonical,
+					packagePath,
+					detection: { method: "plugin" },
+					skillPaths: [],
+				},
+			}
 		}
 
 		return {
 			ok: true,
 			value: {
-				pluginPath,
-				rootPath,
-				type: "plugin",
+				canonical,
+				packagePath,
+				detection: { method: "plugin" },
+				skillPaths: skillPaths.value,
 			},
 		}
 	}
 
-	const subdirSkills = await detectSubdirSkills(rootPath)
+	// Check for subdirectory skills (dirs containing SKILL.md)
+	const subdirSkills = await discoverSkillPaths(packagePath, packagePath)
 	if (!subdirSkills.ok) {
 		return subdirSkills
 	}
@@ -100,15 +139,17 @@ export async function detectPackageType(
 		return {
 			ok: true,
 			value: {
-				rootPath,
-				skillDirs: subdirSkills.value,
-				type: "subdir",
+				canonical,
+				packagePath,
+				detection: { method: "subdir" },
+				skillPaths: subdirSkills.value,
 			},
 		}
 	}
 
-	const rootSkillPath = path.join(rootPath, SKILL_FILENAME)
-	const rootSkillExists = await fileExists(rootSkillPath, rootPath)
+	// Check for single SKILL.md in root
+	const rootSkillPath = coerceAbsolutePathDirect(path.join(packagePath, SKILL_FILENAME))!
+	const rootSkillExists = await fileExists(rootSkillPath, packagePath)
 	if (!rootSkillExists.ok) {
 		return rootSkillExists
 	}
@@ -117,9 +158,10 @@ export async function detectPackageType(
 		return {
 			ok: true,
 			value: {
-				rootPath,
-				skillDir: rootPath,
-				type: "single",
+				canonical,
+				packagePath,
+				detection: { method: "single" },
+				skillPaths: [packagePath], // The skill is in the root
 			},
 		}
 	}
@@ -127,59 +169,58 @@ export async function detectPackageType(
 	return failure(
 		"invalid_package",
 		"No package.toml, plugin.json, or SKILL.md found in package.",
-		rootPath,
+		packagePath,
 	)
 }
 
-async function detectSubdirSkills(
-	rootPath: string,
-): Promise<{ ok: true; value: string[] } | { ok: false; error: PackageDetectionError }> {
-	const entriesResult = await readDirEntries(rootPath)
+/**
+ * Discover skill directories (containing SKILL.md) within a root directory.
+ */
+async function discoverSkillPaths(
+	rootPath: AbsolutePath,
+	errorPath: AbsolutePath,
+): Promise<SkillPathsResult> {
+	const entriesResult = await readDirEntries(rootPath, errorPath)
 	if (!entriesResult.ok) {
 		return entriesResult
 	}
 
-	const entries = entriesResult.value
-
-	const skillDirs: string[] = []
-	for (const entry of entries) {
+	const skillPaths: AbsolutePath[] = []
+	for (const entry of entriesResult.value) {
 		if (!entry.isDirectory()) {
 			continue
 		}
 
-		const skillDir = path.join(rootPath, entry.name)
+		const skillDir = coerceAbsolutePathDirect(path.join(rootPath, String(entry.name)))!
 		const skillFile = path.join(skillDir, SKILL_FILENAME)
-		const skillExists = await fileExists(skillFile, rootPath)
+		const skillExists = await fileExists(skillFile, errorPath)
 		if (!skillExists.ok) {
 			return skillExists
 		}
 
 		if (skillExists.value) {
-			skillDirs.push(skillDir)
+			skillPaths.push(skillDir)
 		}
 	}
 
-	return { ok: true, value: skillDirs }
+	return { ok: true, value: skillPaths }
 }
 
-async function readDirEntries(rootPath: string): Promise<ReadDirResult> {
+async function readDirEntries(rootPath: AbsolutePath, errorPath: AbsolutePath): Promise<ReadDirResult> {
 	try {
-		const entries = await readdir(rootPath, {
-			encoding: "utf8",
-			withFileTypes: true,
-		})
+		const entries = await readdir(rootPath, { withFileTypes: true })
 		return { ok: true, value: entries }
 	} catch (error) {
 		return failure(
 			"io_error",
 			formatErrorMessage(error, `Unable to read ${rootPath}.`),
-			rootPath,
+			errorPath,
 		)
 	}
 }
 
-async function fileExists(targetPath: string, rootPath: string): Promise<ExistsResult> {
-	const stats = await safeStat(targetPath)
+async function fileExists(targetPath: string, rootPath: AbsolutePath): Promise<ExistsResult> {
+	const stats = await safeStat(targetPath, rootPath)
 	if (!stats.ok) {
 		return stats
 	}
@@ -195,8 +236,8 @@ async function fileExists(targetPath: string, rootPath: string): Promise<ExistsR
 	return { ok: true, value: true }
 }
 
-async function dirExists(targetPath: string, rootPath: string): Promise<ExistsResult> {
-	const stats = await safeStat(targetPath)
+async function dirExists(targetPath: string, rootPath: AbsolutePath): Promise<ExistsResult> {
+	const stats = await safeStat(targetPath, rootPath)
 	if (!stats.ok) {
 		return stats
 	}
@@ -216,7 +257,7 @@ async function dirExists(targetPath: string, rootPath: string): Promise<ExistsRe
 	return { ok: true, value: true }
 }
 
-async function safeStat(targetPath: string): Promise<StatResult> {
+async function safeStat(targetPath: string, errorPath: AbsolutePath): Promise<StatResult> {
 	try {
 		const stats = await stat(targetPath)
 		return { ok: true, value: stats }
@@ -228,7 +269,7 @@ async function safeStat(targetPath: string): Promise<StatResult> {
 		return failure(
 			"io_error",
 			formatErrorMessage(error, `Unable to access ${targetPath}.`),
-			targetPath,
+			errorPath,
 		)
 	}
 }
@@ -253,7 +294,7 @@ function formatErrorMessage(error: unknown, fallback: string): string {
 function failure(
 	type: PackageDetectionError["type"],
 	message: string,
-	pathValue: string,
+	pathValue: AbsolutePath,
 ): { ok: false; error: PackageDetectionError } {
 	return {
 		error: {

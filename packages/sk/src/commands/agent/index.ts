@@ -1,11 +1,10 @@
-import { confirm, isCancel, multiselect } from "@clack/prompts"
+import { isCancel, multiselect } from "@clack/prompts"
 import { consola } from "consola"
-import {
-	isManifestNotFoundError,
-	loadManifestFromCwd,
-	saveManifest,
-} from "@/commands/manifest"
+import { loadManifestForUpdate } from "@/commands/manifest-prompt"
 import { listAgents } from "@/core/agents/registry"
+import { saveManifest } from "@/core/manifest/fs"
+import { getAgent, setAgent } from "@/core/manifest/transform"
+import type { AgentId } from "@/core/types/branded"
 import { formatError } from "@/utils/errors"
 
 export async function agentInteractive(): Promise<void> {
@@ -36,7 +35,7 @@ export async function agentInteractive(): Promise<void> {
 			return
 		}
 		const enabled = new Set(
-			Object.entries(manifestResult.manifest.agents)
+			[...manifestResult.manifest.agents.entries()]
 				.filter(([, isEnabled]) => isEnabled)
 				.map(([agentId]) => agentId),
 		)
@@ -58,11 +57,13 @@ export async function agentInteractive(): Promise<void> {
 		}
 
 		const selectedSet = new Set(selected)
+		let updatedManifest = manifestResult.manifest
 		let changed = false
 		for (const agent of installed) {
 			const desired = selectedSet.has(agent.id)
-			if (manifestResult.manifest.agents[agent.id] !== desired) {
-				manifestResult.manifest.agents[agent.id] = desired
+			const agentId = agent.id as AgentId
+			if (getAgent(updatedManifest, agentId) !== desired) {
+				updatedManifest = setAgent(updatedManifest, agentId, desired)
 				changed = true
 			}
 		}
@@ -74,7 +75,7 @@ export async function agentInteractive(): Promise<void> {
 			return
 		}
 
-		await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
+		await saveManifest(updatedManifest, manifestResult.manifestPath)
 		consola.success("Updated agent selections.")
 		consola.info(`Manifest: ${manifestResult.manifestPath} (updated).`)
 		consola.success("Done.")
@@ -82,24 +83,5 @@ export async function agentInteractive(): Promise<void> {
 		process.exitCode = 1
 		consola.error(formatError(error))
 		consola.error("Agent update failed.")
-	}
-}
-
-async function loadManifestForUpdate() {
-	try {
-		return await loadManifestFromCwd({ createIfMissing: false })
-	} catch (error) {
-		if (!isManifestNotFoundError(error)) {
-			throw error
-		}
-
-		const shouldCreate = await confirm({
-			message: "package.toml not found. Create it?",
-		})
-		if (isCancel(shouldCreate) || !shouldCreate) {
-			throw new Error("Canceled.")
-		}
-
-		return await loadManifestFromCwd({ createIfMissing: true })
 	}
 }

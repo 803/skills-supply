@@ -1,13 +1,14 @@
 import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
+import type { AbsolutePath, AgentId, Alias } from "@/core/types/branded"
 import { parseManifest } from "@/core/manifest/parse"
-import type { Manifest } from "@/core/manifest/types"
+import type { Manifest, ValidatedDependency } from "@/core/manifest/types"
 import { serializeManifest } from "@/core/manifest/write"
 
 export interface ManifestLoadResult {
 	created: boolean
 	manifest: Manifest
-	manifestPath: string
+	manifestPath: AbsolutePath
 }
 
 export class ManifestNotFoundError extends Error {
@@ -17,16 +18,20 @@ export class ManifestNotFoundError extends Error {
 	}
 }
 
+/**
+ * Load manifest from current working directory.
+ * Optionally creates a new empty manifest if none exists.
+ */
 export async function loadManifestFromCwd(options: {
 	createIfMissing: boolean
 }): Promise<ManifestLoadResult> {
-	const manifestPath = path.join(process.cwd(), "package.toml")
+	const manifestPath = path.join(process.cwd(), "package.toml") as AbsolutePath
 	let manifest: Manifest
 	let created = false
 
 	try {
 		const contents = await readFile(manifestPath, "utf8")
-		const parsed = parseManifest(contents, manifestPath)
+		const parsed = parseManifest(contents, manifestPath, "cwd")
 		if (!parsed.ok) {
 			throw new Error(parsed.error.message)
 		}
@@ -40,11 +45,8 @@ export async function loadManifestFromCwd(options: {
 				)
 			}
 
-			manifest = {
-				agents: {},
-				dependencies: {},
-				sourcePath: manifestPath,
-			}
+			// Create empty manifest with proper typed Maps
+			manifest = createEmptyManifest(manifestPath, "cwd")
 			created = true
 		} else {
 			throw error
@@ -54,9 +56,26 @@ export async function loadManifestFromCwd(options: {
 	return { created, manifest, manifestPath }
 }
 
+/**
+ * Create an empty manifest with proper typed structures.
+ */
+export function createEmptyManifest(
+	sourcePath: AbsolutePath,
+	discoveredAt: "cwd" | "parent" | "home" | "sk-global",
+): Manifest {
+	return {
+		agents: new Map<AgentId, boolean>(),
+		dependencies: new Map<Alias, ValidatedDependency>(),
+		origin: { sourcePath, discoveredAt },
+	}
+}
+
+/**
+ * Save a manifest to disk.
+ */
 export async function saveManifest(
 	manifest: Manifest,
-	manifestPath: string,
+	manifestPath: AbsolutePath,
 ): Promise<void> {
 	const serialized = serializeManifest(manifest)
 	await writeFile(manifestPath, serialized, "utf8")

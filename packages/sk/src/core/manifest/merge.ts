@@ -1,64 +1,82 @@
+import type { AgentId, Alias, ManifestOrigin } from "@/core/types/branded"
 import type {
-	DependencyDeclaration,
 	Manifest,
 	ManifestDependencyEntry,
 	ManifestMergeError,
 	ManifestMergeResult,
+	MergedManifest,
+	ValidatedDependency,
 } from "@/core/manifest/types"
-import { resolvePackageDeclaration } from "@/core/packages/resolve"
-import type { CanonicalPackage } from "@/core/packages/types"
 
-type DedupeKeyResult =
-	| { ok: true; value: string }
-	| { ok: false; error: ManifestMergeError }
-
+/**
+ * Merge multiple manifests into a single merged manifest.
+ *
+ * - Agents: first occurrence wins (earlier manifests take precedence)
+ * - Dependencies: deduplicated by canonical form
+ *   - Same alias, different package → error
+ *   - Same package, different alias → warning, first alias wins
+ */
 export function mergeManifests(manifests: Manifest[]): ManifestMergeResult {
-	const mergedAgents: Record<string, boolean> = {}
-	const mergedDependencies: Record<string, ManifestDependencyEntry> = {}
-	const aliasToDedupe = new Map<string, string>()
-	const aliasSources = new Map<string, string>()
-	const dedupeToAlias = new Map<string, string>()
+	const mergedAgents = new Map<AgentId, boolean>()
+	const mergedDependencies = new Map<Alias, ManifestDependencyEntry>()
+	const warnings: string[] = []
+
+	// Track alias → dedupe key mapping
+	const aliasToDedupe = new Map<Alias, string>()
+	const aliasOrigins = new Map<Alias, ManifestOrigin>()
+
+	// Track dedupe key → first alias (for warning about duplicates)
+	const dedupeToAlias = new Map<string, Alias>()
+	const warnedAliases = new Set<Alias>()
 
 	for (const manifest of manifests) {
-		for (const [agent, enabled] of Object.entries(manifest.agents)) {
-			if (mergedAgents[agent] === undefined) {
-				mergedAgents[agent] = enabled
+		// Merge agents (first occurrence wins)
+		for (const [agentId, enabled] of manifest.agents) {
+			if (!mergedAgents.has(agentId)) {
+				mergedAgents.set(agentId, enabled)
 			}
 		}
 
-		for (const [alias, declaration] of Object.entries(manifest.dependencies)) {
-			const dedupeResult = buildDedupeKey(alias, declaration, manifest.sourcePath)
-			if (!dedupeResult.ok) {
-				return dedupeResult
-			}
-
-			const dedupeKey = dedupeResult.value
+		// Merge dependencies with deduplication
+		for (const [alias, dependency] of manifest.dependencies) {
+			const dedupeKey = buildDedupeKey(dependency)
 			const existingDedupe = aliasToDedupe.get(alias)
+
 			if (existingDedupe) {
+				// This alias was seen before
 				if (existingDedupe !== dedupeKey) {
-					const existingSource = aliasSources.get(alias) ?? "unknown"
+					// Same alias, different package → error
+					const existingOrigin = aliasOrigins.get(alias)
 					return failure(
 						"alias_conflict",
-						`Alias "${alias}" refers to different dependencies (first: ${existingSource}, next: ${manifest.sourcePath}).`,
+						`Alias "${alias}" refers to different dependencies (first: ${existingOrigin?.sourcePath ?? "unknown"}, next: ${manifest.origin.sourcePath}).`,
 						alias,
-						manifest.sourcePath,
+						manifest.origin,
 					)
 				}
-
+				// Same alias, same package → skip (already added)
 				continue
 			}
 
-			if (dedupeToAlias.has(dedupeKey)) {
+			// Check if this package was seen under a different alias
+			const existingAlias = dedupeToAlias.get(dedupeKey)
+			if (existingAlias && existingAlias !== alias && !warnedAliases.has(alias)) {
+				const existingOrigin = aliasOrigins.get(existingAlias)
+				warnings.push(
+					`Dependency alias "${alias}" in ${manifest.origin.sourcePath} resolves to the same package as "${existingAlias}" in ${existingOrigin?.sourcePath ?? "unknown"}; using "${existingAlias}".`,
+				)
+				warnedAliases.add(alias)
 				continue
 			}
 
+			// New dependency - add it
 			aliasToDedupe.set(alias, dedupeKey)
-			aliasSources.set(alias, manifest.sourcePath)
+			aliasOrigins.set(alias, manifest.origin)
 			dedupeToAlias.set(dedupeKey, alias)
-			mergedDependencies[alias] = {
-				declaration,
-				sourcePath: manifest.sourcePath,
-			}
+			mergedDependencies.set(alias, {
+				dependency,
+				origin: manifest.origin,
+			})
 		}
 	}
 
@@ -67,51 +85,43 @@ export function mergeManifests(manifests: Manifest[]): ManifestMergeResult {
 		value: {
 			agents: mergedAgents,
 			dependencies: mergedDependencies,
+			warnings,
 		},
 	}
 }
 
-function buildDedupeKey(
-	alias: string,
-	declaration: DependencyDeclaration,
-	sourcePath: string,
-): DedupeKeyResult {
-	const resolved = resolvePackageDeclaration(alias, declaration, sourcePath)
-	if (!resolved.ok) {
-		return failure("invalid_dependency", resolved.error.message, alias, sourcePath)
-	}
-
-	return { ok: true, value: dedupeKeyFromCanonical(resolved.value) }
-}
-
-function dedupeKeyFromCanonical(canonical: CanonicalPackage): string {
-	switch (canonical.type) {
+/**
+ * Build a dedupe key from a validated dependency.
+ * Packages that resolve to the same key are considered identical.
+ */
+function buildDedupeKey(dep: ValidatedDependency): string {
+	switch (dep.type) {
 		case "registry": {
-			const orgPart = canonical.org ?? ""
-			return ["registry", canonical.registry, orgPart, canonical.name].join("|")
+			const orgPart = dep.org ?? ""
+			return ["registry", orgPart, dep.name].join("|")
 		}
 		case "github":
-			return ["github", canonical.gh, canonical.path ?? ""].join("|")
+			return ["github", dep.gh, dep.path ?? ""].join("|")
 		case "git":
-			return ["git", canonical.normalizedUrl, canonical.path ?? ""].join("|")
+			return ["git", dep.url, dep.path ?? ""].join("|")
 		case "local":
-			return ["local", canonical.absolutePath].join("|")
+			return ["local", dep.path].join("|")
 		case "claude-plugin":
-			return ["claude-plugin", canonical.marketplace, canonical.plugin].join("|")
+			return ["claude-plugin", dep.marketplace, dep.plugin].join("|")
 	}
 }
 
 function failure(
 	type: ManifestMergeError["type"],
 	message: string,
-	alias: string,
-	sourcePath: string,
+	alias: Alias,
+	origin: ManifestOrigin,
 ): { ok: false; error: ManifestMergeError } {
 	return {
 		error: {
 			alias,
 			message,
-			sourcePath,
+			origin,
 			type,
 		},
 		ok: false,

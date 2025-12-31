@@ -1,14 +1,12 @@
-import { confirm, isCancel } from "@clack/prompts"
 import { consola } from "consola"
-import {
-	isManifestNotFoundError,
-	loadManifestFromCwd,
-	type ManifestLoadResult,
-	saveManifest,
-} from "@/commands/manifest"
+import { loadManifestForUpdate } from "@/commands/manifest-prompt"
 import type { AddOptions } from "@/commands/pkg/spec"
 import { buildPackageSpec } from "@/commands/pkg/spec"
-import type { DependencyDeclaration } from "@/core/manifest/types"
+import { coerceDependency } from "@/core/manifest/coerce"
+import { saveManifest } from "@/core/manifest/fs"
+import { addDependency, getDependency } from "@/core/manifest/transform"
+import type { ValidatedDependency } from "@/core/manifest/types"
+import { coerceAlias } from "@/core/types/coerce"
 import { formatError } from "@/utils/errors"
 
 export async function pkgAdd(
@@ -23,12 +21,27 @@ export async function pkgAdd(
 		const pkgSpec = buildPackageSpec(type, spec, options)
 		const manifestResult = await loadManifestForUpdate()
 
-		const current = manifestResult.manifest.dependencies[pkgSpec.alias]
-		const changed = !areDeclarationsEqual(current, pkgSpec.declaration)
+		const alias = coerceAlias(pkgSpec.alias)
+		if (!alias) {
+			throw new Error(`Invalid alias: ${pkgSpec.alias}`)
+		}
+
+		// Coerce the declaration to a validated dependency
+		const coerced = coerceDependency(
+			pkgSpec.declaration,
+			pkgSpec.alias,
+			manifestResult.manifestPath,
+		)
+		if (!coerced.ok) {
+			throw new Error(coerced.error.message)
+		}
+
+		const current = getDependency(manifestResult.manifest, alias)
+		const changed = !areDependenciesEqual(current, coerced.value)
 
 		if (changed) {
-			manifestResult.manifest.dependencies[pkgSpec.alias] = pkgSpec.declaration
-			await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
+			const updated = addDependency(manifestResult.manifest, alias, coerced.value)
+			await saveManifest(updated, manifestResult.manifestPath)
 		}
 
 		consola.success("Dependency settings updated.")
@@ -53,36 +66,18 @@ export async function pkgAdd(
 	}
 }
 
-async function loadManifestForUpdate(): Promise<ManifestLoadResult> {
-	try {
-		return await loadManifestFromCwd({ createIfMissing: false })
-	} catch (error) {
-		if (!isManifestNotFoundError(error)) {
-			throw error
-		}
-
-		const shouldCreate = await confirm({
-			message: "package.toml not found. Create it?",
-		})
-		if (isCancel(shouldCreate) || !shouldCreate) {
-			throw new Error("Canceled.")
-		}
-
-		return await loadManifestFromCwd({ createIfMissing: true })
-	}
-}
-
-function areDeclarationsEqual(
-	current: DependencyDeclaration | undefined,
-	next: DependencyDeclaration,
+function areDependenciesEqual(
+	current: ValidatedDependency | undefined,
+	next: ValidatedDependency,
 ): boolean {
 	if (current === undefined) {
 		return false
 	}
 
-	if (typeof current === "string" || typeof next === "string") {
-		return current === next
+	if (current.type !== next.type) {
+		return false
 	}
 
+	// Compare serialized form for deep equality
 	return JSON.stringify(current) === JSON.stringify(next)
 }

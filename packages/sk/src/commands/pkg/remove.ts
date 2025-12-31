@@ -1,5 +1,7 @@
 import { consola } from "consola"
-import { loadManifestFromCwd, saveManifest } from "@/commands/manifest"
+import { loadManifestFromCwd, saveManifest } from "@/core/manifest/fs"
+import { hasDependency, removeDependency } from "@/core/manifest/transform"
+import { coerceAlias } from "@/core/types/coerce"
 import { formatError } from "@/utils/errors"
 
 export async function pkgRemove(alias: string): Promise<void> {
@@ -12,13 +14,18 @@ export async function pkgRemove(alias: string): Promise<void> {
 			throw new Error("Dependency alias is required.")
 		}
 
+		const coercedAlias = coerceAlias(trimmed)
+		if (!coercedAlias) {
+			throw new Error(`Invalid alias: ${trimmed}`)
+		}
+
 		const manifestResult = await loadManifestFromCwd({ createIfMissing: false })
-		if (!(trimmed in manifestResult.manifest.dependencies)) {
+		if (!hasDependency(manifestResult.manifest, coercedAlias)) {
 			throw new Error(`Dependency not found: ${trimmed}`)
 		}
 
-		delete manifestResult.manifest.dependencies[trimmed]
-		await saveManifest(manifestResult.manifest, manifestResult.manifestPath)
+		const updated = removeDependency(manifestResult.manifest, coercedAlias)
+		await saveManifest(updated, manifestResult.manifestPath)
 
 		consola.success("Dependency settings updated.")
 		consola.success(`Removed dependency: ${trimmed}.`)

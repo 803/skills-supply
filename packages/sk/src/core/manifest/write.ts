@@ -1,25 +1,31 @@
 import { stringify } from "smol-toml"
+import type { GitRef } from "@/core/types/branded"
 import type {
-	ClaudePluginDeclaration,
-	DependencyDeclaration,
-	GithubPackageDeclaration,
-	GitPackageDeclaration,
-	LocalPackageDeclaration,
 	Manifest,
+	ValidatedClaudePluginDependency,
+	ValidatedDependency,
+	ValidatedGitDependency,
+	ValidatedGithubDependency,
+	ValidatedLocalDependency,
+	ValidatedPackageMetadata,
+	ValidatedRegistryDependency,
 } from "@/core/manifest/types"
 
+/**
+ * Serialize a Manifest to TOML string.
+ */
 export function serializeManifest(manifest: Manifest): string {
 	const output: Record<string, unknown> = {}
 
 	if (manifest.package) {
-		output.package = manifest.package
+		output.package = serializePackageMetadata(manifest.package)
 	}
 
-	if (Object.keys(manifest.agents).length > 0) {
-		output.agents = manifest.agents
+	if (manifest.agents.size > 0) {
+		output.agents = Object.fromEntries(manifest.agents)
 	}
 
-	if (Object.keys(manifest.dependencies).length > 0) {
+	if (manifest.dependencies.size > 0) {
 		output.dependencies = serializeDependencies(manifest.dependencies)
 	}
 
@@ -35,85 +41,121 @@ export function serializeManifest(manifest: Manifest): string {
 	return toml.endsWith("\n") ? toml : `${toml}\n`
 }
 
+function serializePackageMetadata(
+	pkg: ValidatedPackageMetadata,
+): Record<string, string> {
+	const output: Record<string, string> = {
+		name: pkg.name,
+		version: pkg.version,
+	}
+
+	if (pkg.description) {
+		output.description = pkg.description
+	}
+
+	if (pkg.license) {
+		output.license = pkg.license
+	}
+
+	if (pkg.org) {
+		output.org = pkg.org
+	}
+
+	return output
+}
+
 function serializeDependencies(
-	dependencies: Record<string, DependencyDeclaration>,
+	dependencies: ReadonlyMap<string, ValidatedDependency>,
 ): Record<string, unknown> {
 	const output: Record<string, unknown> = {}
 
-	for (const [alias, declaration] of Object.entries(dependencies)) {
-		output[alias] = serializeDependencyDeclaration(declaration)
+	for (const [alias, dep] of dependencies) {
+		output[alias] = serializeValidatedDependency(dep)
 	}
 
 	return output
 }
 
-function serializeDependencyDeclaration(declaration: DependencyDeclaration): unknown {
-	if (typeof declaration === "string") {
-		return declaration
+function serializeValidatedDependency(dep: ValidatedDependency): unknown {
+	switch (dep.type) {
+		case "registry":
+			return serializeRegistryDependency(dep)
+		case "github":
+			return serializeGithubDependency(dep)
+		case "git":
+			return serializeGitDependency(dep)
+		case "local":
+			return serializeLocalDependency(dep)
+		case "claude-plugin":
+			return serializeClaudePluginDependency(dep)
 	}
-
-	if ("type" in declaration && declaration.type === "claude-plugin") {
-		return serializeClaudePlugin(declaration)
-	}
-
-	if ("gh" in declaration) {
-		return serializeGithubPackage(declaration)
-	}
-
-	if ("git" in declaration) {
-		return serializeGitPackage(declaration)
-	}
-
-	return serializeLocalPackage(declaration)
 }
 
-function serializeGithubPackage(
-	declaration: GithubPackageDeclaration,
+function serializeRegistryDependency(dep: ValidatedRegistryDependency): string {
+	if (dep.org) {
+		return `@${dep.org}/${dep.name}@${dep.version}`
+	}
+	return `${dep.name}@${dep.version}`
+}
+
+function serializeGithubDependency(
+	dep: ValidatedGithubDependency,
 ): Record<string, string> {
-	return serializeRefPackage({ gh: declaration.gh }, declaration)
+	const output: Record<string, string> = { gh: dep.gh }
+
+	if (dep.ref) {
+		serializeGitRef(dep.ref, output)
+	}
+
+	if (dep.path) {
+		output.path = dep.path
+	}
+
+	return output
 }
 
-function serializeGitPackage(declaration: GitPackageDeclaration): Record<string, string> {
-	return serializeRefPackage({ git: declaration.git }, declaration)
-}
-
-function serializeLocalPackage(
-	declaration: LocalPackageDeclaration,
+function serializeGitDependency(
+	dep: ValidatedGitDependency,
 ): Record<string, string> {
-	return { path: declaration.path }
+	const output: Record<string, string> = { git: dep.url }
+
+	if (dep.ref) {
+		serializeGitRef(dep.ref, output)
+	}
+
+	if (dep.path) {
+		output.path = dep.path
+	}
+
+	return output
 }
 
-function serializeClaudePlugin(
-	declaration: ClaudePluginDeclaration,
+function serializeLocalDependency(
+	dep: ValidatedLocalDependency,
+): Record<string, string> {
+	return { path: dep.path }
+}
+
+function serializeClaudePluginDependency(
+	dep: ValidatedClaudePluginDependency,
 ): Record<string, string> {
 	return {
-		marketplace: declaration.marketplace,
-		plugin: declaration.plugin,
-		type: declaration.type,
+		type: "claude-plugin",
+		plugin: dep.plugin,
+		marketplace: dep.marketplace,
 	}
 }
 
-function serializeRefPackage(
-	base: Record<string, string>,
-	declaration: GithubPackageDeclaration | GitPackageDeclaration,
-): Record<string, string> {
-	const output = { ...base }
-
-	if (declaration.tag !== undefined) {
-		output.tag = declaration.tag
+function serializeGitRef(ref: GitRef, output: Record<string, string>): void {
+	switch (ref.type) {
+		case "tag":
+			output.tag = ref.value
+			break
+		case "branch":
+			output.branch = ref.value
+			break
+		case "rev":
+			output.rev = ref.value
+			break
 	}
-
-	if (declaration.branch !== undefined) {
-		output.branch = declaration.branch
-	}
-
-	if (declaration.rev !== undefined) {
-		output.rev = declaration.rev
-	}
-
-	if (declaration.path !== undefined) {
-		output.path = declaration.path
-	}
-
-	return output
 }
