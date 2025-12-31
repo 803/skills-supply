@@ -31,7 +31,7 @@ sk --help
 
 ## Documentation
 
-For full documentation, see the [main repository](https://github.com/803/skillssupply).
+For full documentation, see the [main repository](https://github.com/803/skills-supply).
 
 ## License
 

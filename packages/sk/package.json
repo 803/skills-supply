@@ -25,7 +25,7 @@
 		"LICENSE",
 		"README.md"
 	],
-	"homepage": "https://github.com/803/skillssupply",
+	"homepage": "https://github.com/803/skills-supply",
 	"keywords": [
 		"skills",
 		"ai",
@@ -38,7 +38,7 @@
 	"name": "@skills-supply/sk",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/803/skillssupply.git"
+		"url": "https://github.com/803/skills-supply.git"
 	},
 	"scripts": {
 		"build": "bun run build:binary && bun run build:node",
@@ -52,5 +52,5 @@
 		"tsc": "npx tsc -p tsconfig.json"
 	},
 	"type": "module",
-	"version": "0.1.1"
+	"version": "0.1.2"
 }
