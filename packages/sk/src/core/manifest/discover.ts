@@ -8,7 +8,7 @@ import type {
 } from "@/src/core/manifest/types"
 import type { AbsolutePath } from "@/src/core/types/branded"
 
-const MANIFEST_FILENAME = "package.toml"
+const MANIFEST_FILENAME = "agents.toml"
 const USER_MANIFEST_DIR = ".sk"
 
 type FileExistsResult =
@@ -20,7 +20,7 @@ type StatResult =
 	| { ok: false; error: ManifestDiscoveryError }
 
 /**
- * Walk up from startDir to find the closest package.toml.
+ * Walk up from startDir to find the closest agents.toml.
  * Stops at the home directory boundary (if inside home) or filesystem root.
  */
 export async function findProjectRoot(
@@ -73,7 +73,7 @@ export async function findProjectRoot(
 
 /**
  * Find the global manifest root directory (~/.sk).
- * Returns the directory path if ~/.sk/package.toml exists, null otherwise.
+ * Returns the directory path if ~/.sk/agents.toml exists, null otherwise.
  */
 export async function findGlobalRoot(): Promise<ManifestDiscoveryResult> {
 	const homeDir = path.resolve(homedir()) as AbsolutePath
@@ -123,7 +123,7 @@ async function fileExists(
 		if (!stats.isFile()) {
 			return failure(
 				"io_error",
-				`package.toml exists but is not a file: ${filePath}`,
+				`agents.toml exists but is not a file: ${filePath}`,
 				filePath,
 			)
 		}

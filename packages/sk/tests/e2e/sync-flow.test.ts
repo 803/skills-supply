@@ -38,7 +38,7 @@ function buildAgentPaths(baseDir: string): { rootPath: string; skillsPath: strin
 }
 
 async function loadProjectManifest(projectDir: string) {
-	const manifestPath = coerceAbsolutePathDirect(join(projectDir, "package.toml"))
+	const manifestPath = coerceAbsolutePathDirect(join(projectDir, "agents.toml"))
 	if (!manifestPath) {
 		throw new Error("Invalid manifest path.")
 	}

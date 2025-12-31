@@ -116,8 +116,8 @@ describe("setupFixturePackage", () => {
 				version: "2.0.0",
 			})
 
-			// Check package.toml exists and has correct content
-			const manifestPath = join(pkgDir, "package.toml")
+			// Check agents.toml exists and has correct content
+			const manifestPath = join(pkgDir, "agents.toml")
 			expect(await exists(manifestPath)).toBe(true)
 
 			const manifestContent = await readFile(manifestPath, "utf-8")
@@ -151,7 +151,7 @@ describe("setupFixturePackage", () => {
 			await setupFixturePackage(pkgDir)
 
 			// Should still create manifest with defaults
-			const manifestPath = join(pkgDir, "package.toml")
+			const manifestPath = join(pkgDir, "agents.toml")
 			expect(await exists(manifestPath)).toBe(true)
 
 			const manifestContent = await readFile(manifestPath, "utf-8")
@@ -170,7 +170,7 @@ describe("setupFixturePackage", () => {
 			})
 
 			// No manifest
-			expect(await exists(join(pkgDir, "package.toml"))).toBe(false)
+			expect(await exists(join(pkgDir, "agents.toml"))).toBe(false)
 
 			// But skills should exist (each skill is a directory with SKILL.md)
 			expect(await exists(join(pkgDir, "skills", "test", "SKILL.md"))).toBe(true)
@@ -187,7 +187,7 @@ describe("buildRawManifest", () => {
 		expect(manifest.package?.version).toBe("1.0.0")
 		expect(manifest.agents).toEqual({ "claude-code": true })
 		expect(manifest.dependencies).toEqual({})
-		expect(manifest.sourcePath).toBe("/test/package.toml")
+		expect(manifest.sourcePath).toBe("/test/agents.toml")
 	})
 
 	it("allows overriding package metadata", () => {

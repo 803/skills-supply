@@ -162,7 +162,7 @@ async function main(): Promise<void> {
 
 	program
 		.command("init")
-		.description("Initialize a package.toml manifest")
+		.description("Initialize an agents.toml manifest")
 		.option("--global", "Create a global manifest")
 		.option("--non-interactive", "Run without prompts")
 		.option("--agents <agents>", "Comma-separated list of agent ids")

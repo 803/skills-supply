@@ -53,7 +53,7 @@ export function buildRawManifest(overrides: RawManifestOverrides = {}): RawManif
 		package: overrides.package
 			? { ...defaultPackage, ...overrides.package }
 			: defaultPackage,
-		sourcePath: overrides.sourcePath ?? "/test/package.toml",
+		sourcePath: overrides.sourcePath ?? "/test/agents.toml",
 	}
 }
 

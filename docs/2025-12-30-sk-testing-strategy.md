@@ -164,18 +164,18 @@ import { discoverManifests } from '../../src/core/manifest/discover'
 describe('discoverManifests', () => {
   it('finds manifest in current directory', async () => {
     await withTempDir(async (dir) => {
-      await writeFile(join(dir, 'package.toml'), 'name = "test"')
+      await writeFile(join(dir, 'agents.toml'), 'name = "test"')
 
       const result = await discoverManifests(dir)
 
       expect(result).toHaveLength(1)
-      expect(result[0]).toContain('package.toml')
+      expect(result[0]).toContain('agents.toml')
     })
   })
 
   it('finds manifests in parent directories', async () => {
     await withTempDir(async (dir) => {
-      await writeFile(join(dir, 'package.toml'), 'name = "parent"')
+      await writeFile(join(dir, 'agents.toml'), 'name = "parent"')
       const child = join(dir, 'child')
       await mkdir(child)
 
@@ -243,7 +243,7 @@ describe('sync e2e', () => {
       // Setup: create manifest pointing to local package
       const projectDir = join(dir, 'project')
       await mkdir(projectDir)
-      await writeFile(join(projectDir, 'package.toml'), `
+      await writeFile(join(projectDir, 'agents.toml'), `
         [dependencies]
         my-pkg = "local:${pkgDir}"
 

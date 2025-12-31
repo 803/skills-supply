@@ -62,7 +62,7 @@ export async function runSync(options: TestSyncOptions): Promise<TestSyncResult>
 	// the actual sync with injectable dependencies.
 	// For now, return a placeholder result.
 
-	const manifestPath = coerceAbsolutePathDirect(join(options.cwd, "package.toml"))
+	const manifestPath = coerceAbsolutePathDirect(join(options.cwd, "agents.toml"))
 	if (!manifestPath) {
 		throw new Error("Invalid manifest path.")
 	}
@@ -152,7 +152,7 @@ ${agentLines}
 ${depLines}
 `
 
-	await writeFile(join(projectDir, "package.toml"), manifest)
+	await writeFile(join(projectDir, "agents.toml"), manifest)
 }
 
 /**

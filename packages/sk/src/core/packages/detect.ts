@@ -9,7 +9,7 @@ import type {
 import type { AbsolutePath } from "@/src/core/types/branded"
 import { coerceAbsolutePath } from "@/src/core/types/coerce"
 
-const MANIFEST_FILENAME = "package.toml"
+const MANIFEST_FILENAME = "agents.toml"
 const SKILL_FILENAME = "SKILL.md"
 const PLUGIN_DIR = ".claude-plugin"
 const PLUGIN_FILENAME = "plugin.json"
@@ -57,7 +57,7 @@ export async function detectPackageType(
 		)
 	}
 
-	// Check for package.toml (manifest)
+	// Check for agents.toml (manifest)
 	const manifestPath = coerceAbsolutePath(MANIFEST_FILENAME, packagePath)
 	if (!manifestPath) {
 		return failure(
@@ -187,7 +187,7 @@ export async function detectPackageType(
 
 	return failure(
 		"invalid_package",
-		"No package.toml, plugin.json, or SKILL.md found in package.",
+		"No agents.toml, plugin.json, or SKILL.md found in package.",
 		packagePath,
 	)
 }

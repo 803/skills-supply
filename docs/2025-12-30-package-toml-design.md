@@ -1,15 +1,15 @@
-# package.toml Design (sksup)
+# agents.toml Design (sk)
 
 Date: 2025-12-30
 Status: Validated (Brainstorming)
 
 ## Summary
 
-We will replace `skills.toml` with a single `package.toml` manifest that serves both consumers and package authors. The schema is Cargo-inspired: `[package]` contains author metadata, while `[dependencies]` always defines install targets. For v1, exports only support auto-discovery of skills via `[exports.auto_discover]`. Claude plugins are dependency types; for Claude Code they are installed natively, and for non-Claude agents we extract skills from the plugin layout. Validation is enforced via Zod at the parsing boundary.
+We will replace `skills.toml` with a single `agents.toml` manifest that serves both consumers and package authors. The schema is Cargo-inspired: `[package]` contains author metadata, while `[dependencies]` always defines install targets. For v1, exports only support auto-discovery of skills via `[exports.auto_discover]`. Claude plugins are dependency types; for Claude Code they are installed natively, and for non-Claude agents we extract skills from the plugin layout. Validation is enforced via Zod at the parsing boundary.
 
 ## Goals
 
-- Single manifest file: `package.toml` only.
+- Single manifest file: `agents.toml` only.
 - Cargo-style mental model: `[package]` and `[dependencies]` in the same file.
 - Multi-resource future without schema migrations; v1 remains skills-only.
 - Claude plugin dependencies are supported and treated as first-class dependency types.
@@ -24,8 +24,8 @@ We will replace `skills.toml` with a single `package.toml` manifest that serves 
 
 ## Manifest Discovery and Merge
 
-- Discover `package.toml` by walking up from CWD to home/root.
-- Always include `~/.sksup/package.toml` as the base layer.
+- Discover `agents.toml` by walking up from CWD to home/root.
+- Always include `~/.sk/agents.toml` as the base layer.
 - Merge with “closest wins” semantics at the dependency entry level.
 - Relative `path` resolves from the directory containing the defining manifest.
 

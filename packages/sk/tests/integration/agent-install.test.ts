@@ -43,7 +43,7 @@ function makeLocalPackage(absolutePath: string): CanonicalPackage {
 		fetchStrategy: { mode: "symlink" },
 		origin: {
 			alias: alias("test-pkg"),
-			manifestPath: abs("/test/package.toml"),
+			manifestPath: abs("/test/agents.toml"),
 		},
 		type: "local",
 	}
@@ -58,7 +58,7 @@ function makeGithubPackage(): CanonicalPackage {
 		gh: ghRef("org/repo"),
 		origin: {
 			alias: alias("github-pkg"),
-			manifestPath: abs("/test/package.toml"),
+			manifestPath: abs("/test/agents.toml"),
 		},
 		type: "github",
 	}
@@ -72,7 +72,7 @@ function makeSkill(name: string, sourcePath: string): Skill {
 		name: nes(name),
 		origin: {
 			alias: alias("test-pkg"),
-			manifestPath: abs("/test/package.toml"),
+			manifestPath: abs("/test/agents.toml"),
 		},
 		sourcePath: abs(sourcePath),
 	}

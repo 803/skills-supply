@@ -111,7 +111,7 @@ global=true
 1. **`-g` / `--global` flag convention** - sk already uses this, good alignment
 2. **Separate install locations for local vs global** - sk already does this
 3. **Walk-up-the-tree for project discovery** - sk does this with git as terminator
-4. **Project config in project root** - `package.toml` at CWD or git root
+4. **Project config in project root** - `agents.toml` at CWD or git root
 
 **AVOID from npm:**
 
@@ -135,6 +135,6 @@ global=true
 | Config inheritance | 4-layer cascade | None (separate scopes) |
 | Local install path | `./node_modules/` | `CWD/.{agent}/skills/` |
 | Global install path | `{prefix}/lib/node_modules/` | `~/.{agent}/skills/` |
-| Global config | `$PREFIX/etc/npmrc` | `~/.sk/package.toml` |
+| Global config | `$PREFIX/etc/npmrc` | `~/.sk/agents.toml` |
 | Workspaces | Explicit in package.json | Git repo = workspace |
 | Subdirectory behavior | Walk to nearest package.json | Walk to git root |

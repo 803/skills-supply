@@ -68,7 +68,7 @@ async function extractFromManifest(
 	if (skillsSetting === false) {
 		return failure(
 			"invalid_skill",
-			"Skill auto-discovery is disabled in package.toml.",
+			"Skill auto-discovery is disabled in agents.toml.",
 			manifestPath,
 			origin,
 		)

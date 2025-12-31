@@ -32,12 +32,12 @@ export function buildParentPromptMessage(
 	cwd: AbsolutePath,
 	options: ParentPromptMessageOptions,
 ): string {
-	const lines = [`Warning: Found package.toml at ${projectRoot}.`]
+	const lines = [`Warning: Found agents.toml at ${projectRoot}.`]
 
 	if (options.action === "sync") {
 		lines.push(`Skills will install under ${projectRoot}.`)
 	} else {
-		lines.push(`This will modify ${projectRoot}/package.toml.`)
+		lines.push(`This will modify ${projectRoot}/agents.toml.`)
 	}
 
 	if (options.warnAboutSkillVisibility) {
@@ -107,7 +107,7 @@ export async function resolveLocalManifest(
 	}
 
 	const projectRoot = rootResult.value
-	const manifestPath = path.join(projectRoot, "package.toml") as AbsolutePath
+	const manifestPath = path.join(projectRoot, "agents.toml") as AbsolutePath
 	const discoveredAt: ManifestDiscoveredAt = projectRoot === cwd ? "cwd" : "parent"
 
 	if (projectRoot !== cwd) {
@@ -120,7 +120,7 @@ export async function resolveLocalManifest(
 			if (decision === "create") {
 				return await createManifestSelection({
 					discoveredAt: "cwd",
-					manifestPath: path.join(cwd, "package.toml") as AbsolutePath,
+					manifestPath: path.join(cwd, "agents.toml") as AbsolutePath,
 					scope: "local",
 					scopeRoot: cwd,
 					usedParent: false,
@@ -155,12 +155,12 @@ export async function resolveGlobalManifest(
 		throw new Error(rootResult.error.message)
 	}
 
-	const globalPath = path.join(homeDir, ".sk", "package.toml") as AbsolutePath
+	const globalPath = path.join(homeDir, ".sk", "agents.toml") as AbsolutePath
 	if (!rootResult.value) {
 		return await resolveMissingGlobalManifest(globalPath, homeDir, options)
 	}
 
-	const manifestPath = path.join(rootResult.value, "package.toml") as AbsolutePath
+	const manifestPath = path.join(rootResult.value, "agents.toml") as AbsolutePath
 	const loaded = await loadManifest(manifestPath, "sk-global")
 	return {
 		created: false,
@@ -195,7 +195,7 @@ async function resolveMissingLocalManifest(
 	if (options.createIfMissing) {
 		return await createManifestSelection({
 			discoveredAt: "cwd",
-			manifestPath: path.join(cwd, "package.toml") as AbsolutePath,
+			manifestPath: path.join(cwd, "agents.toml") as AbsolutePath,
 			scope: "local",
 			scopeRoot: cwd,
 			usedParent: false,
@@ -203,16 +203,16 @@ async function resolveMissingLocalManifest(
 	}
 
 	if (options.nonInteractive) {
-		throw new Error("No package.toml found.")
+		throw new Error("No agents.toml found.")
 	}
 
 	if (!options.promptToCreate) {
-		throw new Error("No package.toml found.")
+		throw new Error("No agents.toml found.")
 	}
 
 	const shouldCreate = await confirm({
 		initialValue: false,
-		message: "No package.toml found. Create one here?",
+		message: "No agents.toml found. Create one here?",
 	})
 	if (isCancel(shouldCreate) || !shouldCreate) {
 		throw new Error("Canceled.")
@@ -220,7 +220,7 @@ async function resolveMissingLocalManifest(
 
 	return await createManifestSelection({
 		discoveredAt: "cwd",
-		manifestPath: path.join(cwd, "package.toml") as AbsolutePath,
+		manifestPath: path.join(cwd, "agents.toml") as AbsolutePath,
 		scope: "local",
 		scopeRoot: cwd,
 		usedParent: false,
@@ -252,7 +252,7 @@ async function resolveMissingGlobalManifest(
 
 	const shouldCreate = await confirm({
 		initialValue: false,
-		message: "No global package.toml found. Create ~/.sk/package.toml?",
+		message: "No global agents.toml found. Create ~/.sk/agents.toml?",
 	})
 	if (isCancel(shouldCreate) || !shouldCreate) {
 		throw new Error("Canceled.")
@@ -275,7 +275,7 @@ async function selectParentManifest(
 		message,
 		options: [
 			{ label: "Continue with parent manifest", value: "parent" },
-			{ label: "Create new package.toml here instead", value: "create" },
+			{ label: "Create new agents.toml here instead", value: "create" },
 			{ label: "Cancel", value: "cancel" },
 		],
 	})

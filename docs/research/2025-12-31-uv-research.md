@@ -123,7 +123,7 @@ Key behaviors:
 | Aspect | uv | sk Design |
 |--------|-----|-----------|
 | Project boundary | `pyproject.toml` discovery | Git root |
-| Global scope | User config dirs (`~/.config/uv/`) | `~/.sk/package.toml` |
+| Global scope | User config dirs (`~/.config/uv/`) | `~/.sk/agents.toml` |
 | Local install location | `.venv/` (project root) | `CWD/.{agent}/skills/` |
 | Global install location | `~/.local/share/uv/tools/` | `~/.{agent}/skills/` |
 | Config inheritance | Yes (merge project + user + system) | No (completely separate) |

@@ -27,7 +27,7 @@ import "@/tests/helpers/assertions"
 // TEST FIXTURES
 // =============================================================================
 
-const TEST_SOURCE_PATH = "/test/project/package.toml" as AbsolutePath
+const TEST_SOURCE_PATH = "/test/project/agents.toml" as AbsolutePath
 const TEST_DISCOVERED_AT: ManifestDiscoveredAt = "cwd"
 
 function alias(value: string) {
@@ -345,7 +345,7 @@ describe("coerceDependency - local", () => {
 
 		expect(result).toBeOk()
 		if (result.ok && result.value.type === "local") {
-			// /test/project/package.toml -> /test/project -> /test/other-pkg
+			// /test/project/agents.toml -> /test/project -> /test/other-pkg
 			expect(result.value.path).toBe("/test/other-pkg")
 		}
 	})
@@ -770,7 +770,7 @@ describe("coerceManifest - origin tracking", () => {
 		const raw: RawParsedManifest = {}
 		const result = coerceManifest(
 			raw,
-			"/parent/package.toml" as AbsolutePath,
+			"/parent/agents.toml" as AbsolutePath,
 			"parent",
 		)
 
@@ -784,7 +784,7 @@ describe("coerceManifest - origin tracking", () => {
 		const raw: RawParsedManifest = {}
 		const result = coerceManifest(
 			raw,
-			"/home/user/package.toml" as AbsolutePath,
+			"/home/user/agents.toml" as AbsolutePath,
 			"home",
 		)
 
@@ -798,7 +798,7 @@ describe("coerceManifest - origin tracking", () => {
 		const raw: RawParsedManifest = {}
 		const result = coerceManifest(
 			raw,
-			"/home/user/.sk/package.toml" as AbsolutePath,
+			"/home/user/.sk/agents.toml" as AbsolutePath,
 			"sk-global",
 		)
 

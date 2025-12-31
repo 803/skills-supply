@@ -219,7 +219,7 @@ export interface ManifestDiscoveryError {
 
 /**
  * Result of discovering manifest root directories.
- * Returns the absolute path to the directory containing package.toml, or null if not found.
+ * Returns the absolute path to the directory containing agents.toml, or null if not found.
  */
 export type ManifestDiscoveryResult =
 	| { ok: true; value: AbsolutePath | null }

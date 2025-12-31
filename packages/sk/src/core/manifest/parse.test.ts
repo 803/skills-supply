@@ -19,7 +19,7 @@ import type { AbsolutePath, ManifestDiscoveredAt } from "@/src/core/types/brande
 import { coerceAlias } from "@/src/core/types/coerce"
 
 // Helper to create branded types for tests
-const testPath = "/test/package.toml" as AbsolutePath
+const testPath = "/test/agents.toml" as AbsolutePath
 const discoveredAt: ManifestDiscoveredAt = "cwd"
 
 function alias(value: string) {
@@ -502,7 +502,7 @@ path = "/absolute/path/to/package"
 			})
 
 			it("resolves local dependency with relative path", () => {
-				const manifestPath = "/projects/my-app/package.toml" as AbsolutePath
+				const manifestPath = "/projects/my-app/agents.toml" as AbsolutePath
 				const toml = `
 [dependencies.local]
 path = "../shared-lib"

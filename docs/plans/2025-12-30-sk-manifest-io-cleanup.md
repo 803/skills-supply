@@ -6,7 +6,7 @@ This plan must be maintained in accordance with `.agent/PLANS.md` from the repos
 
 ## Purpose / Big Picture
 
-After this change, `sk` manifest read/write logic lives under `packages/sk/src/core/manifest`, command handlers share one prompt path for creating `package.toml`, and unused helpers are removed. This keeps review surfaces small while preserving the current CLI behavior. You can verify it by running `sk pkg add` or `sk agent` in a directory without a `package.toml` and seeing the same create prompt as before.
+After this change, `sk` manifest read/write logic lives under `packages/sk/src/core/manifest`, command handlers share one prompt path for creating `agents.toml`, and unused helpers are removed. This keeps review surfaces small while preserving the current CLI behavior. You can verify it by running `sk pkg add` or `sk agent` in a directory without a `agents.toml` and seeing the same create prompt as before.
 
 ## Progress
 
@@ -27,7 +27,7 @@ After this change, `sk` manifest read/write logic lives under `packages/sk/src/c
   Rationale: It matches the existing `core/manifest` organization while keeping downstream changes minimal.
   Date/Author: 2025-12-30 Codex
 
-- Decision: Introduce a command-layer helper `packages/sk/src/commands/manifest-prompt.ts` that wraps the "create package.toml?" prompt and returns `ManifestLoadResult`.
+- Decision: Introduce a command-layer helper `packages/sk/src/commands/manifest-prompt.ts` that wraps the "create agents.toml?" prompt and returns `ManifestLoadResult`.
   Rationale: The prompt is UI-specific, but the manifest IO should stay in core.
   Date/Author: 2025-12-30 Codex
 
@@ -37,7 +37,7 @@ After this change, `sk` manifest read/write logic lives under `packages/sk/src/c
 
 ## Context and Orientation
 
-The `sk` CLI reads and writes `package.toml` manifests. Today that IO lives in `packages/sk/src/commands/manifest.ts`, while `packages/sk/src/commands/pkg/add.ts`, `packages/sk/src/commands/pkg/index.ts`, and `packages/sk/src/commands/agent/index.ts` duplicate the same "create manifest" prompt flow. The `core/manifest` directory already contains parsing and serialization helpers, so the IO should live there as well. There are also unused helpers (`packages/sk/src/core/io/temp.ts`, unused fetch helpers, unused install helpers) and an empty `packages/sk/src/ui` directory.
+The `sk` CLI reads and writes `agents.toml` manifests. Today that IO lives in `packages/sk/src/commands/manifest.ts`, while `packages/sk/src/commands/pkg/add.ts`, `packages/sk/src/commands/pkg/index.ts`, and `packages/sk/src/commands/agent/index.ts` duplicate the same "create manifest" prompt flow. The `core/manifest` directory already contains parsing and serialization helpers, so the IO should live there as well. There are also unused helpers (`packages/sk/src/core/io/temp.ts`, unused fetch helpers, unused install helpers) and an empty `packages/sk/src/ui` directory.
 
 ## Plan of Work
 
@@ -68,7 +68,7 @@ Finally, run `npm biome` from the repository root and capture the output.
 
 ## Validation and Acceptance
 
-Running `npm biome` from the repo root completes without errors. Manual verification: in a directory without `package.toml`, running `sk pkg add` or `sk agent` still prompts "package.toml not found. Create it?" and proceeds identically once confirmed. The codebase has no references to removed helpers, and `rg --files packages/sk/src/ui` returns nothing.
+Running `npm biome` from the repo root completes without errors. Manual verification: in a directory without `agents.toml`, running `sk pkg add` or `sk agent` still prompts "agents.toml not found. Create it?" and proceeds identically once confirmed. The codebase has no references to removed helpers, and `rg --files packages/sk/src/ui` returns nothing.
 
 ## Idempotence and Recovery
 

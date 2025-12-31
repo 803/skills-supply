@@ -595,7 +595,7 @@ async function resolvePluginSource(
 	}
 
 	const baseDir = resolveMarketplacePluginBasePath(marketplace)
-	const manifestPath = coerceAbsolutePath("package.toml", baseDir)
+	const manifestPath = coerceAbsolutePath("agents.toml", baseDir)
 	if (!manifestPath) {
 		return failSync(
 			"resolve",

@@ -48,7 +48,7 @@ Delivered the inheritance-rule refactor end-to-end: single-manifest discovery, s
 
 ## Context and Orientation
 
-The CLI implementation lives in `packages/sk/src`. Manifest discovery currently happens in `packages/sk/src/core/manifest/discover.ts`, which walks up the filesystem and returns multiple manifests, then appends `~/.sk/package.toml`. Merging is handled in `packages/sk/src/core/manifest/merge.ts`, and sync uses `packages/sk/src/core/sync/sync.ts` to discover, parse, merge, resolve packages, and install skills. Agent installation relies on `AgentDefinition.skillsPath` from `packages/sk/src/core/agents/registry.ts`, which today is always a global path under the home directory. Commands are defined in `packages/sk/src/commands/*` and wired in `packages/sk/src/cli.ts`.
+The CLI implementation lives in `packages/sk/src`. Manifest discovery currently happens in `packages/sk/src/core/manifest/discover.ts`, which walks up the filesystem and returns multiple manifests, then appends `~/.sk/agents.toml`. Merging is handled in `packages/sk/src/core/manifest/merge.ts`, and sync uses `packages/sk/src/core/sync/sync.ts` to discover, parse, merge, resolve packages, and install skills. Agent installation relies on `AgentDefinition.skillsPath` from `packages/sk/src/core/agents/registry.ts`, which today is always a global path under the home directory. Commands are defined in `packages/sk/src/commands/*` and wired in `packages/sk/src/cli.ts`.
 
 The new design requires a single manifest per scope, no merging, project-root installs, and explicit prompts when a parent manifest is found. This will touch manifest discovery, manifest serialization, agent registry path resolution, sync behavior, and multiple commands (sync, pkg add/remove, agent add/remove, init). Tests live in `packages/sk/tests`, with discovery tests in `packages/sk/tests/integration/manifest-discovery.test.ts` and sync flow tests in `packages/sk/tests/e2e/sync-flow.test.ts`.
 
@@ -78,8 +78,8 @@ Work from the repository root.
 
 Success means:
 
-- Running `sk sync` from a subdirectory with a parent `package.toml` triggers the blocking prompt in interactive mode and installs to `{project_root}/.{agent}/skills` when continued. Running with `--non-interactive` uses the parent manifest silently. When no manifest exists, interactive mode prompts to create one; `--non-interactive` errors unless `--init` is used (for `pkg add`).
-- `sk sync --global` uses only `~/.sk/package.toml` and installs to `~/.{agent}/skills`.
+- Running `sk sync` from a subdirectory with a parent `agents.toml` triggers the blocking prompt in interactive mode and installs to `{project_root}/.{agent}/skills` when continued. Running with `--non-interactive` uses the parent manifest silently. When no manifest exists, interactive mode prompts to create one; `--non-interactive` errors unless `--init` is used (for `pkg add`).
+- `sk sync --global` uses only `~/.sk/agents.toml` and installs to `~/.{agent}/skills`.
 - `sk sync --non-interactive` with no `[agents]` produces a no-op message and exits 0.
 - `sk init` creates a manifest with an empty `[dependencies]` section and includes `[agents]` only when interactive or when `--agents` is provided; non-interactive runs without `--agents` omit `[agents]`. Errors if the target manifest already exists, and supports `--global` and `--non-interactive`.
 - `sk pkg add/remove` and `sk agent add/remove` honor the same discovery rules and new flags.

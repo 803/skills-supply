@@ -12,9 +12,9 @@ import { withTempDir } from "@/tests/helpers/fs"
 import "@/tests/helpers/assertions"
 
 describe("findProjectRoot", () => {
-	it("returns cwd when package.toml exists in start directory", async () => {
+	it("returns cwd when agents.toml exists in start directory", async () => {
 		await withTempDir(async (dir) => {
-			await writeFile(join(dir, "package.toml"), 'name = "test"')
+			await writeFile(join(dir, "agents.toml"), 'name = "test"')
 
 			const result = await findProjectRoot(dir)
 
@@ -25,9 +25,9 @@ describe("findProjectRoot", () => {
 		})
 	})
 
-	it("returns parent when package.toml exists above start directory", async () => {
+	it("returns parent when agents.toml exists above start directory", async () => {
 		await withTempDir(async (dir) => {
-			await writeFile(join(dir, "package.toml"), 'name = "parent"')
+			await writeFile(join(dir, "agents.toml"), 'name = "parent"')
 			const child = join(dir, "child")
 			await mkdir(child)
 
@@ -40,7 +40,7 @@ describe("findProjectRoot", () => {
 		})
 	})
 
-	it("returns null when no package.toml exists", async () => {
+	it("returns null when no agents.toml exists", async () => {
 		await withTempDir(async (dir) => {
 			const nested = join(dir, "a", "b")
 			await mkdir(nested, { recursive: true })
@@ -79,9 +79,9 @@ describe("findProjectRoot", () => {
 		})
 	})
 
-	it("returns error when package.toml is a directory", async () => {
+	it("returns error when agents.toml is a directory", async () => {
 		await withTempDir(async (dir) => {
-			await mkdir(join(dir, "package.toml"))
+			await mkdir(join(dir, "agents.toml"))
 
 			const result = await findProjectRoot(dir)
 
@@ -95,7 +95,7 @@ describe("findProjectRoot", () => {
 
 	it("returns absolute path", async () => {
 		await withTempDir(async (dir) => {
-			await writeFile(join(dir, "package.toml"), 'name = "test"')
+			await writeFile(join(dir, "agents.toml"), 'name = "test"')
 
 			const result = await findProjectRoot(dir)
 

@@ -83,7 +83,7 @@ export interface FixturePackageOptions {
 	skills?: FixtureSkill[]
 	/** Skills directory name (defaults to "skills") */
 	skillsDir?: string
-	/** Whether to create a package.toml (defaults to true) */
+	/** Whether to create an agents.toml (defaults to true) */
 	createManifest?: boolean
 }
 
@@ -119,7 +119,7 @@ version = "${version}"
 [exports.auto_discover]
 skills = "${skillsDir}"
 `
-		await writeFile(join(pkgDir, "package.toml"), manifest)
+		await writeFile(join(pkgDir, "agents.toml"), manifest)
 	}
 
 	// Create skills directory with skill subdirectories

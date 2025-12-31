@@ -51,7 +51,7 @@ All code lives in `packages/discovery/`.
 │  ┌──────────────┐      ┌──────────────┐                                    │
 │  │  5. GENERATE │ ──▶  │  6. PUBLISH  │                                    │
 │  │              │      │              │                                    │
-│  │ package.toml │      │ sk registry  │                                    │
+│  │ agents.toml │      │ sk registry  │                                    │
 │  │ PRs          │      │              │                                    │
 │  └──────────────┘      └──────────────┘                                    │
 │                                                                             │
@@ -76,7 +76,7 @@ In order of preference:
 
 In order of preference:
 
-1. `package.toml` → native sk package (registry-ready)
+1. `agents.toml` → native sk package (registry-ready)
 2. `skill-subdir` → directory with skills (e.g., `.claude/skills/*`)
 3. `skill-single` → single `SKILL.md` at root
 
@@ -241,7 +241,7 @@ function extractRepoFromGithubUrl(url: string): string | null {
 Direct GitHub API queries for:
 - Repos with `SKILL.md` files
 - Repos with `.claude/skills/` directories
-- Repos with `package.toml` (sk-native)
+- Repos with `agents.toml` (sk-native)
 - Repos tagged with `claude-skills`, `claude-code-plugins`
 
 ---
@@ -288,7 +288,7 @@ sk-discovery draft <id>                  # Generate README install section
 sk-discovery draft <id> --format md      # Output as markdown
 
 # Phase 3: Native packages (future)
-sk-discovery pr <id>                     # Create PR to add package.toml
+sk-discovery pr <id>                     # Create PR to add agents.toml
 ```
 
 ---
@@ -364,7 +364,7 @@ rm -rf /tmp/sk-scan-XXXXX
 - `--depth 1` is fast (no history)
 
 **Detection logic:** Reuse/share with sksup's package detection code. Scan for:
-1. `package.toml` at root → registry-ready
+1. `agents.toml` at root → registry-ready
 2. `.claude/skills/` or similar subdirs → skill-subdir
 3. `SKILL.md` at root → skill-single
 4. `.claude-plugin/` directory → claude-plugin

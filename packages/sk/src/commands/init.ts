@@ -66,8 +66,8 @@ export async function initCommand(options: {
 
 function resolveManifestPath(useGlobal: boolean): AbsolutePath {
 	const resolved = useGlobal
-		? path.join(homedir(), ".sk", "package.toml")
-		: path.join(process.cwd(), "package.toml")
+		? path.join(homedir(), ".sk", "agents.toml")
+		: path.join(process.cwd(), "agents.toml")
 	const coerced = coerceAbsolutePathDirect(resolved)
 	if (!coerced) {
 		throw new Error("Unable to resolve manifest path.")

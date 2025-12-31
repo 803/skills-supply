@@ -1,4 +1,4 @@
-# Implement package.toml + Zod validation + Claude plugin dependencies
+# Implement agents.toml + Zod validation + Claude plugin dependencies
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
@@ -6,13 +6,13 @@ This document must be maintained in accordance with `./.agent/PLANS.md`.
 
 ## Purpose / Big Picture
 
-After this change, sk uses `package.toml` as the only manifest format and validates it with Zod. Users can declare dependencies under `[dependencies]`, and package authors can export skills via `[exports.auto_discover]` without duplicating names. Claude plugin dependencies become first-class: they install natively for Claude Code and have skills extracted for non-Claude agents. A user can run `sk sync` in a repo with `package.toml` and see skills installed across agents; invalid manifests or unsupported plugin sources fail loudly with clear errors.
+After this change, sk uses `agents.toml` as the only manifest format and validates it with Zod. Users can declare dependencies under `[dependencies]`, and package authors can export skills via `[exports.auto_discover]` without duplicating names. Claude plugin dependencies become first-class: they install natively for Claude Code and have skills extracted for non-Claude agents. A user can run `sk sync` in a repo with `agents.toml` and see skills installed across agents; invalid manifests or unsupported plugin sources fail loudly with clear errors.
 
 ## Progress
 
 - [x] (2025-12-30 23:25Z) Created and validated design doc in `docs/plans/2025-12-30-package-toml-design.md`.
 - [x] (2025-12-30 23:45Z) Add Zod to `packages/sk` and define manifest schema + parser that outputs validated internal models.
-- [x] (2025-12-30 23:45Z) Replace `skills.toml` usage with `package.toml` across discovery, CLI edits, and sync pipeline.
+- [x] (2025-12-30 23:45Z) Replace `skills.toml` usage with `agents.toml` across discovery, CLI edits, and sync pipeline.
 - [x] (2025-12-30 23:45Z) Implement exports auto-discovery for manifest packages and update skill extraction/detection accordingly.
 - [x] (2025-12-30 23:45Z) Implement Claude plugin dependency resolution and per-agent behavior.
 - [x] (2025-12-30 23:45Z) Run `npm run biome`.
@@ -24,7 +24,7 @@ After this change, sk uses `package.toml` as the only manifest format and valida
 
 ## Decision Log
 
-- Decision: Use `package.toml` only; no `skills.toml` compatibility layer.
+- Decision: Use `agents.toml` only; no `skills.toml` compatibility layer.
   Rationale: Alpha software; migration is explicit and avoids dual-path complexity.
   Date/Author: 2025-12-30 / Codex
 - Decision: `[exports.auto_discover].skills` is the only skill discovery config in v1; `false` disables discovery.
@@ -49,7 +49,7 @@ After this change, sk uses `package.toml` as the only manifest format and valida
 
 ## Context and Orientation
 
-The sk CLI lives in `packages/sk/src`. Manifest parsing is implemented in `packages/sk/src/core/manifest`, with discovery in `discover.ts`, parsing in `parse.ts`, merging in `merge.ts`, and serialization in `write.ts`. The sync pipeline is in `packages/sk/src/core/sync/sync.ts` and uses package detection in `packages/sk/src/core/packages/detect.ts`, extraction in `packages/sk/src/core/packages/extract.ts`, and dependency resolution in `packages/sk/src/core/packages/resolve.ts`. CLI commands that edit manifests live in `packages/sk/src/commands/*` and reference `package.toml` and `[dependencies]`.
+The sk CLI lives in `packages/sk/src`. Manifest parsing is implemented in `packages/sk/src/core/manifest`, with discovery in `discover.ts`, parsing in `parse.ts`, merging in `merge.ts`, and serialization in `write.ts`. The sync pipeline is in `packages/sk/src/core/sync/sync.ts` and uses package detection in `packages/sk/src/core/packages/detect.ts`, extraction in `packages/sk/src/core/packages/extract.ts`, and dependency resolution in `packages/sk/src/core/packages/resolve.ts`. CLI commands that edit manifests live in `packages/sk/src/commands/*` and reference `agents.toml` and `[dependencies]`.
 
 A “skill” is a directory containing `SKILL.md` with YAML frontmatter including a `name` field. The install pipeline uses `AgentDefinition.skillsPath` and installs skills with the `<prefix>-<skillname>` naming rule.
 
@@ -57,9 +57,9 @@ A “skill” is a directory containing `SKILL.md` with YAML frontmatter includi
 
 First, add Zod to `packages/sk` and define a manifest schema that validates `[package]`, `[dependencies]`, `[agents]`, and `[exports.auto_discover]`. Update `parseManifest` to parse TOML via `smol-toml`, validate with Zod, and return a normalized internal model. Replace `Manifest` and related types to use `dependencies` instead of `packages`, and add a `ClaudePluginDeclaration` type.
 
-Second, switch all manifest discovery and CLI editing to `package.toml`. Update `discover.ts`, `commands/manifest.ts`, `commands/pkg/*`, `commands/agent/*`, and user-facing messages to refer to `package.toml`. Update serializer to write `[dependencies]` and (when present) `[agents]`.
+Second, switch all manifest discovery and CLI editing to `agents.toml`. Update `discover.ts`, `commands/manifest.ts`, `commands/pkg/*`, `commands/agent/*`, and user-facing messages to refer to `agents.toml`. Update serializer to write `[dependencies]` and (when present) `[agents]`.
 
-Third, implement `exports.auto_discover` support for package manifests. Update `detect.ts` to look for `package.toml` (not `skills.toml`). Update `extract.ts` so `manifest` packages read `package.toml`, resolve the skills directory (default `./skills`), and scan immediate subdirectories for `SKILL.md`. If the skills directory is missing or auto-discover is `false`, return a hard error since v1 is skills-only. Keep existing support for subdir and single-skill packages.
+Third, implement `exports.auto_discover` support for package manifests. Update `detect.ts` to look for `agents.toml` (not `skills.toml`). Update `extract.ts` so `manifest` packages read `agents.toml`, resolve the skills directory (default `./skills`), and scan immediate subdirectories for `SKILL.md`. If the skills directory is missing or auto-discover is `false`, return a hard error since v1 is skills-only. Keep existing support for subdir and single-skill packages.
 
 Fourth, add Claude plugin dependency handling. Extend `PackageDeclaration` + `CanonicalPackage` with a `claude-plugin` type. In sync, partition dependencies per-agent: for `claude-code`, call Claude’s native plugin commands (`/plugin marketplace add` and `/plugin install`) using the marketplace source spec string and plugin name, then skip skill extraction for that dependency. For non-Claude agents, resolve the plugin marketplace source by reading `.claude-plugin/marketplace.json`, find the plugin entry by name, resolve its `source` into a GitHub/Git/Path package, fetch it, require `.claude-plugin/plugin.json`, and scan `./skills` at the plugin root. Return errors if the marketplace or plugin is invalid.
 
@@ -69,9 +69,9 @@ Finally, run `npm run biome`, run a dry-run sync to validate, and commit with `-
 
 Work in repository root `./`. Run these commands as the plan progresses:
 
-  - `rg -n "package.toml|dependencies" packages/sk/src` to find remaining references.
+  - `rg -n "agents.toml|dependencies" packages/sk/src` to find remaining references.
   - `npm run biome` after code changes.
-  - `sk sync --dry-run` (from a sample repo with `package.toml`) to smoke test behavior.
+  - `sk sync --dry-run` (from a sample repo with `agents.toml`) to smoke test behavior.
 
 Expected outputs include Biome reporting clean checks and `sk sync --dry-run` printing a summary with manifests/packages detected and planned installs. Update this section with any new commands or transcripts as they are executed.
 
@@ -79,7 +79,7 @@ Expected outputs include Biome reporting clean checks and `sk sync --dry-run` pr
 
 Validation is complete when:
 
-- Running `sk sync --dry-run` in a repo containing `package.toml` succeeds, discovers manifests, and plans installs.
+- Running `sk sync --dry-run` in a repo containing `agents.toml` succeeds, discovers manifests, and plans installs.
 - A malformed manifest (wrong types or unknown keys) fails with a clear error that references the manifest path.
 - A Claude plugin dependency for Claude Code triggers the plugin install path; the same dependency for a non-Claude agent extracts skills from the plugin `./skills` directory.
 - `npm run biome` reports no issues.

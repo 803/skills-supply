@@ -30,7 +30,7 @@ import { abs, alias, ghRef, gitUrl, nes } from "@/tests/helpers/branded"
 // TEST HELPERS - fixture builders using branded helpers
 // =============================================================================
 
-function makeOrigin(aliasStr: string, path = "/test/package.toml"): PackageOrigin {
+function makeOrigin(aliasStr: string, path = "/test/agents.toml"): PackageOrigin {
 	return {
 		alias: alias(aliasStr),
 		manifestPath: abs(path),
@@ -38,7 +38,7 @@ function makeOrigin(aliasStr: string, path = "/test/package.toml"): PackageOrigi
 }
 
 function makeManifestOrigin(
-	path = "/test/package.toml",
+	path = "/test/agents.toml",
 	discoveredAt: "cwd" | "parent" | "home" | "sk-global" = "cwd",
 ): ManifestOrigin {
 	return {
@@ -49,7 +49,7 @@ function makeManifestOrigin(
 
 function makeManifest(
 	dependencies: Array<[string, ValidatedDependency]>,
-	originPath = "/test/package.toml",
+	originPath = "/test/agents.toml",
 ): Manifest {
 	return {
 		agents: new Map(),
@@ -85,7 +85,7 @@ describe("resolveValidatedDependency", () => {
 				  "org": "superpowers-marketplace",
 				  "origin": {
 				    "alias": "superpowers",
-				    "manifestPath": "/test/package.toml",
+				    "manifestPath": "/test/agents.toml",
 				  },
 				  "registry": "skills.supply",
 				  "type": "registry",
@@ -119,12 +119,12 @@ describe("resolveValidatedDependency", () => {
 				type: "registry",
 				version: nes("1.0.0"),
 			}
-			const origin = makeOrigin("custom-alias", "/custom/path/package.toml")
+			const origin = makeOrigin("custom-alias", "/custom/path/agents.toml")
 
 			const result = resolveValidatedDependency(dep, origin)
 
 			expect(result.origin.alias).toBe("custom-alias")
-			expect(result.origin.manifestPath).toBe("/custom/path/package.toml")
+			expect(result.origin.manifestPath).toBe("/custom/path/agents.toml")
 		})
 
 		it("uses clone fetch strategy without sparse", () => {
@@ -164,7 +164,7 @@ describe("resolveValidatedDependency", () => {
 				  "gh": "superpowers-marketplace/superpowers",
 				  "origin": {
 				    "alias": "superpowers",
-				    "manifestPath": "/test/package.toml",
+				    "manifestPath": "/test/agents.toml",
 				  },
 				  "path": undefined,
 				  "ref": undefined,
@@ -270,7 +270,7 @@ describe("resolveValidatedDependency", () => {
 				  "gh": "superpowers-marketplace/elements-of-style",
 				  "origin": {
 				    "alias": "elements",
-				    "manifestPath": "/test/package.toml",
+				    "manifestPath": "/test/agents.toml",
 				  },
 				  "path": "skills",
 				  "ref": {
@@ -305,7 +305,7 @@ describe("resolveValidatedDependency", () => {
 				  },
 				  "origin": {
 				    "alias": "repo",
-				    "manifestPath": "/test/package.toml",
+				    "manifestPath": "/test/agents.toml",
 				  },
 				  "path": undefined,
 				  "ref": undefined,
@@ -368,7 +368,7 @@ describe("resolveValidatedDependency", () => {
 				  },
 				  "origin": {
 				    "alias": "utils",
-				    "manifestPath": "/test/package.toml",
+				    "manifestPath": "/test/agents.toml",
 				  },
 				  "path": "skills/utils",
 				  "ref": {
@@ -404,7 +404,7 @@ describe("resolveValidatedDependency", () => {
 				  },
 				  "origin": {
 				    "alias": "my-skill",
-				    "manifestPath": "/test/package.toml",
+				    "manifestPath": "/test/agents.toml",
 				  },
 				  "type": "local",
 				}
@@ -465,7 +465,7 @@ describe("resolveValidatedDependency", () => {
 				  "marketplace": "https://github.com/anthropics/claude-plugins",
 				  "origin": {
 				    "alias": "web-search",
-				    "manifestPath": "/test/package.toml",
+				    "manifestPath": "/test/agents.toml",
 				  },
 				  "plugin": "web-search",
 				  "type": "claude-plugin",
