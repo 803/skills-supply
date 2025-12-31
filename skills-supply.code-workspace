@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../agents-toml"
+		},
+		{
+			"path": "../scoop-sk"
+		},
+		{
+			"path": "../homebrew-sk"
+		}
+	],
+	"settings": {}
+}
