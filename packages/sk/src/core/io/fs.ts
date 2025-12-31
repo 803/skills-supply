@@ -1,10 +1,10 @@
 import { lstat, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises"
-import type { IoError, IoResult } from "@/core/io/types"
-import { ioFailure } from "@/core/io/types"
-import { formatError } from "@/utils/errors"
+import type { IoResult } from "@/src/core/io/types"
+import { ioFailure } from "@/src/core/io/types"
+import { formatError } from "@/src/utils/errors"
 
 // Re-export types for convenience
-export type { IoError, IoResult } from "@/core/io/types"
+export type { IoError, IoResult } from "@/src/core/io/types"
 
 type StatResult = IoResult<Awaited<ReturnType<typeof stat>> | null>
 type LStatResult = IoResult<Awaited<ReturnType<typeof lstat>> | null>

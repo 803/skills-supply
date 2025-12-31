@@ -3,7 +3,7 @@ import {
 	isManifestNotFoundError,
 	loadManifestFromCwd,
 	type ManifestLoadResult,
-} from "@/core/manifest/fs"
+} from "@/src/core/manifest/fs"
 
 export async function loadManifestForUpdate(): Promise<ManifestLoadResult> {
 	try {

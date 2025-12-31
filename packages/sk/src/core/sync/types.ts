@@ -1,6 +1,6 @@
-import type { AgentDefinition } from "@/core/agents/types"
-import type { Manifest, MergedManifest } from "@/core/manifest/types"
-import type { CanonicalPackage, Skill } from "@/core/packages/types"
+import type { AgentDefinition } from "@/src/core/agents/types"
+import type { Manifest, MergedManifest } from "@/src/core/manifest/types"
+import type { CanonicalPackage, Skill } from "@/src/core/packages/types"
 
 export type SyncStage =
 	| "discover"

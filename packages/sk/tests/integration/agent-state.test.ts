@@ -13,12 +13,12 @@ import {
 	readAgentState,
 	resolveStatePath,
 	writeAgentState,
-} from "../../src/core/agents/state"
-import type { AgentDefinition, AgentId } from "../../src/core/agents/types"
-import { exists, isFile, withTempDir } from "../helpers/fs"
+} from "@/src/core/agents/state"
+import type { AgentDefinition, AgentId } from "@/src/core/agents/types"
+import { exists, isFile, withTempDir } from "@/tests/helpers/fs"
 
 // Import assertions to register custom matchers
-import "../helpers/assertions"
+import "@/tests/helpers/assertions"
 
 /**
  * Creates a minimal agent definition for testing.

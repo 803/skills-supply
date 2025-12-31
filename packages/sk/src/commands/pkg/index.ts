@@ -1,14 +1,18 @@
 import { confirm, isCancel, select, text } from "@clack/prompts"
 import { consola } from "consola"
-import { loadManifestForUpdate } from "@/commands/manifest-prompt"
-import type { AddOptions } from "@/commands/pkg/spec"
-import { buildPackageSpec } from "@/commands/pkg/spec"
-import { coerceDependency } from "@/core/manifest/coerce"
-import { loadManifestFromCwd, saveManifest } from "@/core/manifest/fs"
-import { addDependency, hasDependency, removeDependency } from "@/core/manifest/transform"
-import type { Alias } from "@/core/types/branded"
-import { coerceAlias } from "@/core/types/coerce"
-import { formatError } from "@/utils/errors"
+import { loadManifestForUpdate } from "@/src/commands/manifest-prompt"
+import type { AddOptions } from "@/src/commands/pkg/spec"
+import { buildPackageSpec } from "@/src/commands/pkg/spec"
+import { coerceDependency } from "@/src/core/manifest/coerce"
+import { loadManifestFromCwd, saveManifest } from "@/src/core/manifest/fs"
+import {
+	addDependency,
+	hasDependency,
+	removeDependency,
+} from "@/src/core/manifest/transform"
+import type { Alias } from "@/src/core/types/branded"
+import { coerceAlias } from "@/src/core/types/coerce"
+import { formatError } from "@/src/utils/errors"
 
 export async function pkgInteractive(): Promise<void> {
 	consola.info("sk pkg")

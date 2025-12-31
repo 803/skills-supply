@@ -4,11 +4,10 @@ import type {
 	Alias,
 	GithubRef,
 	GitRef,
-	ManifestDiscoveredAt,
 	ManifestOrigin,
 	NonEmptyString,
 	NormalizedGitUrl,
-} from "@/core/types/branded"
+} from "@/src/core/types/branded"
 
 // =============================================================================
 // RAW DECLARATION TYPES (from TOML, before validation)

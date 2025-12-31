@@ -4,8 +4,8 @@ import path from "node:path"
 import type {
 	ManifestDiscoveryError,
 	ManifestDiscoveryResult,
-} from "@/core/manifest/types"
-import type { AbsolutePath } from "@/core/types/branded"
+} from "@/src/core/manifest/types"
+import type { AbsolutePath } from "@/src/core/types/branded"
 
 const MANIFEST_FILENAME = "package.toml"
 const USER_MANIFEST_DIR = ".sk"

@@ -4,7 +4,7 @@
 		"composite": true,
 		"noEmit": true,
 		"paths": {
-			"@/*": ["./src/*"]
+			"@/*": ["./*"]
 		},
 		"rootDir": "./src",
 		"types": ["node"]

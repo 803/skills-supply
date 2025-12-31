@@ -1,15 +1,14 @@
 import { parse, TomlError } from "smol-toml"
 import { z } from "zod"
+import { coerceManifest, type RawParsedManifest } from "@/src/core/manifest/coerce"
 import type {
-	LegacyManifest,
 	LegacyManifestParseResult,
 	ManifestExports,
 	ManifestParseError,
 	ManifestParseResult,
-} from "@/core/manifest/types"
-import type { AbsolutePath, ManifestDiscoveredAt } from "@/core/types/branded"
-import { coerceAbsolutePathDirect } from "@/core/types/coerce"
-import { coerceManifest, type RawParsedManifest } from "./coerce.js"
+} from "@/src/core/manifest/types"
+import type { AbsolutePath, ManifestDiscoveredAt } from "@/src/core/types/branded"
+import { coerceAbsolutePathDirect } from "@/src/core/types/coerce"
 
 type ParseResult<T> = { ok: true; value: T } | { ok: false; error: ManifestParseError }
 

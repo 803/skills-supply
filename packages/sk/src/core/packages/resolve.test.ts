@@ -9,29 +9,30 @@
  */
 
 import { describe, expect, it } from "vitest"
-import "../../../tests/helpers/assertions"
+import "@/tests/helpers/assertions"
 import type {
 	ManifestDependencyEntry,
 	MergedManifest,
 	ValidatedClaudePluginDependency,
-	ValidatedDependency,
 	ValidatedGitDependency,
 	ValidatedGithubDependency,
 	ValidatedLocalDependency,
 	ValidatedRegistryDependency,
-} from "@/core/manifest/types"
+} from "@/src/core/manifest/types"
+import {
+	resolveMergedPackages,
+	resolveValidatedDependency,
+} from "@/src/core/packages/resolve"
 import type {
 	AbsolutePath,
 	AgentId,
 	Alias,
 	GithubRef,
-	GitRef,
 	ManifestOrigin,
 	NonEmptyString,
 	NormalizedGitUrl,
 	PackageOrigin,
-} from "@/core/types/branded"
-import { resolveMergedPackages, resolveValidatedDependency } from "./resolve"
+} from "@/src/core/types/branded"
 
 // =============================================================================
 // TEST HELPERS - create branded types for test fixtures

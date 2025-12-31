@@ -1,9 +1,9 @@
 import { consola } from "consola"
-import { removeCredentials } from "@/credentials/remove"
-import { getStoredCredentials } from "@/credentials/retrieve"
-import { SK_BASE_URL } from "@/env"
-import { formatError } from "@/utils/errors"
-import { fetchWithRetry } from "@/utils/fetch"
+import { removeCredentials } from "@/src/credentials/remove"
+import { getStoredCredentials } from "@/src/credentials/retrieve"
+import { SK_BASE_URL } from "@/src/env"
+import { formatError } from "@/src/utils/errors"
+import { fetchWithRetry } from "@/src/utils/fetch"
 
 export async function logout(): Promise<void> {
 	consola.info("sk logout")

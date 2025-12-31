@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 import path from "node:path"
-import type { GitRef } from "@/core/packages/types"
+import type { GitRef } from "@/src/core/packages/types"
 
 export function buildRepoKey(
 	type: "github" | "git",

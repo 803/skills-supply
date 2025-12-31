@@ -7,23 +7,6 @@
 
 import path from "node:path"
 import type {
-	AbsolutePath,
-	AgentId,
-	Alias,
-	GitRef,
-	ManifestDiscoveredAt,
-	ManifestOrigin,
-	NonEmptyString,
-} from "@/core/types/branded"
-import {
-	coerceAbsolutePath,
-	coerceAlias,
-	coerceGithubRef,
-	coerceGitRef,
-	coerceGitUrl,
-	coerceNonEmpty,
-} from "@/core/types/coerce"
-import type {
 	ClaudePluginDeclaration,
 	DependencyDeclaration,
 	GithubPackageDeclaration,
@@ -41,7 +24,24 @@ import type {
 	ValidatedManifestExports,
 	ValidatedPackageMetadata,
 	ValidatedRegistryDependency,
-} from "./types.js"
+} from "@/src/core/manifest/types"
+import type {
+	AbsolutePath,
+	AgentId,
+	Alias,
+	GitRef,
+	ManifestDiscoveredAt,
+	ManifestOrigin,
+	NonEmptyString,
+} from "@/src/core/types/branded"
+import {
+	coerceAbsolutePath,
+	coerceAlias,
+	coerceGithubRef,
+	coerceGitRef,
+	coerceGitUrl,
+	coerceNonEmpty,
+} from "@/src/core/types/coerce"
 
 // =============================================================================
 // RESULT TYPE
@@ -103,9 +103,20 @@ function parseRegistryString(
 	const atOrgMatch = value.match(/^@([^/]+)\/([^@]+)@(.+)$/)
 	if (atOrgMatch) {
 		const [, orgStr, nameStr, versionStr] = atOrgMatch
-		const org = coerceNonEmpty(orgStr!)
-		const name = coerceNonEmpty(nameStr!)
-		const version = coerceNonEmpty(versionStr!)
+		if (!orgStr || !nameStr || !versionStr) {
+			return {
+				error: {
+					key: alias,
+					message: `Invalid registry dependency format: ${value}`,
+					sourcePath,
+					type: "coercion_failed",
+				},
+				ok: false,
+			}
+		}
+		const org = coerceNonEmpty(orgStr)
+		const name = coerceNonEmpty(nameStr)
+		const version = coerceNonEmpty(versionStr)
 		if (!org || !name || !version) {
 			return {
 				error: {
@@ -123,8 +134,19 @@ function parseRegistryString(
 	const simpleMatch = value.match(/^([^@]+)@(.+)$/)
 	if (simpleMatch) {
 		const [, nameStr, versionStr] = simpleMatch
-		const name = coerceNonEmpty(nameStr!)
-		const version = coerceNonEmpty(versionStr!)
+		if (!nameStr || !versionStr) {
+			return {
+				error: {
+					key: alias,
+					message: `Invalid registry dependency format: ${value}`,
+					sourcePath,
+					type: "coercion_failed",
+				},
+				ok: false,
+			}
+		}
+		const name = coerceNonEmpty(nameStr)
+		const version = coerceNonEmpty(versionStr)
 		if (!name || !version) {
 			return {
 				error: {

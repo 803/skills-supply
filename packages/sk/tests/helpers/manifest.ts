@@ -9,7 +9,7 @@ import type {
 	ManifestExports,
 	PackageMetadata,
 	RawManifest,
-} from "../../src/core/manifest/types"
+} from "@/src/core/manifest/types"
 
 /**
  * Partial overrides for building a RawManifest.

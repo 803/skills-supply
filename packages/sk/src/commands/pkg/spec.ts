@@ -4,7 +4,7 @@ import type {
 	GithubPackageDeclaration,
 	GitPackageDeclaration,
 	LocalPackageDeclaration,
-} from "@/core/manifest/types"
+} from "@/src/core/manifest/types"
 
 export interface AddOptions {
 	tag?: string

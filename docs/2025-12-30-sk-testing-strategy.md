@@ -349,25 +349,11 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
-    exclude: ['tests/e2e/**/*.test.ts'],
+    testTimeout: 30000, // E2E tests are slower
     coverage: {
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts'],
     },
-  },
-})
-```
-
-Separate config for E2E:
-
-```typescript
-// packages/sk/vitest.e2e.config.ts
-import { defineConfig } from 'vitest/config'
-
-export default defineConfig({
-  test: {
-    include: ['tests/e2e/**/*.test.ts'],
-    testTimeout: 30000, // E2E tests are slower
   },
 })
 ```
@@ -379,7 +365,7 @@ NPM scripts:
   "scripts": {
     "test": "vitest",
     "test:unit": "vitest --exclude tests/e2e",
-    "test:e2e": "vitest --config vitest.e2e.config.ts",
+    "test:e2e": "vitest --include tests/e2e/**/*.test.ts",
     "test:coverage": "vitest --coverage"
   }
 }

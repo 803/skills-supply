@@ -8,7 +8,7 @@ import type {
 	AgentListResult,
 	AgentLookupResult,
 	AgentRegistryError,
-} from "@/core/agents/types"
+} from "@/src/core/agents/types"
 
 interface AgentEntry {
 	id: AgentId

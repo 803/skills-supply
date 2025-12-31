@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config"
 export default defineConfig({
 	resolve: {
 		alias: {
-			"@": resolve(__dirname, "./src"),
+			"@": resolve(__dirname, "./"),
 		},
 	},
 	test: {
@@ -12,7 +12,8 @@ export default defineConfig({
 			exclude: ["src/**/*.test.ts"],
 			include: ["src/**/*.ts"],
 		},
-		exclude: ["tests/e2e/**/*.test.ts"],
 		include: ["src/**/*.test.ts", "tests/**/*.test.ts"],
+		name: "sk",
+		testTimeout: 30000,
 	},
 })

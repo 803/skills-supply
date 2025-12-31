@@ -1,13 +1,13 @@
 import { consola } from "consola"
-import { loadManifestForUpdate } from "@/commands/manifest-prompt"
-import type { AddOptions } from "@/commands/pkg/spec"
-import { buildPackageSpec } from "@/commands/pkg/spec"
-import { coerceDependency } from "@/core/manifest/coerce"
-import { saveManifest } from "@/core/manifest/fs"
-import { addDependency, getDependency } from "@/core/manifest/transform"
-import type { ValidatedDependency } from "@/core/manifest/types"
-import { coerceAlias } from "@/core/types/coerce"
-import { formatError } from "@/utils/errors"
+import { loadManifestForUpdate } from "@/src/commands/manifest-prompt"
+import type { AddOptions } from "@/src/commands/pkg/spec"
+import { buildPackageSpec } from "@/src/commands/pkg/spec"
+import { coerceDependency } from "@/src/core/manifest/coerce"
+import { saveManifest } from "@/src/core/manifest/fs"
+import { addDependency, getDependency } from "@/src/core/manifest/transform"
+import type { ValidatedDependency } from "@/src/core/manifest/types"
+import { coerceAlias } from "@/src/core/types/coerce"
+import { formatError } from "@/src/utils/errors"
 
 export async function pkgAdd(
 	type: string,

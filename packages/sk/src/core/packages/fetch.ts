@@ -7,9 +7,9 @@ import type {
 	LocalPackage,
 	PackageFetchError,
 	PackageFetchResult,
-} from "@/core/packages/types"
-import type { PackageOrigin } from "@/core/types/branded"
-import { ensureGitAvailable } from "@/utils/git"
+} from "@/src/core/packages/types"
+import type { PackageOrigin } from "@/src/core/types/branded"
+import { ensureGitAvailable } from "@/src/utils/git"
 
 const execFileAsync = promisify(execFile)
 

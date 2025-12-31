@@ -5,19 +5,25 @@
  * in actual tests.
  */
 
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { exists, isDirectory, isFile, setupFixturePackage, withTempDir } from "./fs"
+import {
+	exists,
+	isDirectory,
+	isFile,
+	setupFixturePackage,
+	withTempDir,
+} from "@/tests/helpers/fs"
 import {
 	buildManifestWithGithubDeps,
 	buildManifestWithLocalDeps,
 	buildMultiAgentManifest,
 	buildRawManifest,
-} from "./manifest"
+} from "@/tests/helpers/manifest"
 
 // Import assertions to register custom matchers
-import "./assertions"
+import "@/tests/helpers/assertions"
 
 describe("withTempDir", () => {
 	it("creates a temporary directory that exists during callback", async () => {
@@ -33,7 +39,10 @@ describe("withTempDir", () => {
 
 		// Directory should be cleaned up after callback
 		expect(capturedDir).not.toBeNull()
-		expect(await exists(capturedDir!)).toBe(false)
+		if (!capturedDir) {
+			throw new Error("Expected temporary directory to be captured.")
+		}
+		expect(await exists(capturedDir)).toBe(false)
 	})
 
 	it("cleans up even if callback throws", async () => {
@@ -48,7 +57,10 @@ describe("withTempDir", () => {
 
 		// Directory should still be cleaned up
 		expect(capturedDir).not.toBeNull()
-		expect(await exists(capturedDir!)).toBe(false)
+		if (!capturedDir) {
+			throw new Error("Expected temporary directory to be captured.")
+		}
+		expect(await exists(capturedDir)).toBe(false)
 	})
 
 	it("returns the value from the callback", async () => {

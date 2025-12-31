@@ -9,10 +9,15 @@
  */
 
 import { describe, expect, it } from "vitest"
-import "../../../tests/helpers/assertions"
-import type { AbsolutePath, AgentId, Alias, ManifestOrigin } from "@/core/types/branded"
-import { mergeManifests } from "./merge"
-import type { Manifest, ValidatedDependency } from "./types"
+import "@/tests/helpers/assertions"
+import { mergeManifests } from "@/src/core/manifest/merge"
+import type { Manifest, ValidatedDependency } from "@/src/core/manifest/types"
+import type {
+	AbsolutePath,
+	AgentId,
+	Alias,
+	ManifestOrigin,
+} from "@/src/core/types/branded"
 
 // =============================================================================
 // TEST HELPERS

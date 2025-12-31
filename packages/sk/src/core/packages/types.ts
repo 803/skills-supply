@@ -1,20 +1,19 @@
 import type {
 	AbsolutePath,
-	Alias,
 	FetchStrategy,
 	GithubRef,
 	GitRef,
 	NonEmptyString,
 	NormalizedGitUrl,
 	PackageOrigin,
-} from "@/core/types/branded"
+} from "@/src/core/types/branded"
 
 // =============================================================================
 // PACKAGE ORIGIN
 // =============================================================================
 
 // Re-export from branded types for convenience
-export type { FetchStrategy, GitRef, PackageOrigin } from "@/core/types/branded"
+export type { FetchStrategy, GitRef, PackageOrigin } from "@/src/core/types/branded"
 
 // =============================================================================
 // CANONICAL PACKAGE TYPES

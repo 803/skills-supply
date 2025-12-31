@@ -1,5 +1,5 @@
-import { failSync } from "@/core/sync/errors"
-import type { ExtractedPackage, SyncResult } from "@/core/sync/types"
+import { failSync } from "@/src/core/sync/errors"
+import type { ExtractedPackage, SyncResult } from "@/src/core/sync/types"
 
 export function validateExtractedPackages(
 	packages: ExtractedPackage[],

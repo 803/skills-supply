@@ -1,10 +1,10 @@
 import { consola } from "consola"
-import { getAgentById } from "@/core/agents/registry"
-import type { AgentDefinition } from "@/core/agents/types"
-import { loadManifestFromCwd, saveManifest } from "@/core/manifest/fs"
-import { getAgent, setAgent } from "@/core/manifest/transform"
-import type { AgentId } from "@/core/types/branded"
-import { formatError } from "@/utils/errors"
+import { getAgentById } from "@/src/core/agents/registry"
+import type { AgentDefinition } from "@/src/core/agents/types"
+import { loadManifestFromCwd, saveManifest } from "@/src/core/manifest/fs"
+import { getAgent, setAgent } from "@/src/core/manifest/transform"
+import type { AgentId } from "@/src/core/types/branded"
+import { formatError } from "@/src/utils/errors"
 
 type AgentAction = "enable" | "disable"
 

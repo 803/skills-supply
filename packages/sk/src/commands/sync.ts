@@ -1,6 +1,6 @@
 import { consola } from "consola"
-import { runSync } from "@/core/sync/sync"
-import { formatError } from "@/utils/errors"
+import { runSync } from "@/src/core/sync/sync"
+import { formatError } from "@/src/utils/errors"
 
 export async function syncCommand(options: { dryRun: boolean }): Promise<void> {
 	consola.info("sk sync")

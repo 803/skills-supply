@@ -16,7 +16,7 @@ import type {
 	GitRef,
 	NonEmptyString,
 	NormalizedGitUrl,
-} from "./branded.js"
+} from "@/src/core/types/branded"
 
 // === NON-EMPTY STRING ===
 

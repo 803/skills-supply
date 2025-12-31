@@ -2,7 +2,7 @@ import { spawn } from "node:child_process"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { getCredentialHelper } from "@/credentials/helper"
+import { getCredentialHelper } from "@/src/credentials/helper"
 
 export function storeCredentials(baseUrl: string, username: string, token: string): void {
 	const helper = getCredentialHelper()

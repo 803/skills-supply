@@ -11,14 +11,14 @@
 import { mkdir, readdir, readFile, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { AgentDefinition, AgentId } from "../../src/core/agents/types"
+import type { AgentDefinition, AgentId } from "@/src/core/agents/types"
 import {
 	createTestProject,
 	exists,
 	isDirectory,
 	setupFixturePackage,
 	withTempDir,
-} from "../helpers"
+} from "@/tests/helpers"
 
 // Store test context
 let testAgentSkillsDir: string
@@ -61,7 +61,7 @@ vi.mock("../../src/core/agents/registry", () => ({
 }))
 
 // Import sync after mocking
-import { runSync } from "../../src/core/sync/sync"
+import { runSync } from "@/src/core/sync/sync"
 
 /**
  * Helper to read the .sk-state.json file from an agent's skills directory.

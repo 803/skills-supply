@@ -4,10 +4,10 @@
  * Import from this file to get all test utilities in one place.
  *
  * @example
- * import { withTempDir, buildRawManifest, runSync } from '../helpers'
+ * import { withTempDir, buildRawManifest, runSync } from "@/tests/helpers"
  */
 
-export * from "./assertions"
-export * from "./e2e"
-export * from "./fs"
-export * from "./manifest"
+export * from "@/tests/helpers/assertions"
+export * from "@/tests/helpers/e2e"
+export * from "@/tests/helpers/fs"
+export * from "@/tests/helpers/manifest"

@@ -1,8 +1,8 @@
 import path from "node:path"
-import type { AgentInstallState } from "@/core/agents/state"
-import type { AgentDefinition } from "@/core/agents/types"
-import type { IoResult } from "@/core/io/fs"
-import { removePath } from "@/core/io/fs"
+import type { AgentInstallState } from "@/src/core/agents/state"
+import type { AgentDefinition } from "@/src/core/agents/types"
+import type { IoResult } from "@/src/core/io/fs"
+import { removePath } from "@/src/core/io/fs"
 
 export interface ReconcileResult {
 	removed: string[]

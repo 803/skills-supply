@@ -2,26 +2,30 @@ import { execFile } from "node:child_process"
 import { homedir } from "node:os"
 import path from "node:path"
 import { promisify } from "node:util"
-import type { AgentDefinition } from "@/core/agents/types"
-import { readTextFile, safeStat } from "@/core/io/fs"
-import { coerceDependency } from "@/core/manifest/coerce"
-import type { DependencyDeclaration } from "@/core/manifest/types"
+import type { AgentDefinition } from "@/src/core/agents/types"
+import { readTextFile, safeStat } from "@/src/core/io/fs"
+import { coerceDependency } from "@/src/core/manifest/coerce"
+import type { DependencyDeclaration } from "@/src/core/manifest/types"
 import {
 	fetchGithubRepository,
 	fetchGitRepository,
 	parseGithubSlug,
-} from "@/core/packages/fetch"
-import { resolveValidatedDependency } from "@/core/packages/resolve"
+} from "@/src/core/packages/fetch"
+import { resolveValidatedDependency } from "@/src/core/packages/resolve"
 import type {
 	CanonicalPackage,
 	ClaudePluginPackage,
 	PackageOrigin,
-} from "@/core/packages/types"
-import { failSync } from "@/core/sync/errors"
-import { buildRepoDir, buildRepoKey } from "@/core/sync/repo"
-import type { SyncResult } from "@/core/sync/types"
-import type { AbsolutePath, Alias } from "@/core/types/branded"
-import { coerceAbsolutePathDirect, coerceAlias } from "@/core/types/coerce"
+} from "@/src/core/packages/types"
+import { failSync } from "@/src/core/sync/errors"
+import { buildRepoDir, buildRepoKey } from "@/src/core/sync/repo"
+import type { SyncResult } from "@/src/core/sync/types"
+import type { AbsolutePath, Alias } from "@/src/core/types/branded"
+import {
+	coerceAbsolutePath,
+	coerceAbsolutePathDirect,
+	coerceAlias,
+} from "@/src/core/types/coerce"
 
 // Create a fake origin for marketplace operations
 function createMarketplaceOrigin(manifestPath: string): PackageOrigin {
@@ -591,7 +595,13 @@ async function resolvePluginSource(
 	}
 
 	const baseDir = resolveMarketplacePluginBasePath(marketplace)
-	const manifestPath = coerceAbsolutePathDirect(path.join(baseDir, "package.toml"))!
+	const manifestPath = coerceAbsolutePath("package.toml", baseDir)
+	if (!manifestPath) {
+		return failSync(
+			"resolve",
+			new Error(`Marketplace base path is invalid: ${baseDir}`),
+		)
+	}
 
 	// Coerce the declaration to a validated dependency
 	const coerced = coerceDependency(declaration.value, alias, manifestPath)

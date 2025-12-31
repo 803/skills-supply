@@ -23,7 +23,7 @@
 		"clean": "rm -rf dist bin",
 		"test": "vitest",
 		"test:coverage": "vitest --coverage",
-		"test:e2e": "vitest --config vitest.e2e.config.ts",
+		"test:e2e": "vitest --include tests/e2e/**/*.test.ts",
 		"test:unit": "vitest --exclude tests/e2e"
 	},
 	"type": "module",

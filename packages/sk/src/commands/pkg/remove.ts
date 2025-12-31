@@ -1,8 +1,8 @@
 import { consola } from "consola"
-import { loadManifestFromCwd, saveManifest } from "@/core/manifest/fs"
-import { hasDependency, removeDependency } from "@/core/manifest/transform"
-import { coerceAlias } from "@/core/types/coerce"
-import { formatError } from "@/utils/errors"
+import { loadManifestFromCwd, saveManifest } from "@/src/core/manifest/fs"
+import { hasDependency, removeDependency } from "@/src/core/manifest/transform"
+import { coerceAlias } from "@/src/core/types/coerce"
+import { formatError } from "@/src/utils/errors"
 
 export async function pkgRemove(alias: string): Promise<void> {
 	consola.info("sk pkg remove")

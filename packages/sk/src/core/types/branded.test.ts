@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest"
-import "../../../tests/helpers/assertions"
+import "@/tests/helpers/assertions"
 import {
 	coerceAbsolutePath,
 	coerceAbsolutePathDirect,
@@ -25,7 +25,7 @@ import {
 	isGithubRef,
 	isNonEmpty,
 	isNormalizedGitUrl,
-} from "./coerce"
+} from "@/src/core/types/coerce"
 
 // ============================================================================
 // NonEmptyString
@@ -603,7 +603,7 @@ describe("unwrap", () => {
 	// Note: unwrap is just a passthrough, but we test to document the contract
 	it("unwraps branded string to plain string", async () => {
 		// Dynamic import to get unwrap
-		const { unwrap } = await import("./branded")
+		const { unwrap } = await import("@/src/core/types/branded")
 		const branded = coerceNonEmpty("hello")
 		expect(branded).not.toBeNull()
 		if (branded) {

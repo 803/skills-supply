@@ -12,13 +12,12 @@ import {
 	type AgentInstallPlan,
 	applyAgentInstall,
 	type InstallGuard,
-	type InstallTask,
 	planAgentInstall,
-} from "../../src/core/agents/install"
-import type { AgentDefinition, InstallablePackage } from "../../src/core/agents/types"
-import type { CanonicalPackage, Skill } from "../../src/core/packages/types"
-import type { AbsolutePath, Alias, NonEmptyString } from "../../src/core/types/branded"
-import { exists, isDirectory, withTempDir } from "../helpers"
+} from "@/src/core/agents/install"
+import type { AgentDefinition, InstallablePackage } from "@/src/core/agents/types"
+import type { CanonicalPackage, Skill } from "@/src/core/packages/types"
+import type { AbsolutePath, Alias, NonEmptyString } from "@/src/core/types/branded"
+import { exists, isDirectory, withTempDir } from "@/tests/helpers"
 
 // =============================================================================
 // TEST HELPERS

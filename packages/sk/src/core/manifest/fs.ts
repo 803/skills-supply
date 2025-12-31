@@ -1,9 +1,9 @@
 import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
-import { parseManifest } from "@/core/manifest/parse"
-import type { Manifest, ValidatedDependency } from "@/core/manifest/types"
-import { serializeManifest } from "@/core/manifest/write"
-import type { AbsolutePath, AgentId, Alias } from "@/core/types/branded"
+import { parseManifest } from "@/src/core/manifest/parse"
+import type { Manifest, ValidatedDependency } from "@/src/core/manifest/types"
+import { serializeManifest } from "@/src/core/manifest/write"
+import type { AbsolutePath, AgentId, Alias } from "@/src/core/types/branded"
 
 export interface ManifestLoadResult {
 	created: boolean

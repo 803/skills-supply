@@ -9,11 +9,11 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { discoverManifests } from "../../src/core/manifest/discover"
-import { withTempDir } from "../helpers/fs"
+import { discoverManifests } from "@/src/core/manifest/discover"
+import { withTempDir } from "@/tests/helpers/fs"
 
 // Import assertions to register custom matchers
-import "../helpers/assertions"
+import "@/tests/helpers/assertions"
 
 describe("discoverManifests", () => {
 	describe("finding manifest in current directory", () => {

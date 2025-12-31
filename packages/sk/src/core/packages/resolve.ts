@@ -14,7 +14,7 @@ import type {
 	ValidatedGithubDependency,
 	ValidatedLocalDependency,
 	ValidatedRegistryDependency,
-} from "@/core/manifest/types"
+} from "@/src/core/manifest/types"
 import type {
 	CanonicalPackage,
 	ClaudePluginPackage,
@@ -22,14 +22,12 @@ import type {
 	GitPackage,
 	LocalPackage,
 	RegistryPackage,
-	ResolveManifestPackagesResult,
-} from "@/core/packages/types"
+} from "@/src/core/packages/types"
 import type {
-	Alias,
 	FetchStrategy,
 	NonEmptyString,
 	PackageOrigin,
-} from "@/core/types/branded"
+} from "@/src/core/types/branded"
 
 const REGISTRY_NAME = "skills.supply" as NonEmptyString
 

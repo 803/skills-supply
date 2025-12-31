@@ -2,17 +2,17 @@
 
 import { Command } from "commander"
 import { consola } from "consola"
-import { agentAdd } from "@/commands/agent/add"
-import { agentInteractive } from "@/commands/agent/index"
-import { agentRemove } from "@/commands/agent/remove"
-import { auth } from "@/commands/auth"
-import { logout } from "@/commands/logout"
-import { pkgAdd } from "@/commands/pkg/add"
-import { pkgInteractive } from "@/commands/pkg/index"
-import { pkgRemove } from "@/commands/pkg/remove"
-import { status } from "@/commands/status"
-import { syncCommand } from "@/commands/sync"
-import { whoami } from "@/commands/whoami"
+import { agentAdd } from "@/src/commands/agent/add"
+import { agentInteractive } from "@/src/commands/agent/index"
+import { agentRemove } from "@/src/commands/agent/remove"
+import { auth } from "@/src/commands/auth"
+import { logout } from "@/src/commands/logout"
+import { pkgAdd } from "@/src/commands/pkg/add"
+import { pkgInteractive } from "@/src/commands/pkg/index"
+import { pkgRemove } from "@/src/commands/pkg/remove"
+import { status } from "@/src/commands/status"
+import { syncCommand } from "@/src/commands/sync"
+import { whoami } from "@/src/commands/whoami"
 
 async function main(): Promise<void> {
 	const program = new Command()

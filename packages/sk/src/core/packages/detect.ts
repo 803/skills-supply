@@ -3,13 +3,11 @@ import { readdir, stat } from "node:fs/promises"
 import path from "node:path"
 import type {
 	CanonicalPackage,
-	DetectedPackage,
-	DetectionMethod,
 	PackageDetectionError,
 	PackageDetectionResult,
-} from "@/core/packages/types"
-import type { AbsolutePath } from "@/core/types/branded"
-import { coerceAbsolutePathDirect } from "@/core/types/coerce"
+} from "@/src/core/packages/types"
+import type { AbsolutePath } from "@/src/core/types/branded"
+import { coerceAbsolutePath } from "@/src/core/types/coerce"
 
 const MANIFEST_FILENAME = "package.toml"
 const SKILL_FILENAME = "SKILL.md"
@@ -60,9 +58,14 @@ export async function detectPackageType(
 	}
 
 	// Check for package.toml (manifest)
-	const manifestPath = coerceAbsolutePathDirect(
-		path.join(packagePath, MANIFEST_FILENAME),
-	)!
+	const manifestPath = coerceAbsolutePath(MANIFEST_FILENAME, packagePath)
+	if (!manifestPath) {
+		return failure(
+			"invalid_package",
+			`Unable to resolve ${MANIFEST_FILENAME} under ${packagePath}.`,
+			packagePath,
+		)
+	}
 	const manifestExists = await fileExists(manifestPath, packagePath)
 	if (!manifestExists.ok) {
 		return manifestExists
@@ -105,9 +108,14 @@ export async function detectPackageType(
 		}
 
 		// Discover skills in plugin's skills directory
-		const skillsRoot = coerceAbsolutePathDirect(
-			path.join(packagePath, PLUGIN_SKILLS_DIR),
-		)!
+		const skillsRoot = coerceAbsolutePath(PLUGIN_SKILLS_DIR, packagePath)
+		if (!skillsRoot) {
+			return failure(
+				"invalid_package",
+				`Unable to resolve ${PLUGIN_SKILLS_DIR} under ${packagePath}.`,
+				packagePath,
+			)
+		}
 		const skillPaths = await discoverSkillPaths(skillsRoot, packagePath)
 		if (!skillPaths.ok) {
 			// Plugin might not have skills dir - that's okay
@@ -152,9 +160,14 @@ export async function detectPackageType(
 	}
 
 	// Check for single SKILL.md in root
-	const rootSkillPath = coerceAbsolutePathDirect(
-		path.join(packagePath, SKILL_FILENAME),
-	)!
+	const rootSkillPath = coerceAbsolutePath(SKILL_FILENAME, packagePath)
+	if (!rootSkillPath) {
+		return failure(
+			"invalid_package",
+			`Unable to resolve ${SKILL_FILENAME} under ${packagePath}.`,
+			packagePath,
+		)
+	}
 	const rootSkillExists = await fileExists(rootSkillPath, packagePath)
 	if (!rootSkillExists.ok) {
 		return rootSkillExists
@@ -197,9 +210,14 @@ async function discoverSkillPaths(
 			continue
 		}
 
-		const skillDir = coerceAbsolutePathDirect(
-			path.join(rootPath, String(entry.name)),
-		)!
+		const skillDir = coerceAbsolutePath(String(entry.name), rootPath)
+		if (!skillDir) {
+			return failure(
+				"invalid_package",
+				`Invalid skill directory entry "${entry.name}" under ${rootPath}.`,
+				rootPath,
+			)
+		}
 		const skillFile = path.join(skillDir, SKILL_FILENAME)
 		const skillExists = await fileExists(skillFile, errorPath)
 		if (!skillExists.ok) {

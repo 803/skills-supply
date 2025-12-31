@@ -1,8 +1,8 @@
 import { consola } from "consola"
-import { getStoredCredentials } from "@/credentials/retrieve"
-import { SK_BASE_URL } from "@/env"
-import { formatError } from "@/utils/errors"
-import { fetchWithRetry } from "@/utils/fetch"
+import { getStoredCredentials } from "@/src/credentials/retrieve"
+import { SK_BASE_URL } from "@/src/env"
+import { formatError } from "@/src/utils/errors"
+import { fetchWithRetry } from "@/src/utils/fetch"
 
 interface MeResponse {
 	email: string

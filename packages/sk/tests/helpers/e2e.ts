@@ -6,7 +6,7 @@
 
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import type { SyncOptions, SyncResult, SyncSummary } from "../../src/core/sync/types"
+import type { SyncOptions, SyncResult, SyncSummary } from "@/src/core/sync/types"
 
 /**
  * Options for running sync in tests.
@@ -149,4 +149,10 @@ ${depLines}
 /**
  * Re-export filesystem helpers for convenience.
  */
-export { exists, isDirectory, isFile, setupFixturePackage, withTempDir } from "./fs"
+export {
+	exists,
+	isDirectory,
+	isFile,
+	setupFixturePackage,
+	withTempDir,
+} from "@/tests/helpers/fs"

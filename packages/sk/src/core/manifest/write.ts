@@ -8,8 +8,8 @@ import type {
 	ValidatedLocalDependency,
 	ValidatedPackageMetadata,
 	ValidatedRegistryDependency,
-} from "@/core/manifest/types"
-import type { GitRef } from "@/core/types/branded"
+} from "@/src/core/manifest/types"
+import type { GitRef } from "@/src/core/types/branded"
 
 /**
  * Serialize a Manifest to TOML string.

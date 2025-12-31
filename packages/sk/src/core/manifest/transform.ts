@@ -1,5 +1,5 @@
-import type { AgentId, Alias } from "@/core/types/branded"
-import type { Manifest, ValidatedDependency } from "./types"
+import type { Manifest, ValidatedDependency } from "@/src/core/manifest/types"
+import type { AgentId, Alias } from "@/src/core/types/branded"
 
 /**
  * Pure transformation functions for Manifest.

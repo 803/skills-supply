@@ -1,19 +1,19 @@
 import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import type { AgentInstallPlan } from "@/core/agents/install"
-import { applyAgentInstall, planAgentInstall } from "@/core/agents/install"
-import { reconcileAgentSkills } from "@/core/agents/reconcile"
-import { detectInstalledAgents, getAgentById } from "@/core/agents/registry"
-import { buildAgentState, readAgentState, writeAgentState } from "@/core/agents/state"
-import type { AgentDefinition } from "@/core/agents/types"
-import { readTextFile, removePath, safeStat } from "@/core/io/fs"
-import { discoverManifests } from "@/core/manifest/discover"
-import { mergeManifests } from "@/core/manifest/merge"
-import { parseManifest } from "@/core/manifest/parse"
-import type { Manifest, MergedManifest } from "@/core/manifest/types"
-import { detectPackageType } from "@/core/packages/detect"
-import { extractSkills } from "@/core/packages/extract"
+import type { AgentInstallPlan } from "@/src/core/agents/install"
+import { applyAgentInstall, planAgentInstall } from "@/src/core/agents/install"
+import { reconcileAgentSkills } from "@/src/core/agents/reconcile"
+import { detectInstalledAgents, getAgentById } from "@/src/core/agents/registry"
+import { buildAgentState, readAgentState, writeAgentState } from "@/src/core/agents/state"
+import type { AgentDefinition } from "@/src/core/agents/types"
+import { readTextFile, removePath, safeStat } from "@/src/core/io/fs"
+import { discoverManifests } from "@/src/core/manifest/discover"
+import { mergeManifests } from "@/src/core/manifest/merge"
+import { parseManifest } from "@/src/core/manifest/parse"
+import type { Manifest, MergedManifest } from "@/src/core/manifest/types"
+import { detectPackageType } from "@/src/core/packages/detect"
+import { extractSkills } from "@/src/core/packages/extract"
 import {
 	fetchGithubRepository,
 	fetchGitRepository,
@@ -21,8 +21,8 @@ import {
 	joinRepoPath,
 	normalizeSparsePath,
 	parseGithubSlug,
-} from "@/core/packages/fetch"
-import { resolveMergedPackages } from "@/core/packages/resolve"
+} from "@/src/core/packages/fetch"
+import { resolveMergedPackages } from "@/src/core/packages/resolve"
 import type {
 	CanonicalPackage,
 	FetchedPackage,
@@ -30,19 +30,18 @@ import type {
 	GitPackage,
 	GitRef,
 	PackageOrigin,
-} from "@/core/packages/types"
-import { failSync } from "@/core/sync/errors"
-import { resolveAgentPackages } from "@/core/sync/marketplace"
-import { buildRepoDir, buildRepoKey } from "@/core/sync/repo"
+} from "@/src/core/packages/types"
+import { failSync } from "@/src/core/sync/errors"
+import { resolveAgentPackages } from "@/src/core/sync/marketplace"
+import { buildRepoDir, buildRepoKey } from "@/src/core/sync/repo"
 import type {
 	ExtractedPackage,
 	SyncOptions,
 	SyncResult,
 	SyncSummary,
-} from "@/core/sync/types"
-import { validateExtractedPackages } from "@/core/sync/validate"
-import type { AbsolutePath } from "@/core/types/branded"
-import { coerceAbsolutePathDirect } from "@/core/types/coerce"
+} from "@/src/core/sync/types"
+import { validateExtractedPackages } from "@/src/core/sync/validate"
+import { coerceAbsolutePathDirect } from "@/src/core/types/coerce"
 
 interface AgentSyncSummary {
 	agent: AgentDefinition
@@ -407,14 +406,29 @@ async function fetchPackagesForAgent(
 			return failSync("fetch", repoResult.error)
 		}
 
+		const repoPath = coerceAbsolutePathDirect(repoResult.value.repoPath)
+		if (!repoPath) {
+			return failSync(
+				"fetch",
+				new Error(`Invalid repo path: ${repoResult.value.repoPath}`),
+			)
+		}
+
 		for (const member of group.packages) {
 			const packagePath = member.normalizedPath
-				? joinRepoPath(repoResult.value.repoPath, member.normalizedPath)
-				: repoResult.value.repoPath
+				? joinRepoPath(repoPath, member.normalizedPath)
+				: repoPath
+			const absolutePackagePath = coerceAbsolutePathDirect(packagePath)
+			if (!absolutePackagePath) {
+				return failSync(
+					"fetch",
+					new Error(`Invalid package path: ${packagePath}`),
+				)
+			}
 			fetched.push({
 				canonical: member.canonical,
-				packagePath: coerceAbsolutePathDirect(packagePath)!,
-				repoPath: coerceAbsolutePathDirect(repoResult.value.repoPath)!,
+				packagePath: absolutePackagePath,
+				repoPath,
 			})
 		}
 	}

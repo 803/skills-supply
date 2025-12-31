@@ -1,4 +1,4 @@
-import type { SyncError, SyncResult, SyncStage } from "@/core/sync/types"
+import type { SyncError, SyncResult, SyncStage } from "@/src/core/sync/types"
 
 export function failSync(
 	stage: SyncStage,

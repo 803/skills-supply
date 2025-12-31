@@ -1,15 +1,15 @@
 import type { Dirent } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
-import { parseLegacyManifest } from "@/core/manifest/parse"
+import { parseLegacyManifest } from "@/src/core/manifest/parse"
 import type {
 	DetectedPackage,
 	PackageExtractionError,
 	PackageExtractionResult,
 	Skill,
-} from "@/core/packages/types"
-import type { AbsolutePath } from "@/core/types/branded"
-import { coerceAbsolutePathDirect, coerceNonEmpty } from "@/core/types/coerce"
+} from "@/src/core/packages/types"
+import type { AbsolutePath } from "@/src/core/types/branded"
+import { coerceAbsolutePath, coerceNonEmpty } from "@/src/core/types/coerce"
 
 const SKILL_FILENAME = "SKILL.md"
 
@@ -74,9 +74,15 @@ async function extractFromManifest(
 		)
 	}
 
-	const skillsRoot = coerceAbsolutePathDirect(
-		path.resolve(path.dirname(manifestPath), skillsSetting),
-	)!
+	const skillsRoot = coerceAbsolutePath(skillsSetting, path.dirname(manifestPath))
+	if (!skillsRoot) {
+		return failure(
+			"invalid_skill",
+			`Invalid skills path "${skillsSetting}" in ${manifestPath}.`,
+			manifestPath,
+			origin,
+		)
+	}
 	const skillDirs = await discoverSkillDirs(skillsRoot)
 	if (!skillDirs.ok) {
 		return skillDirs
@@ -131,8 +137,22 @@ async function discoverSkillDirs(rootDir: AbsolutePath): Promise<SkillDirResult>
 			continue
 		}
 
-		const skillDir = coerceAbsolutePathDirect(path.join(rootDir, String(entry.name)))!
-		const skillFile = path.join(skillDir, SKILL_FILENAME)
+		const skillDir = coerceAbsolutePath(String(entry.name), rootDir)
+		if (!skillDir) {
+			return failure(
+				"invalid_skill",
+				`Invalid skill directory entry "${entry.name}" under ${rootDir}.`,
+				rootDir,
+			)
+		}
+		const skillFile = coerceAbsolutePath(SKILL_FILENAME, skillDir)
+		if (!skillFile) {
+			return failure(
+				"invalid_skill",
+				`Unable to resolve ${SKILL_FILENAME} under ${skillDir}.`,
+				skillDir,
+			)
+		}
 		const exists = await fileExists(skillFile)
 		if (!exists.ok) {
 			return exists
@@ -183,7 +203,15 @@ async function loadSkillFromDir(
 	skillDir: AbsolutePath,
 	origin: Skill["origin"],
 ): Promise<SkillResult> {
-	const skillPath = coerceAbsolutePathDirect(path.join(skillDir, SKILL_FILENAME))!
+	const skillPath = coerceAbsolutePath(SKILL_FILENAME, skillDir)
+	if (!skillPath) {
+		return failure(
+			"invalid_skill",
+			`Unable to resolve ${SKILL_FILENAME} under ${skillDir}.`,
+			skillDir,
+			origin,
+		)
+	}
 	let contents: string
 
 	try {
@@ -347,9 +375,8 @@ async function safeStat(targetPath: AbsolutePath): Promise<StatResult> {
 	}
 }
 
-async function fileExists(targetPath: string): Promise<ExistsResult> {
-	const absPath = coerceAbsolutePathDirect(targetPath)!
-	const stats = await safeStat(absPath)
+async function fileExists(targetPath: AbsolutePath): Promise<ExistsResult> {
+	const stats = await safeStat(targetPath)
 	if (!stats.ok) {
 		return stats
 	}
@@ -359,7 +386,7 @@ async function fileExists(targetPath: string): Promise<ExistsResult> {
 	}
 
 	if (!stats.value.isFile()) {
-		return failure("invalid_skill", `Expected file at ${targetPath}.`, absPath)
+		return failure("invalid_skill", `Expected file at ${targetPath}.`, targetPath)
 	}
 
 	return { ok: true, value: true }

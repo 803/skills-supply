@@ -13,13 +13,22 @@
  */
 
 import { describe, expect, it } from "vitest"
-import "../../../tests/helpers/assertions"
-import type { AbsolutePath, ManifestDiscoveredAt } from "@/core/types/branded"
-import { parseLegacyManifest, parseManifest } from "./parse"
+import "@/tests/helpers/assertions"
+import { parseLegacyManifest, parseManifest } from "@/src/core/manifest/parse"
+import type { AbsolutePath, ManifestDiscoveredAt } from "@/src/core/types/branded"
+import { coerceAlias } from "@/src/core/types/coerce"
 
 // Helper to create branded types for tests
 const testPath = "/test/package.toml" as AbsolutePath
 const discoveredAt: ManifestDiscoveredAt = "cwd"
+
+function alias(value: string) {
+	const coerced = coerceAlias(value)
+	if (!coerced) {
+		throw new Error(`Invalid alias in test: ${value}`)
+	}
+	return coerced
+}
 
 describe("parseManifest", () => {
 	describe("TOML parsing", () => {
@@ -216,7 +225,8 @@ future-agent = true
 			expect(result).toBeOk()
 			if (result.ok) {
 				expect(result.value.agents.get("claude-code")).toBe(true)
-				expect(result.value.agents.has("future-agent" as any)).toBe(false)
+				const agentIds: string[] = Array.from(result.value.agents.keys())
+				expect(agentIds.includes("future-agent")).toBe(false)
 			}
 		})
 
@@ -259,7 +269,7 @@ my-dep = "some-pkg@1.0.0"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("my-dep" as any)
+					const dep = result.value.dependencies.get(alias("my-dep"))
 					expect(dep?.type).toBe("registry")
 					if (dep?.type === "registry") {
 						expect(dep.name).toBe("some-pkg")
@@ -278,7 +288,7 @@ my-dep = "@my-org/my-pkg@2.0.0"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("my-dep" as any)
+					const dep = result.value.dependencies.get(alias("my-dep"))
 					expect(dep?.type).toBe("registry")
 					if (dep?.type === "registry") {
 						expect(dep.name).toBe("my-pkg")
@@ -313,7 +323,7 @@ gh = "superpowers-marketplace/superpowers"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("superpowers" as any)
+					const dep = result.value.dependencies.get(alias("superpowers"))
 					expect(dep?.type).toBe("github")
 					if (dep?.type === "github") {
 						expect(dep.gh).toBe("superpowers-marketplace/superpowers")
@@ -331,7 +341,7 @@ tag = "v1.0.0"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("elements" as any)
+					const dep = result.value.dependencies.get(alias("elements"))
 					if (dep?.type === "github") {
 						expect(dep.ref?.type).toBe("tag")
 						expect(dep.ref?.value).toBe("v1.0.0")
@@ -349,7 +359,7 @@ branch = "develop"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("dev" as any)
+					const dep = result.value.dependencies.get(alias("dev"))
 					if (dep?.type === "github") {
 						expect(dep.ref?.type).toBe("branch")
 						expect(dep.ref?.value).toBe("develop")
@@ -367,7 +377,7 @@ rev = "abc123"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("pinned" as any)
+					const dep = result.value.dependencies.get(alias("pinned"))
 					if (dep?.type === "github") {
 						expect(dep.ref?.type).toBe("rev")
 						expect(dep.ref?.value).toBe("abc123")
@@ -385,7 +395,7 @@ path = "packages/plugin"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("plugin" as any)
+					const dep = result.value.dependencies.get(alias("plugin"))
 					if (dep?.type === "github") {
 						expect(dep.path).toBe("packages/plugin")
 					}
@@ -428,7 +438,7 @@ git = "https://gitlab.com/org/repo"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("external" as any)
+					const dep = result.value.dependencies.get(alias("external"))
 					expect(dep?.type).toBe("git")
 					if (dep?.type === "git") {
 						expect(dep.url).toBe("https://gitlab.com/org/repo")
@@ -445,7 +455,7 @@ git = "git@gitlab.com:org/repo.git"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("private" as any)
+					const dep = result.value.dependencies.get(alias("private"))
 					expect(dep?.type).toBe("git")
 					if (dep?.type === "git") {
 						// URL is normalized to HTTPS
@@ -464,7 +474,7 @@ tag = "v2.0.0"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("tagged" as any)
+					const dep = result.value.dependencies.get(alias("tagged"))
 					if (dep?.type === "git") {
 						expect(dep.ref?.type).toBe("tag")
 						expect(dep.ref?.value).toBe("v2.0.0")
@@ -483,7 +493,7 @@ path = "/absolute/path/to/package"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("local" as any)
+					const dep = result.value.dependencies.get(alias("local"))
 					expect(dep?.type).toBe("local")
 					if (dep?.type === "local") {
 						expect(dep.path).toBe("/absolute/path/to/package")
@@ -501,7 +511,7 @@ path = "../shared-lib"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("local" as any)
+					const dep = result.value.dependencies.get(alias("local"))
 					if (dep?.type === "local") {
 						// Resolved relative to manifest directory
 						expect(dep.path).toBe("/projects/shared-lib")
@@ -522,7 +532,7 @@ marketplace = "https://github.com/sensei-marketplace/sensei"
 
 				expect(result).toBeOk()
 				if (result.ok) {
-					const dep = result.value.dependencies.get("sensei" as any)
+					const dep = result.value.dependencies.get(alias("sensei"))
 					expect(dep?.type).toBe("claude-plugin")
 					if (dep?.type === "claude-plugin") {
 						expect(dep.plugin).toBe("sensei")
@@ -683,13 +693,13 @@ skills = "skills/"
 
 				// Dependencies
 				expect(result.value.dependencies.size).toBe(3)
-				expect(result.value.dependencies.get("registry-dep" as any)?.type).toBe(
+				expect(result.value.dependencies.get(alias("registry-dep"))?.type).toBe(
 					"registry",
 				)
-				expect(result.value.dependencies.get("github-dep" as any)?.type).toBe(
+				expect(result.value.dependencies.get(alias("github-dep"))?.type).toBe(
 					"github",
 				)
-				expect(result.value.dependencies.get("local-dep" as any)?.type).toBe(
+				expect(result.value.dependencies.get(alias("local-dep"))?.type).toBe(
 					"local",
 				)
 

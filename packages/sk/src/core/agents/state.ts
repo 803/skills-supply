@@ -1,7 +1,7 @@
 import path from "node:path"
-import type { AgentDefinition } from "@/core/agents/types"
-import type { IoError, IoResult } from "@/core/io/fs"
-import { ensureDir, readTextFile, safeStat, writeTextFile } from "@/core/io/fs"
+import type { AgentDefinition } from "@/src/core/agents/types"
+import type { IoError, IoResult } from "@/src/core/io/fs"
+import { ensureDir, readTextFile, safeStat, writeTextFile } from "@/src/core/io/fs"
 
 export interface AgentInstallState {
 	version: number

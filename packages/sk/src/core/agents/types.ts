@@ -1,4 +1,4 @@
-import type { CanonicalPackage, Skill } from "@/core/packages/types"
+import type { CanonicalPackage, Skill } from "@/src/core/packages/types"
 
 export type AgentId = "claude-code" | "codex" | "opencode"
 

@@ -5,5 +5,5 @@
  * Import from here rather than individual files.
  */
 
-export * from "./branded.js"
-export * from "./coerce.js"
+export * from "@/src/core/types/branded"
+export * from "@/src/core/types/coerce"

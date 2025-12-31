@@ -156,7 +156,7 @@ expect.extend({
 
 // Extend Vitest's expect types
 declare module "vitest" {
-	interface Assertion<T> {
+	interface Assertion<_T> {
 		toBeOk(): void
 		toBeErr(): void
 		toBeOkWith(predicate: (value: unknown) => boolean): void

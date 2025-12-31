@@ -1,4 +1,4 @@
-import { sleep } from "@/utils/sleep"
+import { sleep } from "@/src/utils/sleep"
 
 export async function fetchWithRetry(
 	url: string,

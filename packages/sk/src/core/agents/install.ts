@@ -6,7 +6,7 @@ import type {
 	AgentInstallResult,
 	InstallablePackage,
 	InstalledSkill,
-} from "@/core/agents/types"
+} from "@/src/core/agents/types"
 
 type InstallMode = "copy" | "symlink"
 

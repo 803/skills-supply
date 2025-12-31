@@ -7,18 +7,21 @@
  */
 
 import { describe, expect, it } from "vitest"
-import type { AbsolutePath, ManifestDiscoveredAt } from "@/core/types/branded"
-import { coerceDependency, coerceManifest, type RawParsedManifest } from "./coerce"
+import {
+	coerceDependency,
+	coerceManifest,
+	type RawParsedManifest,
+} from "@/src/core/manifest/coerce"
 import type {
 	ClaudePluginDeclaration,
 	DependencyDeclaration,
 	GithubPackageDeclaration,
 	GitPackageDeclaration,
 	LocalPackageDeclaration,
-	ManifestExports,
-	PackageMetadata,
-} from "./types"
-import "../../../tests/helpers/assertions"
+} from "@/src/core/manifest/types"
+import type { AbsolutePath, ManifestDiscoveredAt } from "@/src/core/types/branded"
+import { coerceAlias } from "@/src/core/types/coerce"
+import "@/tests/helpers/assertions"
 
 // =============================================================================
 // TEST FIXTURES
@@ -26,6 +29,14 @@ import "../../../tests/helpers/assertions"
 
 const TEST_SOURCE_PATH = "/test/project/package.toml" as AbsolutePath
 const TEST_DISCOVERED_AT: ManifestDiscoveredAt = "cwd"
+
+function alias(value: string) {
+	const coerced = coerceAlias(value)
+	if (!coerced) {
+		throw new Error(`Invalid alias in test: ${value}`)
+	}
+	return coerced
+}
 
 // =============================================================================
 // coerceDependency - REGISTRY DEPENDENCIES
@@ -511,9 +522,9 @@ describe("coerceManifest", () => {
 		expect(result).toBeOk()
 		if (result.ok) {
 			expect(result.value.dependencies.size).toBe(2)
-			const myPkg = result.value.dependencies.get("my-pkg" as any)
+			const myPkg = result.value.dependencies.get(alias("my-pkg"))
 			expect(myPkg?.type).toBe("registry")
-			const ghPkg = result.value.dependencies.get("gh-pkg" as any)
+			const ghPkg = result.value.dependencies.get(alias("gh-pkg"))
 			expect(ghPkg?.type).toBe("github")
 		}
 	})
@@ -815,7 +826,7 @@ describe("coercion edge cases", () => {
 
 		expect(result).toBeOk()
 		if (result.ok) {
-			expect(result.value.dependencies.has("my-complex-alias-123" as any)).toBe(
+			expect(result.value.dependencies.has(alias("my-complex-alias-123"))).toBe(
 				true,
 			)
 		}
@@ -832,7 +843,7 @@ describe("coercion edge cases", () => {
 		expect(result).toBeOk()
 		if (result.ok) {
 			expect(
-				result.value.dependencies.has("my_alias_with_underscores" as any),
+				result.value.dependencies.has(alias("my_alias_with_underscores")),
 			).toBe(true)
 		}
 	})
@@ -874,12 +885,12 @@ describe("coercion edge cases", () => {
 		expect(result).toBeOk()
 		if (result.ok) {
 			expect(result.value.dependencies.size).toBe(4)
-			expect(result.value.dependencies.get("registry" as any)?.type).toBe(
+			expect(result.value.dependencies.get(alias("registry"))?.type).toBe(
 				"registry",
 			)
-			expect(result.value.dependencies.get("github" as any)?.type).toBe("github")
-			expect(result.value.dependencies.get("git" as any)?.type).toBe("git")
-			expect(result.value.dependencies.get("local" as any)?.type).toBe("local")
+			expect(result.value.dependencies.get(alias("github"))?.type).toBe("github")
+			expect(result.value.dependencies.get(alias("git"))?.type).toBe("git")
+			expect(result.value.dependencies.get(alias("local"))?.type).toBe("local")
 		}
 	})
 })

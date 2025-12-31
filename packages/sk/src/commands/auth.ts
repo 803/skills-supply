@@ -1,12 +1,12 @@
 import { consola } from "consola"
-import { configureCredentialHelper } from "@/credentials/helper"
-import { storeCredentials } from "@/credentials/store"
-import { SK_BASE_URL } from "@/env"
-import { openBrowser } from "@/utils/browser"
-import { formatError } from "@/utils/errors"
-import { fetchWithRetry } from "@/utils/fetch"
-import { ensureGitAvailable } from "@/utils/git"
-import { sleep } from "@/utils/sleep"
+import { configureCredentialHelper } from "@/src/credentials/helper"
+import { storeCredentials } from "@/src/credentials/store"
+import { SK_BASE_URL } from "@/src/env"
+import { openBrowser } from "@/src/utils/browser"
+import { formatError } from "@/src/utils/errors"
+import { fetchWithRetry } from "@/src/utils/fetch"
+import { ensureGitAvailable } from "@/src/utils/git"
+import { sleep } from "@/src/utils/sleep"
 
 const MAX_POLL_ATTEMPTS = 150
 

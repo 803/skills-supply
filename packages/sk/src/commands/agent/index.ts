@@ -1,11 +1,11 @@
 import { isCancel, multiselect } from "@clack/prompts"
 import { consola } from "consola"
-import { loadManifestForUpdate } from "@/commands/manifest-prompt"
-import { listAgents } from "@/core/agents/registry"
-import { saveManifest } from "@/core/manifest/fs"
-import { getAgent, setAgent } from "@/core/manifest/transform"
-import type { AgentId } from "@/core/types/branded"
-import { formatError } from "@/utils/errors"
+import { loadManifestForUpdate } from "@/src/commands/manifest-prompt"
+import { listAgents } from "@/src/core/agents/registry"
+import { saveManifest } from "@/src/core/manifest/fs"
+import { getAgent, setAgent } from "@/src/core/manifest/transform"
+import type { AgentId } from "@/src/core/types/branded"
+import { formatError } from "@/src/utils/errors"
 
 export async function agentInteractive(): Promise<void> {
 	consola.info("sk agent")
