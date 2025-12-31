@@ -18,8 +18,9 @@
 	"name": "@skills-supply/sk",
 	"private": true,
 	"scripts": {
-		"build": "bun build ./src/cli.ts --outdir ./dist --target node",
-		"bundle": "bun build ./src/cli.ts --compile --outfile ./bin/sk",
+		"build": "npm run build:bun && npm run build:node",
+		"build:bun": "bun build ./src/cli.ts --compile --outfile ./bin/sk",
+		"build:node": "bun build ./src/cli.ts --outdir ./dist --target node",
 		"clean": "rm -rf dist bin",
 		"test": "vitest",
 		"test:coverage": "vitest --coverage",

@@ -83,7 +83,7 @@ export interface ValidatedLocalDependency {
 export interface ValidatedClaudePluginDependency {
 	readonly type: "claude-plugin"
 	readonly plugin: NonEmptyString
-	readonly marketplace: NormalizedGitUrl
+	readonly marketplace: NormalizedGitUrl | GithubRef
 }
 
 export type ValidatedDependency =

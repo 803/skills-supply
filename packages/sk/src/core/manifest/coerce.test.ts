@@ -429,7 +429,7 @@ describe("coerceDependency - claude-plugin", () => {
 		expect(result).toBeErrContaining("plugin must be non-empty")
 	})
 
-	it("rejects invalid marketplace URL", () => {
+	it("rejects invalid marketplace", () => {
 		const decl: ClaudePluginDeclaration = {
 			marketplace: "not-a-url",
 			plugin: "my-plugin",
@@ -438,7 +438,21 @@ describe("coerceDependency - claude-plugin", () => {
 		const result = coerceDependency(decl, "my-dep", TEST_SOURCE_PATH)
 
 		expect(result).toBeErr()
-		expect(result).toBeErrContaining("Invalid marketplace URL")
+		expect(result).toBeErrContaining("Invalid marketplace")
+	})
+
+	it("accepts github shorthand marketplace", () => {
+		const decl: ClaudePluginDeclaration = {
+			marketplace: "owner/repo",
+			plugin: "my-plugin",
+			type: "claude-plugin",
+		}
+		const result = coerceDependency(decl, "my-dep", TEST_SOURCE_PATH)
+
+		expect(result).toBeOk()
+		if (result.ok && result.value.type === "claude-plugin") {
+			expect(result.value.marketplace).toBe("owner/repo")
+		}
 	})
 })
 

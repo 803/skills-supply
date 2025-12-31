@@ -352,13 +352,15 @@ function coerceClaudePluginDependency(
 		}
 	}
 
-	const marketplace = coerceGitUrl(decl.marketplace)
+	// Accept either a full git URL or GitHub shorthand (owner/repo)
+	const marketplace =
+		coerceGitUrl(decl.marketplace) ?? coerceGithubRef(decl.marketplace)
 	if (!marketplace) {
 		return {
 			error: {
 				field: "marketplace",
 				key: alias,
-				message: `Invalid marketplace URL: ${decl.marketplace}`,
+				message: `Invalid marketplace: ${decl.marketplace}. Expected a git URL or owner/repo format.`,
 				sourcePath,
 				type: "coercion_failed",
 			},
