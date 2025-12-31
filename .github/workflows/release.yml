@@ -56,6 +56,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/download-artifact@v5
+        with:
+          merge-multiple: true
       - name: Generate checksums
         run: |
           sha256sum sk-*.tar.gz sk-*.zip 2>/dev/null > SHASUMS256.txt || true
