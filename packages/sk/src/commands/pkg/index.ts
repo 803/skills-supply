@@ -1,10 +1,13 @@
 import { confirm, isCancel, select, text } from "@clack/prompts"
 import { consola } from "consola"
-import { loadManifestForUpdate } from "@/src/commands/manifest-prompt"
+import {
+	buildParentPromptMessage,
+	resolveLocalManifest,
+} from "@/src/commands/manifest-selection"
 import type { AddOptions } from "@/src/commands/pkg/spec"
 import { buildPackageSpec } from "@/src/commands/pkg/spec"
 import { coerceDependency } from "@/src/core/manifest/coerce"
-import { loadManifestFromCwd, saveManifest } from "@/src/core/manifest/fs"
+import { saveManifest } from "@/src/core/manifest/fs"
 import {
 	addDependency,
 	hasDependency,
@@ -137,7 +140,23 @@ async function handleAdd(): Promise<void> {
 		}
 	}
 
-	const manifestResult = await loadManifestForUpdate()
+	const selection = await resolveLocalManifest({
+		createIfMissing: false,
+		nonInteractive: false,
+		parentPrompt: {
+			buildMessage: (projectRoot, cwd) =>
+				buildParentPromptMessage(projectRoot, cwd, {
+					action: "modify",
+					warnAboutSkillVisibility: true,
+				}),
+		},
+		promptToCreate: true,
+	})
+	if (selection.usedParent) {
+		consola.warn(
+			`Skills will install under ${selection.scopeRoot}. Run agents from that directory to use them.`,
+		)
+	}
 	const pkgSpec = buildPackageSpec(type as string, spec, options)
 
 	const aliasKey = coerceAlias(pkgSpec.alias)
@@ -145,7 +164,7 @@ async function handleAdd(): Promise<void> {
 		throw new Error(`Invalid alias: ${pkgSpec.alias}`)
 	}
 
-	if (hasDependency(manifestResult.manifest, aliasKey)) {
+	if (hasDependency(selection.manifest, aliasKey)) {
 		const overwrite = await confirm({
 			message: `Dependency ${pkgSpec.alias} already exists. Overwrite it?`,
 		})
@@ -159,20 +178,36 @@ async function handleAdd(): Promise<void> {
 	const coerced = coerceDependency(
 		pkgSpec.declaration,
 		pkgSpec.alias,
-		manifestResult.manifestPath,
+		selection.manifestPath,
 	)
 	if (!coerced.ok) {
 		throw new Error(coerced.error.message)
 	}
 
-	const updated = addDependency(manifestResult.manifest, aliasKey, coerced.value)
-	await saveManifest(updated, manifestResult.manifestPath)
-	consola.success(`Updated ${manifestResult.manifestPath}.`)
+	const updated = addDependency(selection.manifest, aliasKey, coerced.value)
+	await saveManifest(updated, selection.manifestPath, selection.serializeOptions)
+	consola.success(`Updated ${selection.manifestPath}.`)
 }
 
 async function handleRemove(): Promise<void> {
-	const manifestResult = await loadManifestFromCwd({ createIfMissing: false })
-	const aliases = [...manifestResult.manifest.dependencies.keys()].sort()
+	const selection = await resolveLocalManifest({
+		createIfMissing: false,
+		nonInteractive: false,
+		parentPrompt: {
+			buildMessage: (projectRoot, cwd) =>
+				buildParentPromptMessage(projectRoot, cwd, {
+					action: "modify",
+					warnAboutSkillVisibility: true,
+				}),
+		},
+		promptToCreate: false,
+	})
+	if (selection.usedParent) {
+		consola.warn(
+			`Skills will install under ${selection.scopeRoot}. Run agents from that directory to use them.`,
+		)
+	}
+	const aliases = [...selection.manifest.dependencies.keys()].sort()
 	if (aliases.length === 0) {
 		consola.info("No dependencies to remove.")
 		return
@@ -190,7 +225,7 @@ async function handleRemove(): Promise<void> {
 		throw new Error("Canceled.")
 	}
 
-	const updated = removeDependency(manifestResult.manifest, choice as Alias)
-	await saveManifest(updated, manifestResult.manifestPath)
+	const updated = removeDependency(selection.manifest, choice as Alias)
+	await saveManifest(updated, selection.manifestPath, selection.serializeOptions)
 	consola.success(`Removed dependency: ${String(choice)}.`)
 }

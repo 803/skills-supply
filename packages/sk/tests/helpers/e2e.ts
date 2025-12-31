@@ -6,7 +6,9 @@
 
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { createEmptyManifest } from "@/src/core/manifest/fs"
 import type { SyncOptions, SyncResult, SyncSummary } from "@/src/core/sync/types"
+import { coerceAbsolutePathDirect } from "@/src/core/types/coerce"
 
 /**
  * Options for running sync in tests.
@@ -60,8 +62,15 @@ export async function runSync(options: TestSyncOptions): Promise<TestSyncResult>
 	// the actual sync with injectable dependencies.
 	// For now, return a placeholder result.
 
+	const manifestPath = coerceAbsolutePathDirect(join(options.cwd, "package.toml"))
+	if (!manifestPath) {
+		throw new Error("Invalid manifest path.")
+	}
+
 	const syncOptions: SyncOptions = {
+		agents: [],
 		dryRun: options.dryRun ?? false,
+		manifest: createEmptyManifest(manifestPath, "cwd"),
 	}
 
 	// TODO: Actually call the sync operation with mocked paths

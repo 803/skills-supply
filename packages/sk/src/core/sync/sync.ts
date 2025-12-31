@@ -4,14 +4,9 @@ import path from "node:path"
 import type { AgentInstallPlan } from "@/src/core/agents/install"
 import { applyAgentInstall, planAgentInstall } from "@/src/core/agents/install"
 import { reconcileAgentSkills } from "@/src/core/agents/reconcile"
-import { detectInstalledAgents, getAgentById } from "@/src/core/agents/registry"
 import { buildAgentState, readAgentState, writeAgentState } from "@/src/core/agents/state"
-import type { AgentDefinition } from "@/src/core/agents/types"
-import { readTextFile, removePath, safeStat } from "@/src/core/io/fs"
-import { discoverManifests } from "@/src/core/manifest/discover"
-import { mergeManifests } from "@/src/core/manifest/merge"
-import { parseManifest } from "@/src/core/manifest/parse"
-import type { Manifest, MergedManifest } from "@/src/core/manifest/types"
+import type { ResolvedAgent } from "@/src/core/agents/types"
+import { removePath, safeStat } from "@/src/core/io/fs"
 import { detectPackageType } from "@/src/core/packages/detect"
 import { extractSkills } from "@/src/core/packages/extract"
 import {
@@ -22,7 +17,7 @@ import {
 	normalizeSparsePath,
 	parseGithubSlug,
 } from "@/src/core/packages/fetch"
-import { resolveMergedPackages } from "@/src/core/packages/resolve"
+import { resolveManifestPackages } from "@/src/core/packages/resolve"
 import type {
 	CanonicalPackage,
 	FetchedPackage,
@@ -44,7 +39,7 @@ import { validateExtractedPackages } from "@/src/core/sync/validate"
 import { coerceAbsolutePathDirect } from "@/src/core/types/coerce"
 
 interface AgentSyncSummary {
-	agent: AgentDefinition
+	agent: ResolvedAgent
 	installed: number
 	removed: number
 	warnings: string[]
@@ -79,28 +74,21 @@ interface NormalizedPackage {
 }
 
 export async function runSync(options: SyncOptions): Promise<SyncResult<SyncSummary>> {
-	const manifestResult = await loadManifests(process.cwd())
-	if (!manifestResult.ok) {
-		return manifestResult
+	const { agents, manifest } = options
+	if (agents.length === 0) {
+		return failSync("agents", new Error("No agents provided for sync."))
 	}
 
-	const mergedResult = mergeManifests(manifestResult.value)
-	if (!mergedResult.ok) {
-		return failSync("merge", mergedResult.error)
+	const packages = resolveManifestPackages(manifest)
+	if (packages.length === 0) {
+		return syncWithoutDependencies(agents, options.dryRun)
 	}
 
-	const packages = resolveMergedPackages(mergedResult.value)
-
-	const agentsResult = await resolveAgents(mergedResult.value)
-	if (!agentsResult.ok) {
-		return agentsResult
-	}
-
-	const warnings: string[] = [...mergedResult.value.warnings]
+	const warnings: string[] = []
 	let installed = 0
 	let removed = 0
 
-	for (const agent of agentsResult.value) {
+	for (const agent of agents) {
 		const agentResult = await syncAgent(agent, packages, options)
 		if (!agentResult.ok) {
 			return agentResult
@@ -114,89 +102,76 @@ export async function runSync(options: SyncOptions): Promise<SyncResult<SyncSumm
 	return {
 		ok: true,
 		value: {
-			agents: agentsResult.value.map((agent) => agent.displayName),
+			agents: agents.map((agent) => agent.displayName),
 			dependencies: packages.length,
 			dryRun: options.dryRun,
 			installed,
-			manifests: manifestResult.value.length,
+			manifests: 1,
 			removed,
 			warnings,
 		},
 	}
 }
 
-async function loadManifests(startDir: string): Promise<SyncResult<Manifest[]>> {
-	const discovered = await discoverManifests(startDir)
-	if (!discovered.ok) {
-		return failSync("discover", discovered.error)
-	}
+async function syncWithoutDependencies(
+	agents: ResolvedAgent[],
+	dryRun: boolean,
+): Promise<SyncResult<SyncSummary>> {
+	let removed = 0
+	let hasState = false
+	const warnings: string[] = []
 
-	if (discovered.value.length === 0) {
-		return failSync("discover", new Error("No package.toml files were found."))
-	}
-
-	const manifests: Manifest[] = []
-	for (const manifestPath of discovered.value) {
-		const contents = await readTextFile(manifestPath)
-		if (!contents.ok) {
-			return failSync("parse", contents.error)
+	for (const agent of agents) {
+		const stateResult = await readAgentState(agent)
+		if (!stateResult.ok) {
+			return failSync("reconcile", stateResult.error)
 		}
 
-		// Determine discoveredAt based on path
-		const discoveredAt = manifestPath.includes("/.sk/")
-			? "sk-global"
-			: manifestPath.startsWith(startDir)
-				? "cwd"
-				: "parent"
-
-		const parsed = parseManifest(contents.value, manifestPath, discoveredAt)
-		if (!parsed.ok) {
-			return failSync("parse", parsed.error)
+		const previousState = stateResult.value
+		if (!previousState) {
+			continue
 		}
 
-		manifests.push(parsed.value)
-	}
-
-	return { ok: true, value: manifests }
-}
-
-async function resolveAgents(
-	merged: MergedManifest,
-): Promise<SyncResult<AgentDefinition[]>> {
-	if (merged.agents.size > 0) {
-		const agents: AgentDefinition[] = []
-		for (const [agentId, enabled] of merged.agents) {
-			const lookup = getAgentById(agentId)
-			if (!lookup.ok) {
-				return failSync("agents", lookup.error)
-			}
-
-			if (enabled) {
-				agents.push(lookup.value)
-			}
+		hasState = true
+		if (dryRun) {
+			removed += previousState.skills.length
+			continue
 		}
 
-		if (agents.length === 0) {
-			return failSync("agents", new Error("No agents are enabled in the manifest."))
+		const reconcileResult = await reconcileAgentSkills(
+			agent,
+			previousState,
+			new Set<string>(),
+		)
+		if (!reconcileResult.ok) {
+			return failSync("reconcile", reconcileResult.error)
 		}
 
-		return { ok: true, value: agents }
+		removed += reconcileResult.value.removed.length
+		const state = buildAgentState([])
+		const writeResult = await writeAgentState(agent, state)
+		if (!writeResult.ok) {
+			return failSync("reconcile", writeResult.error)
+		}
 	}
 
-	const detected = await detectInstalledAgents()
-	if (!detected.ok) {
-		return failSync("agents", detected.error)
+	return {
+		ok: true,
+		value: {
+			agents: agents.map((agent) => agent.displayName),
+			dependencies: 0,
+			dryRun,
+			installed: 0,
+			manifests: 1,
+			noOpReason: hasState ? undefined : "no-dependencies",
+			removed,
+			warnings,
+		},
 	}
-
-	if (detected.value.length === 0) {
-		return failSync("agents", new Error("No installed agents detected."))
-	}
-
-	return { ok: true, value: detected.value }
 }
 
 async function syncAgent(
-	agent: AgentDefinition,
+	agent: ResolvedAgent,
 	packages: CanonicalPackage[],
 	options: SyncOptions,
 ): Promise<SyncResult<AgentSyncSummary>> {

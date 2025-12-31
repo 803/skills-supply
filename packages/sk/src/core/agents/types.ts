@@ -5,8 +5,16 @@ export type AgentId = "claude-code" | "codex" | "opencode"
 export interface AgentDefinition {
 	id: AgentId
 	displayName: string
-	skillsPath: string
+	basePath: string
+	skillsDir: string
 	detect: () => Promise<AgentDetectionResult>
+}
+
+export interface ResolvedAgent {
+	id: AgentId
+	displayName: string
+	rootPath: string
+	skillsPath: string
 }
 
 export type AgentRegistryErrorType = "unknown_agent" | "io_error"

@@ -1,7 +1,12 @@
 import { consola } from "consola"
+import {
+	buildParentPromptMessage,
+	resolveGlobalManifest,
+	resolveLocalManifest,
+} from "@/src/commands/manifest-selection"
 import { getAgentById } from "@/src/core/agents/registry"
 import type { AgentDefinition } from "@/src/core/agents/types"
-import { loadManifestFromCwd, saveManifest } from "@/src/core/manifest/fs"
+import { saveManifest } from "@/src/core/manifest/fs"
 import { getAgent, setAgent } from "@/src/core/manifest/transform"
 import type { AgentId } from "@/src/core/types/branded"
 import { formatError } from "@/src/utils/errors"
@@ -19,12 +24,12 @@ interface AgentUpdateResult {
 export async function runAgentUpdate(
 	agentId: string,
 	action: AgentAction,
+	options: { global: boolean; nonInteractive: boolean },
 ): Promise<void> {
 	consola.info(`sk agent ${action === "enable" ? "add" : "remove"}`)
-	consola.start("Updating agents...")
 
 	try {
-		const result = await updateAgentManifest(agentId, action)
+		const result = await updateAgentManifest(agentId, action, options)
 		consola.success("Agent settings updated.")
 
 		if (result.created) {
@@ -54,6 +59,7 @@ export async function runAgentUpdate(
 async function updateAgentManifest(
 	agentId: string,
 	action: AgentAction,
+	options: { global: boolean; nonInteractive: boolean },
 ): Promise<AgentUpdateResult> {
 	const lookup = getAgentById(agentId)
 	if (!lookup.ok) {
@@ -61,22 +67,39 @@ async function updateAgentManifest(
 	}
 
 	const desired = action === "enable"
-	const manifestResult = await loadManifestFromCwd({ createIfMissing: desired })
-	const { manifest, created, manifestPath } = manifestResult
+	const selection = options.global
+		? await resolveGlobalManifest({
+				createIfMissing: false,
+				nonInteractive: options.nonInteractive,
+				promptToCreate: desired,
+			})
+		: await resolveLocalManifest({
+				createIfMissing: false,
+				nonInteractive: options.nonInteractive,
+				parentPrompt: {
+					buildMessage: (projectRoot, cwd) =>
+						buildParentPromptMessage(projectRoot, cwd, {
+							action: "modify",
+							warnAboutSkillVisibility: false,
+						}),
+				},
+				promptToCreate: desired,
+			})
+	const { manifest, manifestPath } = selection
 
 	const validatedAgentId = lookup.value.id as AgentId
 	const currentValue = getAgent(manifest, validatedAgentId)
 	const changed = currentValue !== desired
 	if (changed) {
 		const updated = setAgent(manifest, validatedAgentId, desired)
-		await saveManifest(updated, manifestPath)
+		await saveManifest(updated, manifestPath, selection.serializeOptions)
 	}
 
 	return {
 		action,
 		agent: lookup.value,
 		changed,
-		created,
+		created: selection.created,
 		manifestPath,
 	}
 }

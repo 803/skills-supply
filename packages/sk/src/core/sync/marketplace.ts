@@ -2,7 +2,7 @@ import { execFile } from "node:child_process"
 import { homedir } from "node:os"
 import path from "node:path"
 import { promisify } from "node:util"
-import type { AgentDefinition } from "@/src/core/agents/types"
+import type { ResolvedAgent } from "@/src/core/agents/types"
 import { readTextFile, safeStat } from "@/src/core/io/fs"
 import { coerceDependency } from "@/src/core/manifest/coerce"
 import type { DependencyDeclaration } from "@/src/core/manifest/types"
@@ -59,7 +59,7 @@ type MarketplaceSource =
 	| { type: "url"; url: string }
 
 export async function resolveAgentPackages(options: {
-	agent: AgentDefinition
+	agent: ResolvedAgent
 	packages: CanonicalPackage[]
 	tempRoot: string
 	dryRun: boolean

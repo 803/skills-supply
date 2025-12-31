@@ -14,25 +14,21 @@ import {
 	resolveStatePath,
 	writeAgentState,
 } from "@/src/core/agents/state"
-import type { AgentDefinition, AgentId } from "@/src/core/agents/types"
+import type { AgentId, ResolvedAgent } from "@/src/core/agents/types"
 import { exists, isFile, withTempDir } from "@/tests/helpers/fs"
 
 // Import assertions to register custom matchers
 import "@/tests/helpers/assertions"
 
 /**
- * Creates a minimal agent definition for testing.
- * The detect function is stubbed since we don't test detection here.
+ * Creates a minimal resolved agent for testing.
  */
-function createTestAgent(
-	skillsPath: string,
-	id: AgentId = "claude-code",
-): AgentDefinition {
+function createTestAgent(rootPath: string, id: AgentId = "claude-code"): ResolvedAgent {
 	return {
-		detect: async () => ({ ok: true, value: true }),
 		displayName: "Test Agent",
 		id,
-		skillsPath,
+		rootPath,
+		skillsPath: join(rootPath, "skills"),
 	}
 }
 
@@ -57,7 +53,7 @@ describe("readAgentState", () => {
 
 			const stateData = {
 				skills: ["greeting", "farewell"],
-				updatedAt: "2025-01-15T10:30:00.000Z",
+				updated_at: "2025-01-15T10:30:00.000Z",
 				version: 1,
 			}
 
@@ -69,7 +65,7 @@ describe("readAgentState", () => {
 			if (result.ok && result.value) {
 				expect(result.value.version).toBe(1)
 				expect(result.value.skills).toEqual(["greeting", "farewell"])
-				expect(result.value.updatedAt).toBe("2025-01-15T10:30:00.000Z")
+				expect(result.value.updated_at).toBe("2025-01-15T10:30:00.000Z")
 			}
 		})
 	})
@@ -84,7 +80,7 @@ describe("readAgentState", () => {
 
 			const stateData = {
 				skills: ["test-skill"],
-				updatedAt: "2025-01-15T10:30:00.000Z",
+				updated_at: "2025-01-15T10:30:00.000Z",
 				version: 1,
 			}
 
@@ -141,7 +137,7 @@ describe("readAgentState", () => {
 					statePath,
 					JSON.stringify({
 						skills: [],
-						updatedAt: "2025-01-15T10:30:00.000Z",
+						updated_at: "2025-01-15T10:30:00.000Z",
 					}),
 				)
 
@@ -163,7 +159,7 @@ describe("readAgentState", () => {
 					statePath,
 					JSON.stringify({
 						skills: [],
-						updatedAt: "2025-01-15T10:30:00.000Z",
+						updated_at: "2025-01-15T10:30:00.000Z",
 						version: 999,
 					}),
 				)
@@ -188,7 +184,7 @@ describe("readAgentState", () => {
 					statePath,
 					JSON.stringify({
 						skills: "not-an-array",
-						updatedAt: "2025-01-15T10:30:00.000Z",
+						updated_at: "2025-01-15T10:30:00.000Z",
 						version: 1,
 					}),
 				)
@@ -211,7 +207,7 @@ describe("readAgentState", () => {
 					statePath,
 					JSON.stringify({
 						skills: ["valid", 123, "also-valid"],
-						updatedAt: "2025-01-15T10:30:00.000Z",
+						updated_at: "2025-01-15T10:30:00.000Z",
 						version: 1,
 					}),
 				)
@@ -234,7 +230,7 @@ describe("readAgentState", () => {
 					statePath,
 					JSON.stringify({
 						skills: ["valid", "", "also-valid"],
-						updatedAt: "2025-01-15T10:30:00.000Z",
+						updated_at: "2025-01-15T10:30:00.000Z",
 						version: 1,
 					}),
 				)
@@ -257,7 +253,7 @@ describe("readAgentState", () => {
 					statePath,
 					JSON.stringify({
 						skills: ["valid", "sub/dir/skill", "also-valid"],
-						updatedAt: "2025-01-15T10:30:00.000Z",
+						updated_at: "2025-01-15T10:30:00.000Z",
 						version: 1,
 					}),
 				)
@@ -280,7 +276,7 @@ describe("readAgentState", () => {
 					statePath,
 					JSON.stringify({
 						skills: [".", "valid-skill"],
-						updatedAt: "2025-01-15T10:30:00.000Z",
+						updated_at: "2025-01-15T10:30:00.000Z",
 						version: 1,
 					}),
 				)
@@ -294,7 +290,7 @@ describe("readAgentState", () => {
 			})
 		})
 
-		it("rejects missing updatedAt field", async () => {
+		it("rejects missing updated_at field", async () => {
 			await withTempDir(async (dir) => {
 				const agent = createTestAgent(dir)
 				const statePath = resolveStatePath(agent)
@@ -311,12 +307,12 @@ describe("readAgentState", () => {
 
 				expect(result).toBeErr()
 				if (!result.ok) {
-					expect(result.error.message).toContain("updatedAt")
+					expect(result.error.message).toContain("updated_at")
 				}
 			})
 		})
 
-		it("rejects empty updatedAt field", async () => {
+		it("rejects empty updated_at field", async () => {
 			await withTempDir(async (dir) => {
 				const agent = createTestAgent(dir)
 				const statePath = resolveStatePath(agent)
@@ -325,7 +321,7 @@ describe("readAgentState", () => {
 					statePath,
 					JSON.stringify({
 						skills: [],
-						updatedAt: "   ",
+						updated_at: "   ",
 						version: 1,
 					}),
 				)
@@ -334,7 +330,7 @@ describe("readAgentState", () => {
 
 				expect(result).toBeErr()
 				if (!result.ok) {
-					expect(result.error.message).toContain("updatedAt")
+					expect(result.error.message).toContain("updated_at")
 				}
 			})
 		})
@@ -378,7 +374,7 @@ describe("writeAgentState", () => {
 
 			expect(parsed.version).toBe(1)
 			expect(parsed.skills).toEqual(["farewell", "greeting"]) // sorted
-			expect(parsed.updatedAt).toBeDefined()
+			expect(parsed.updated_at).toBeDefined()
 		})
 	})
 
@@ -465,7 +461,7 @@ describe("buildAgentState", () => {
 
 		expect(state.skills).toEqual(["alpha", "beta", "zebra"])
 		expect(state.version).toBe(1)
-		expect(state.updatedAt).toBeDefined()
+		expect(state.updated_at).toBeDefined()
 	})
 
 	it("creates state with empty skills array", async () => {
@@ -479,27 +475,27 @@ describe("buildAgentState", () => {
 		const state = buildAgentState(["test"])
 
 		// Should be parseable as a date
-		const date = new Date(state.updatedAt)
+		const date = new Date(state.updated_at)
 		expect(date.getTime()).not.toBeNaN()
 	})
 })
 
 describe("resolveStatePath", () => {
-	it("resolves state path within agent skills directory", async () => {
-		const agent = createTestAgent("/home/user/.claude/skills")
+	it("resolves state path within agent root directory", async () => {
+		const agent = createTestAgent("/home/user/.claude")
 
 		const statePath = resolveStatePath(agent)
 
-		expect(statePath).toBe("/home/user/.claude/skills/.sk-state.json")
+		expect(statePath).toBe("/home/user/.claude/.sk-state.json")
 	})
 
-	it("handles trailing slash in skills path", async () => {
-		const agent = createTestAgent("/home/user/.claude/skills/")
+	it("handles trailing slash in root path", async () => {
+		const agent = createTestAgent("/home/user/.claude/")
 
 		const statePath = resolveStatePath(agent)
 
 		// path.join normalizes trailing slashes
-		expect(statePath).toBe("/home/user/.claude/skills/.sk-state.json")
+		expect(statePath).toBe("/home/user/.claude/.sk-state.json")
 	})
 })
 
@@ -520,7 +516,7 @@ describe("read/write roundtrip", () => {
 			if (readResult.ok && readResult.value) {
 				expect(readResult.value.version).toBe(originalState.version)
 				expect(readResult.value.skills).toEqual(originalState.skills)
-				expect(readResult.value.updatedAt).toBe(originalState.updatedAt)
+				expect(readResult.value.updated_at).toBe(originalState.updated_at)
 			}
 		})
 	})

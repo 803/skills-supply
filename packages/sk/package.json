@@ -1,4 +1,5 @@
 {
+	"author": "Skills Supply",
 	"bin": {
 		"sk": "./dist/cli.js"
 	},
@@ -10,22 +11,45 @@
 		"smol-toml": "^1.6.0",
 		"zod": "^3.25.76"
 	},
+	"description": "Skills Supply CLI - Install and manage AI agent skills",
 	"devDependencies": {
 		"@types/node": "^25",
 		"@vitest/coverage-v8": "^4.0.16",
 		"vitest": "^4.0.16"
 	},
+	"engines": {
+		"node": ">=18"
+	},
+	"files": [
+		"dist",
+		"LICENSE",
+		"README.md"
+	],
+	"homepage": "https://github.com/skills-supply/skillssupply",
+	"keywords": [
+		"skills",
+		"ai",
+		"agents",
+		"cli",
+		"claude",
+		"mcp"
+	],
+	"license": "MIT",
 	"name": "@skills-supply/sk",
-	"private": true,
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/skills-supply/skillssupply.git"
+	},
 	"scripts": {
-		"build": "npm run build:bun && npm run build:node",
-		"build:bun": "bun build ./src/cli.ts --compile --outfile ./bin/sk",
+		"build": "bun run build:binary && bun run build:node",
+		"build:binary": "bun build ./src/cli.ts --compile --outfile ./bin/sk",
 		"build:node": "bun build ./src/cli.ts --outdir ./dist --target node",
 		"clean": "rm -rf dist bin",
 		"test": "vitest",
 		"test:coverage": "vitest --coverage",
 		"test:e2e": "vitest --include tests/e2e/**/*.test.ts",
-		"test:unit": "vitest --exclude tests/e2e"
+		"test:unit": "vitest --exclude tests/e2e",
+		"tsc": "npx tsc -p tsconfig.json"
 	},
 	"type": "module",
 	"version": "0.1.0"

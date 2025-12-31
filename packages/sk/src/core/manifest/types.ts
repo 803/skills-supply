@@ -218,67 +218,9 @@ export interface ManifestDiscoveryError {
 }
 
 /**
- * Result of discovering manifest files.
- * Returns absolute paths to all found package.toml files.
+ * Result of discovering manifest root directories.
+ * Returns the absolute path to the directory containing package.toml, or null if not found.
  */
 export type ManifestDiscoveryResult =
-	| { ok: true; value: AbsolutePath[] }
+	| { ok: true; value: AbsolutePath | null }
 	| { ok: false; error: ManifestDiscoveryError }
-
-// =============================================================================
-// MERGE TYPES
-// =============================================================================
-
-/**
- * Entry in merged manifest - tracks origin for error messages.
- */
-export interface ManifestDependencyEntry {
-	readonly dependency: ValidatedDependency
-	readonly origin: ManifestOrigin
-}
-
-/**
- * Legacy dependency entry for gradual migration.
- * @deprecated Use ManifestDependencyEntry instead
- */
-export interface LegacyManifestDependencyEntry {
-	declaration: DependencyDeclaration
-	sourcePath: string
-}
-
-/**
- * Result of merging multiple manifests.
- * Dependencies are deduplicated and validated.
- */
-export interface MergedManifest {
-	readonly agents: ReadonlyMap<AgentId, boolean>
-	readonly dependencies: ReadonlyMap<Alias, ManifestDependencyEntry>
-	readonly warnings: readonly string[]
-}
-
-/**
- * Legacy merged manifest for gradual migration.
- * @deprecated Use MergedManifest instead
- */
-export interface LegacyMergedManifest {
-	agents: Record<string, boolean>
-	dependencies: Record<string, LegacyManifestDependencyEntry>
-	warnings: string[]
-}
-
-// =============================================================================
-// MERGE ERRORS AND RESULTS
-// =============================================================================
-
-export type ManifestMergeErrorType = "alias_conflict" | "invalid_dependency"
-
-export interface ManifestMergeError {
-	readonly type: ManifestMergeErrorType
-	readonly message: string
-	readonly alias: Alias
-	readonly origin: ManifestOrigin
-}
-
-export type ManifestMergeResult =
-	| { ok: true; value: MergedManifest }
-	| { ok: false; error: ManifestMergeError }

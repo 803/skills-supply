@@ -7,7 +7,7 @@
  */
 
 import type {
-	MergedManifest,
+	Manifest,
 	ValidatedClaudePluginDependency,
 	ValidatedDependency,
 	ValidatedGitDependency,
@@ -32,18 +32,18 @@ import type {
 const REGISTRY_NAME = "skills.supply" as NonEmptyString
 
 /**
- * Resolve all packages from a merged manifest.
+ * Resolve all packages from a manifest.
  * Pure function - no IO, no validation.
  */
-export function resolveMergedPackages(manifest: MergedManifest): CanonicalPackage[] {
+export function resolveManifestPackages(manifest: Manifest): CanonicalPackage[] {
 	const resolved: CanonicalPackage[] = []
 
-	for (const [alias, entry] of manifest.dependencies) {
+	for (const [alias, dependency] of manifest.dependencies) {
 		const origin: PackageOrigin = {
 			alias,
-			manifestPath: entry.origin.sourcePath,
+			manifestPath: manifest.origin.sourcePath,
 		}
-		const canonical = resolveValidatedDependency(entry.dependency, origin)
+		const canonical = resolveValidatedDependency(dependency, origin)
 		resolved.push(canonical)
 	}
 

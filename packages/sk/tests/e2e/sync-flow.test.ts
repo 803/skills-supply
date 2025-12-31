@@ -2,16 +2,19 @@
  * E2E tests for the sync flow
  *
  * These tests exercise the complete sync pipeline:
- * discover -> merge -> fetch -> extract -> install
+ * parse -> resolve -> fetch -> extract -> install
  *
  * Uses local packages to avoid network dependencies.
- * Mocks the agent registry to use custom skillsPath for isolation.
+ * Uses resolved agent definitions with isolated skills paths.
  */
 
-import { mkdir, readdir, readFile, rm } from "node:fs/promises"
+import { readdir, readFile, rm } from "node:fs/promises"
 import { join } from "node:path"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { AgentDefinition, AgentId } from "@/src/core/agents/types"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import type { ResolvedAgent } from "@/src/core/agents/types"
+import { loadManifest } from "@/src/core/manifest/fs"
+import { runSync } from "@/src/core/sync/sync"
+import { coerceAbsolutePathDirect } from "@/src/core/types/coerce"
 import {
 	createTestProject,
 	exists,
@@ -20,58 +23,38 @@ import {
 	withTempDir,
 } from "@/tests/helpers"
 
-// Store test context
-let testAgentSkillsDir: string
-
-/**
- * Creates a mock agent definition with a custom skills path.
- */
-function createMockAgent(skillsPath: string): AgentDefinition {
+function createResolvedAgent(rootPath: string, skillsPath: string): ResolvedAgent {
 	return {
-		detect: async () => ({ ok: true, value: true }),
 		displayName: "Test Agent",
-		id: "claude-code" as AgentId,
+		id: "claude-code",
+		rootPath,
 		skillsPath,
 	}
 }
 
-// Mock the agent registry before any imports of sync
-vi.mock("../../src/core/agents/registry", () => ({
-	detectInstalledAgents: vi.fn(async () => {
-		const mockAgent = createMockAgent(testAgentSkillsDir)
-		return { ok: true, value: [mockAgent] }
-	}),
-	getAgentById: vi.fn((id: string) => {
-		if (id === "claude-code") {
-			const mockAgent = createMockAgent(testAgentSkillsDir)
-			return { ok: true, value: mockAgent }
-		}
-		return {
-			error: {
-				agentId: id,
-				message: `Unknown agent: ${id}`,
-				type: "unknown_agent",
-			},
-			ok: false,
-		}
-	}),
-	listAgents: vi.fn(() => {
-		return [createMockAgent(testAgentSkillsDir)]
-	}),
-}))
+function buildAgentPaths(baseDir: string): { rootPath: string; skillsPath: string } {
+	const rootPath = join(baseDir, "agent-root")
+	return { rootPath, skillsPath: join(rootPath, "skills") }
+}
 
-// Import sync after mocking
-import { runSync } from "@/src/core/sync/sync"
+async function loadProjectManifest(projectDir: string) {
+	const manifestPath = coerceAbsolutePathDirect(join(projectDir, "package.toml"))
+	if (!manifestPath) {
+		throw new Error("Invalid manifest path.")
+	}
+	const loaded = await loadManifest(manifestPath, "cwd")
+	return loaded.manifest
+}
 
 /**
- * Helper to read the .sk-state.json file from an agent's skills directory.
+ * Helper to read the .sk-state.json file from an agent root directory.
  */
-async function readAgentState(skillsPath: string): Promise<{
+async function readAgentState(rootPath: string): Promise<{
 	version: number
 	skills: string[]
-	updatedAt: string
+	updated_at: string
 } | null> {
-	const statePath = join(skillsPath, ".sk-state.json")
+	const statePath = join(rootPath, ".sk-state.json")
 	try {
 		const content = await readFile(statePath, "utf-8")
 		return JSON.parse(content)
@@ -102,7 +85,6 @@ describe("sync e2e", () => {
 
 	afterEach(async () => {
 		process.chdir(originalCwd)
-		vi.clearAllMocks()
 
 		if (tempDir) {
 			try {
@@ -145,14 +127,17 @@ describe("sync e2e", () => {
 				})
 
 				// Setup: Set the mock agent skills directory
-				const agentSkillsDir = join(dir, "agent-skills")
-				testAgentSkillsDir = agentSkillsDir
-
-				// Change to project directory (sync uses process.cwd())
-				process.chdir(projectDir)
+				const { rootPath: agentRootDir, skillsPath: agentSkillsDir } =
+					buildAgentPaths(dir)
+				const agent = createResolvedAgent(agentRootDir, agentSkillsDir)
+				const manifest = await loadProjectManifest(projectDir)
 
 				// Act: Run sync
-				const result = await runSync({ dryRun: false })
+				const result = await runSync({
+					agents: [agent],
+					dryRun: false,
+					manifest,
+				})
 
 				// Assert: Sync should succeed
 				expect(result.ok).toBe(true)
@@ -169,7 +154,7 @@ describe("sync e2e", () => {
 				expect(await isDirectory(agentSkillsDir)).toBe(true)
 
 				// Assert: State file should be created
-				const state = await readAgentState(agentSkillsDir)
+				const state = await readAgentState(agentRootDir)
 				expect(state).not.toBeNull()
 				expect(state?.version).toBe(1)
 				expect(state?.skills.length).toBeGreaterThan(0)
@@ -206,13 +191,17 @@ describe("sync e2e", () => {
 				})
 
 				// Setup: Mock agent
-				const agentSkillsDir = join(dir, "agent-skills")
-				testAgentSkillsDir = agentSkillsDir
-
-				process.chdir(projectDir)
+				const { rootPath: agentRootDir, skillsPath: agentSkillsDir } =
+					buildAgentPaths(dir)
+				const agent = createResolvedAgent(agentRootDir, agentSkillsDir)
+				const manifest = await loadProjectManifest(projectDir)
 
 				// Act: Run sync - should fail because empty packages are invalid
-				const result = await runSync({ dryRun: false })
+				const result = await runSync({
+					agents: [agent],
+					dryRun: false,
+					manifest,
+				})
 
 				// Assert: Should fail with appropriate error
 				// (Empty packages fail at extract or install stage)
@@ -260,16 +249,20 @@ describe("sync e2e", () => {
 				})
 
 				// Setup: Mock agent
-				const agentSkillsDir = join(dir, "agent-skills")
-				testAgentSkillsDir = agentSkillsDir
-
-				process.chdir(projectDir)
+				const { rootPath: agentRootDir, skillsPath: agentSkillsDir } =
+					buildAgentPaths(dir)
+				const agent = createResolvedAgent(agentRootDir, agentSkillsDir)
 
 				// Act: First sync with pkg1 only
-				const firstResult = await runSync({ dryRun: false })
+				const firstManifest = await loadProjectManifest(projectDir)
+				const firstResult = await runSync({
+					agents: [agent],
+					dryRun: false,
+					manifest: firstManifest,
+				})
 				expect(firstResult.ok).toBe(true)
 
-				const firstState = await readAgentState(agentSkillsDir)
+				const firstState = await readAgentState(agentRootDir)
 				const firstSkillCount = firstState?.skills.length ?? 0
 
 				// Update manifest to add second package
@@ -282,11 +275,16 @@ describe("sync e2e", () => {
 				})
 
 				// Act: Second sync with both packages
-				const secondResult = await runSync({ dryRun: false })
+				const secondManifest = await loadProjectManifest(projectDir)
+				const secondResult = await runSync({
+					agents: [agent],
+					dryRun: false,
+					manifest: secondManifest,
+				})
 				expect(secondResult.ok).toBe(true)
 
 				// Assert: More skills should be installed
-				const secondState = await readAgentState(agentSkillsDir)
+				const secondState = await readAgentState(agentRootDir)
 				expect(secondState?.skills.length).toBeGreaterThan(firstSkillCount)
 
 				// Assert: Both package prefixes should be present
@@ -329,13 +327,17 @@ describe("sync e2e", () => {
 				})
 
 				// Setup: Mock agent
-				const agentSkillsDir = join(dir, "agent-skills")
-				testAgentSkillsDir = agentSkillsDir
-
-				process.chdir(projectDir)
+				const { rootPath: agentRootDir, skillsPath: agentSkillsDir } =
+					buildAgentPaths(dir)
+				const agent = createResolvedAgent(agentRootDir, agentSkillsDir)
 
 				// Act: First sync with both packages
-				const firstResult = await runSync({ dryRun: false })
+				const firstManifest = await loadProjectManifest(projectDir)
+				const firstResult = await runSync({
+					agents: [agent],
+					dryRun: false,
+					manifest: firstManifest,
+				})
 				expect(firstResult.ok).toBe(true)
 
 				// Verify both packages are installed
@@ -352,7 +354,12 @@ describe("sync e2e", () => {
 				})
 
 				// Act: Second sync with only pkg1
-				const secondResult = await runSync({ dryRun: false })
+				const secondManifest = await loadProjectManifest(projectDir)
+				const secondResult = await runSync({
+					agents: [agent],
+					dryRun: false,
+					manifest: secondManifest,
+				})
 				expect(secondResult.ok).toBe(true)
 
 				// Assert: pkg2 skills should be removed
@@ -366,7 +373,7 @@ describe("sync e2e", () => {
 				expect(installedSkills.some((s) => s.startsWith("pkg2-"))).toBe(false)
 
 				// Assert: State should only contain pkg1 skills
-				const state = await readAgentState(agentSkillsDir)
+				const state = await readAgentState(agentRootDir)
 				expect(state?.skills.every((s) => s.startsWith("pkg1-"))).toBe(true)
 			})
 		})
@@ -397,13 +404,17 @@ describe("sync e2e", () => {
 				})
 
 				// Setup: Mock agent
-				const agentSkillsDir = join(dir, "agent-skills")
-				testAgentSkillsDir = agentSkillsDir
-
-				process.chdir(projectDir)
+				const { rootPath: agentRootDir, skillsPath: agentSkillsDir } =
+					buildAgentPaths(dir)
+				const agent = createResolvedAgent(agentRootDir, agentSkillsDir)
+				const manifest = await loadProjectManifest(projectDir)
 
 				// Act: Run sync with dry-run enabled
-				const result = await runSync({ dryRun: true })
+				const result = await runSync({
+					agents: [agent],
+					dryRun: true,
+					manifest,
+				})
 
 				// Assert: Should succeed
 				expect(result.ok).toBe(true)
@@ -421,7 +432,7 @@ describe("sync e2e", () => {
 				expect(await exists(agentSkillsDir)).toBe(false)
 
 				// Assert: No state file should exist
-				const state = await readAgentState(agentSkillsDir)
+				const state = await readAgentState(agentRootDir)
 				expect(state).toBeNull()
 			})
 		})
@@ -453,13 +464,17 @@ describe("sync e2e", () => {
 					},
 				})
 
-				const agentSkillsDir = join(dir, "agent-skills")
-				testAgentSkillsDir = agentSkillsDir
-
-				process.chdir(projectDir)
+				const { rootPath: agentRootDir, skillsPath: agentSkillsDir } =
+					buildAgentPaths(dir)
+				const agent = createResolvedAgent(agentRootDir, agentSkillsDir)
 
 				// First: Do a real sync with both packages
-				const firstResult = await runSync({ dryRun: false })
+				const firstManifest = await loadProjectManifest(projectDir)
+				const firstResult = await runSync({
+					agents: [agent],
+					dryRun: false,
+					manifest: firstManifest,
+				})
 				expect(firstResult.ok).toBe(true)
 
 				// Verify both are installed
@@ -475,7 +490,12 @@ describe("sync e2e", () => {
 				})
 
 				// Act: Dry-run sync with pkg2 removed
-				const dryRunResult = await runSync({ dryRun: true })
+				const dryManifest = await loadProjectManifest(projectDir)
+				const dryRunResult = await runSync({
+					agents: [agent],
+					dryRun: true,
+					manifest: dryManifest,
+				})
 				expect(dryRunResult.ok).toBe(true)
 
 				if (!dryRunResult.ok) {
@@ -494,30 +514,6 @@ describe("sync e2e", () => {
 	})
 
 	describe("error cases", () => {
-		it("fails when no manifest is found", async () => {
-			await withTempDir(async (dir) => {
-				tempDir = dir
-
-				// Setup: Empty project directory (no package.toml)
-				const projectDir = join(dir, "empty-project")
-				await mkdir(projectDir, { recursive: true })
-
-				const agentSkillsDir = join(dir, "agent-skills")
-				testAgentSkillsDir = agentSkillsDir
-
-				process.chdir(projectDir)
-
-				// Act: Run sync
-				const result = await runSync({ dryRun: false })
-
-				// Assert: Should fail at discover stage
-				expect(result.ok).toBe(false)
-				if (!result.ok) {
-					expect(result.error.stage).toBe("discover")
-				}
-			})
-		})
-
 		it("fails when local package path does not exist", async () => {
 			await withTempDir(async (dir) => {
 				tempDir = dir
@@ -531,13 +527,17 @@ describe("sync e2e", () => {
 					},
 				})
 
-				const agentSkillsDir = join(dir, "agent-skills")
-				testAgentSkillsDir = agentSkillsDir
-
-				process.chdir(projectDir)
+				const { rootPath: agentRootDir, skillsPath: agentSkillsDir } =
+					buildAgentPaths(dir)
+				const agent = createResolvedAgent(agentRootDir, agentSkillsDir)
+				const manifest = await loadProjectManifest(projectDir)
 
 				// Act: Run sync
-				const result = await runSync({ dryRun: false })
+				const result = await runSync({
+					agents: [agent],
+					dryRun: false,
+					manifest,
+				})
 
 				// Assert: Should fail at fetch stage
 				expect(result.ok).toBe(false)

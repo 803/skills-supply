@@ -11,24 +11,19 @@
 import { describe, expect, it } from "vitest"
 import "@/tests/helpers/assertions"
 import type {
-	ManifestDependencyEntry,
-	MergedManifest,
+	Manifest,
 	ValidatedClaudePluginDependency,
+	ValidatedDependency,
 	ValidatedGitDependency,
 	ValidatedGithubDependency,
 	ValidatedLocalDependency,
 	ValidatedRegistryDependency,
 } from "@/src/core/manifest/types"
 import {
-	resolveMergedPackages,
+	resolveManifestPackages,
 	resolveValidatedDependency,
 } from "@/src/core/packages/resolve"
-import type {
-	AgentId,
-	Alias,
-	ManifestOrigin,
-	PackageOrigin,
-} from "@/src/core/types/branded"
+import type { ManifestOrigin, PackageOrigin } from "@/src/core/types/branded"
 import { abs, alias, ghRef, gitUrl, nes } from "@/tests/helpers/branded"
 
 // =============================================================================
@@ -49,6 +44,17 @@ function makeManifestOrigin(
 	return {
 		discoveredAt,
 		sourcePath: abs(path),
+	}
+}
+
+function makeManifest(
+	dependencies: Array<[string, ValidatedDependency]>,
+	originPath = "/test/package.toml",
+): Manifest {
+	return {
+		agents: new Map(),
+		dependencies: new Map(dependencies.map(([key, value]) => [alias(key), value])),
+		origin: makeManifestOrigin(originPath),
 	}
 }
 
@@ -483,38 +489,30 @@ describe("resolveValidatedDependency", () => {
 })
 
 // =============================================================================
-// resolveMergedPackages
+// resolveManifestPackages
 // =============================================================================
 
-describe("resolveMergedPackages", () => {
+describe("resolveManifestPackages", () => {
 	it("resolves empty manifest to empty array", () => {
-		const manifest: MergedManifest = {
-			agents: new Map<AgentId, boolean>([["claude-code", true]]),
-			dependencies: new Map(),
-			warnings: [],
-		}
+		const manifest = makeManifest([])
 
-		const result = resolveMergedPackages(manifest)
+		const result = resolveManifestPackages(manifest)
 
 		expect(result).toEqual([])
 	})
 
 	it("resolves single dependency", () => {
-		const entry: ManifestDependencyEntry = {
-			dependency: {
-				gh: ghRef("org/repo"),
-				type: "github",
-			} as ValidatedGithubDependency,
-			origin: makeManifestOrigin(),
-		}
+		const manifest = makeManifest([
+			[
+				"my-pkg",
+				{
+					gh: ghRef("org/repo"),
+					type: "github",
+				} as ValidatedGithubDependency,
+			],
+		])
 
-		const manifest: MergedManifest = {
-			agents: new Map<AgentId, boolean>([["claude-code", true]]),
-			dependencies: new Map([[alias("my-pkg"), entry]]),
-			warnings: [],
-		}
-
-		const result = resolveMergedPackages(manifest)
+		const result = resolveManifestPackages(manifest)
 
 		expect(result).toHaveLength(1)
 		const [resolved] = result
@@ -526,43 +524,33 @@ describe("resolveMergedPackages", () => {
 	})
 
 	it("resolves multiple dependencies", () => {
-		const githubEntry: ManifestDependencyEntry = {
-			dependency: {
-				gh: ghRef("org/repo1"),
-				type: "github",
-			} as ValidatedGithubDependency,
-			origin: makeManifestOrigin(),
-		}
+		const manifest = makeManifest([
+			[
+				"github-pkg",
+				{
+					gh: ghRef("org/repo1"),
+					type: "github",
+				} as ValidatedGithubDependency,
+			],
+			[
+				"local-pkg",
+				{
+					path: abs("/local/path"),
+					type: "local",
+				} as ValidatedLocalDependency,
+			],
+			[
+				"registry-pkg",
+				{
+					name: nes("skill"),
+					org: nes("my-org"),
+					type: "registry",
+					version: nes("1.0.0"),
+				} as ValidatedRegistryDependency,
+			],
+		])
 
-		const localEntry: ManifestDependencyEntry = {
-			dependency: {
-				path: abs("/local/path"),
-				type: "local",
-			} as ValidatedLocalDependency,
-			origin: makeManifestOrigin(),
-		}
-
-		const registryEntry: ManifestDependencyEntry = {
-			dependency: {
-				name: nes("skill"),
-				org: nes("my-org"),
-				type: "registry",
-				version: nes("1.0.0"),
-			} as ValidatedRegistryDependency,
-			origin: makeManifestOrigin(),
-		}
-
-		const manifest: MergedManifest = {
-			agents: new Map<AgentId, boolean>([["claude-code", true]]),
-			dependencies: new Map([
-				[alias("github-pkg"), githubEntry],
-				[alias("local-pkg"), localEntry],
-				[alias("registry-pkg"), registryEntry],
-			]),
-			warnings: [],
-		}
-
-		const result = resolveMergedPackages(manifest)
+		const result = resolveManifestPackages(manifest)
 
 		expect(result).toHaveLength(3)
 
@@ -574,21 +562,20 @@ describe("resolveMergedPackages", () => {
 	})
 
 	it("preserves manifest origin in package origin", () => {
-		const entry: ManifestDependencyEntry = {
-			dependency: {
-				gh: ghRef("org/repo"),
-				type: "github",
-			} as ValidatedGithubDependency,
-			origin: makeManifestOrigin("/custom/manifest/path.toml", "home"),
-		}
+		const manifest = makeManifest(
+			[
+				[
+					"my-pkg",
+					{
+						gh: ghRef("org/repo"),
+						type: "github",
+					} as ValidatedGithubDependency,
+				],
+			],
+			"/custom/manifest/path.toml",
+		)
 
-		const manifest: MergedManifest = {
-			agents: new Map<AgentId, boolean>([["claude-code", true]]),
-			dependencies: new Map([[alias("my-pkg"), entry]]),
-			warnings: [],
-		}
-
-		const result = resolveMergedPackages(manifest)
+		const result = resolveManifestPackages(manifest)
 
 		const [resolved] = result
 		if (!resolved) {
@@ -598,73 +585,51 @@ describe("resolveMergedPackages", () => {
 	})
 
 	it("handles mixed dependency types", () => {
-		const deps = new Map<Alias, ManifestDependencyEntry>([
+		const manifest = makeManifest([
 			[
-				alias("github-simple"),
+				"github-simple",
 				{
-					dependency: {
-						gh: ghRef("org/simple"),
-						type: "github",
-					} as ValidatedGithubDependency,
-					origin: makeManifestOrigin(),
-				},
+					gh: ghRef("org/simple"),
+					type: "github",
+				} as ValidatedGithubDependency,
 			],
 			[
-				alias("github-full"),
+				"github-full",
 				{
-					dependency: {
-						gh: ghRef("org/full"),
-						path: nes("packages/sub"),
-						ref: { type: "tag", value: nes("v1.0.0") },
-						type: "github",
-					} as ValidatedGithubDependency,
-					origin: makeManifestOrigin(),
-				},
+					gh: ghRef("org/full"),
+					path: nes("packages/sub"),
+					ref: { type: "tag", value: nes("v1.0.0") },
+					type: "github",
+				} as ValidatedGithubDependency,
 			],
 			[
-				alias("git-pkg"),
+				"git-pkg",
 				{
-					dependency: {
-						type: "git",
-						url: gitUrl("https://gitlab.com/org/repo"),
-					} as ValidatedGitDependency,
-					origin: makeManifestOrigin(),
-				},
+					type: "git",
+					url: gitUrl("https://gitlab.com/org/repo"),
+				} as ValidatedGitDependency,
 			],
 			[
-				alias("local-pkg"),
+				"local-pkg",
 				{
-					dependency: {
-						path: abs("/home/user/local"),
-						type: "local",
-					} as ValidatedLocalDependency,
-					origin: makeManifestOrigin(),
-				},
+					path: abs("/home/user/local"),
+					type: "local",
+				} as ValidatedLocalDependency,
 			],
 			[
-				alias("plugin-pkg"),
+				"plugin-pkg",
 				{
-					dependency: {
-						marketplace: gitUrl("https://github.com/anthropics/plugins"),
-						plugin: nes("my-plugin"),
-						type: "claude-plugin",
-					} as ValidatedClaudePluginDependency,
-					origin: makeManifestOrigin(),
-				},
+					marketplace: gitUrl("https://github.com/anthropics/plugins"),
+					plugin: nes("my-plugin"),
+					type: "claude-plugin",
+				} as ValidatedClaudePluginDependency,
 			],
 		])
 
-		const manifest: MergedManifest = {
-			agents: new Map<AgentId, boolean>([["claude-code", true]]),
-			dependencies: deps,
-			warnings: [],
-		}
-
-		const result = resolveMergedPackages(manifest)
+		const result = resolveManifestPackages(manifest)
 
 		expect(result).toHaveLength(5)
 
-		// Verify each package was correctly resolved
 		const byAlias = new Map(result.map((p) => [p.origin.alias, p]))
 
 		const githubSimple = byAlias.get(alias("github-simple"))

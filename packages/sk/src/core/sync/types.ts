@@ -1,5 +1,5 @@
-import type { AgentDefinition } from "@/src/core/agents/types"
-import type { Manifest, MergedManifest } from "@/src/core/manifest/types"
+import type { ResolvedAgent } from "@/src/core/agents/types"
+import type { Manifest } from "@/src/core/manifest/types"
 import type { CanonicalPackage, Skill } from "@/src/core/packages/types"
 
 export type SyncStage =
@@ -23,13 +23,6 @@ export interface SyncError {
 
 export type SyncResult<T> = { ok: true; value: T } | { ok: false; error: SyncError }
 
-export interface ResolvedManifest {
-	manifests: Manifest[]
-	merged: MergedManifest
-	dependencies: CanonicalPackage[]
-	agents: AgentDefinition[]
-}
-
 export interface ExtractedPackage {
 	canonical: CanonicalPackage
 	prefix: string
@@ -43,9 +36,12 @@ export interface SyncSummary {
 	manifests: number
 	dependencies: number
 	removed: number
+	noOpReason?: "no-dependencies"
 	warnings: string[]
 }
 
 export interface SyncOptions {
 	dryRun: boolean
+	agents: ResolvedAgent[]
+	manifest: Manifest
 }

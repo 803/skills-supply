@@ -1,5 +1,10 @@
 import { consola } from "consola"
-import { loadManifestForUpdate } from "@/src/commands/manifest-prompt"
+import {
+	buildParentPromptMessage,
+	resolveGlobalManifest,
+	resolveLocalManifest,
+	warnIfSubdirectory,
+} from "@/src/commands/manifest-selection"
 import type { AddOptions } from "@/src/commands/pkg/spec"
 import { buildPackageSpec } from "@/src/commands/pkg/spec"
 import { coerceDependency } from "@/src/core/manifest/coerce"
@@ -9,17 +14,45 @@ import type { ValidatedDependency } from "@/src/core/manifest/types"
 import { coerceAlias } from "@/src/core/types/coerce"
 import { formatError } from "@/src/utils/errors"
 
+export interface PkgAddCommandOptions extends AddOptions {
+	global: boolean
+	init: boolean
+	nonInteractive: boolean
+}
+
 export async function pkgAdd(
 	type: string,
 	spec: string,
-	options: AddOptions,
+	options: PkgAddCommandOptions,
 ): Promise<void> {
 	consola.info("sk pkg add")
-	consola.start("Updating dependencies...")
 
 	try {
 		const pkgSpec = buildPackageSpec(type, spec, options)
-		const manifestResult = await loadManifestForUpdate()
+		const selection = options.global
+			? await resolveGlobalManifest({
+					createIfMissing: options.init,
+					nonInteractive: options.nonInteractive,
+					promptToCreate: true,
+				})
+			: await resolveLocalManifest({
+					createIfMissing: options.init,
+					nonInteractive: options.nonInteractive,
+					parentPrompt: {
+						buildMessage: (projectRoot, cwd) =>
+							buildParentPromptMessage(projectRoot, cwd, {
+								action: "modify",
+								warnAboutSkillVisibility: true,
+							}),
+					},
+					promptToCreate: true,
+				})
+
+		if (!options.global) {
+			warnIfSubdirectory(selection)
+		}
+
+		consola.start("Updating dependencies...")
 
 		const alias = coerceAlias(pkgSpec.alias)
 		if (!alias) {
@@ -30,34 +63,38 @@ export async function pkgAdd(
 		const coerced = coerceDependency(
 			pkgSpec.declaration,
 			pkgSpec.alias,
-			manifestResult.manifestPath,
+			selection.manifestPath,
 		)
 		if (!coerced.ok) {
 			throw new Error(coerced.error.message)
 		}
 
-		const current = getDependency(manifestResult.manifest, alias)
+		const current = getDependency(selection.manifest, alias)
 		const changed = !areDependenciesEqual(current, coerced.value)
 
 		if (changed) {
-			const updated = addDependency(manifestResult.manifest, alias, coerced.value)
-			await saveManifest(updated, manifestResult.manifestPath)
+			const updated = addDependency(selection.manifest, alias, coerced.value)
+			await saveManifest(
+				updated,
+				selection.manifestPath,
+				selection.serializeOptions,
+			)
 		}
 
 		consola.success("Dependency settings updated.")
-		if (manifestResult.created) {
-			consola.info(`Created ${manifestResult.manifestPath}.`)
+		if (selection.created) {
+			consola.info(`Created ${selection.manifestPath}.`)
 		}
 
 		if (!changed) {
 			consola.info(`Dependency already present: ${pkgSpec.alias}.`)
-			consola.info(`Manifest: ${manifestResult.manifestPath} (no changes).`)
+			consola.info(`Manifest: ${selection.manifestPath} (no changes).`)
 			consola.success("Done.")
 			return
 		}
 
 		consola.success(`Added dependency: ${pkgSpec.alias}.`)
-		consola.info(`Manifest: ${manifestResult.manifestPath} (updated).`)
+		consola.info(`Manifest: ${selection.manifestPath} (updated).`)
 		consola.success("Done.")
 	} catch (error) {
 		process.exitCode = 1

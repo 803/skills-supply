@@ -20,6 +20,9 @@
 		},
 		"lint": {
 			"dependsOn": ["^build"]
+		},
+		"tsc": {
+			"cache": false
 		}
 	}
 }

@@ -1,6 +1,6 @@
 import path from "node:path"
 import type { AgentInstallState } from "@/src/core/agents/state"
-import type { AgentDefinition } from "@/src/core/agents/types"
+import type { ResolvedAgent } from "@/src/core/agents/types"
 import type { IoResult } from "@/src/core/io/fs"
 import { removePath } from "@/src/core/io/fs"
 
@@ -9,7 +9,7 @@ export interface ReconcileResult {
 }
 
 export async function reconcileAgentSkills(
-	agent: AgentDefinition,
+	agent: ResolvedAgent,
 	state: AgentInstallState | null,
 	desired: Set<string>,
 ): Promise<IoResult<ReconcileResult>> {

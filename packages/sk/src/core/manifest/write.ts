@@ -11,10 +11,18 @@ import type {
 } from "@/src/core/manifest/types"
 import type { GitRef } from "@/src/core/types/branded"
 
+export interface SerializeOptions {
+	includeEmptyAgents?: boolean
+	includeEmptyDependencies?: boolean
+}
+
 /**
  * Serialize a Manifest to TOML string.
  */
-export function serializeManifest(manifest: Manifest): string {
+export function serializeManifest(
+	manifest: Manifest,
+	options: SerializeOptions = {},
+): string {
 	const output: Record<string, unknown> = {}
 
 	if (manifest.package) {
@@ -37,7 +45,24 @@ export function serializeManifest(manifest: Manifest): string {
 		}
 	}
 
-	const toml = stringify(output)
+	let toml = stringify(output).trimEnd()
+	const extras: string[] = []
+
+	if (options.includeEmptyAgents && manifest.agents.size === 0) {
+		extras.push("[agents]")
+	}
+
+	if (options.includeEmptyDependencies && manifest.dependencies.size === 0) {
+		extras.push("[dependencies]")
+	}
+
+	if (extras.length > 0) {
+		if (toml.length > 0) {
+			toml += "\n\n"
+		}
+		toml += extras.join("\n\n")
+	}
+
 	return toml.endsWith("\n") ? toml : `${toml}\n`
 }
 

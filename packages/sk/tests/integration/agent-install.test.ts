@@ -6,7 +6,7 @@
  */
 
 import { lstat, mkdir, readdir, readFile, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { describe, expect, it } from "vitest"
 import {
 	type AgentInstallPlan,
@@ -14,7 +14,7 @@ import {
 	type InstallGuard,
 	planAgentInstall,
 } from "@/src/core/agents/install"
-import type { AgentDefinition, InstallablePackage } from "@/src/core/agents/types"
+import type { InstallablePackage, ResolvedAgent } from "@/src/core/agents/types"
 import type { CanonicalPackage, Skill } from "@/src/core/packages/types"
 import { abs, alias, exists, ghRef, isDirectory, nes, withTempDir } from "@/tests/helpers"
 
@@ -23,13 +23,13 @@ import { abs, alias, exists, ghRef, isDirectory, nes, withTempDir } from "@/test
 // =============================================================================
 
 /**
- * Create a test agent definition.
+ * Create a resolved agent for tests.
  */
-function makeAgent(skillsPath: string): AgentDefinition {
+function makeAgent(skillsPath: string): ResolvedAgent {
 	return {
-		detect: async () => ({ ok: true, value: true }),
 		displayName: "Claude Code",
 		id: "claude-code",
+		rootPath: dirname(skillsPath),
 		skillsPath,
 	}
 }

@@ -1,12 +1,12 @@
 import path from "node:path"
-import type { AgentDefinition } from "@/src/core/agents/types"
+import type { ResolvedAgent } from "@/src/core/agents/types"
 import type { IoError, IoResult } from "@/src/core/io/fs"
 import { ensureDir, readTextFile, safeStat, writeTextFile } from "@/src/core/io/fs"
 
 export interface AgentInstallState {
 	version: number
 	skills: string[]
-	updatedAt: string
+	updated_at: string
 }
 
 const STATE_FILENAME = ".sk-state.json"
@@ -16,7 +16,7 @@ type StateResult = IoResult<AgentInstallState | null>
 
 type StateWriteResult = IoResult<void>
 
-export async function readAgentState(agent: AgentDefinition): Promise<StateResult> {
+export async function readAgentState(agent: ResolvedAgent): Promise<StateResult> {
 	const statePath = resolveStatePath(agent)
 	const stats = await safeStat(statePath)
 	if (!stats.ok) {
@@ -52,10 +52,10 @@ export async function readAgentState(agent: AgentDefinition): Promise<StateResul
 }
 
 export async function writeAgentState(
-	agent: AgentDefinition,
+	agent: ResolvedAgent,
 	state: AgentInstallState,
 ): Promise<StateWriteResult> {
-	const basePath = path.resolve(agent.skillsPath)
+	const basePath = path.resolve(agent.rootPath)
 	const ensured = await ensureDir(basePath)
 	if (!ensured.ok) {
 		return ensured
@@ -70,13 +70,13 @@ export function buildAgentState(skills: string[]): AgentInstallState {
 	const uniqueSkills = Array.from(new Set(skills)).sort()
 	return {
 		skills: uniqueSkills,
-		updatedAt: new Date().toISOString(),
+		updated_at: new Date().toISOString(),
 		version: STATE_VERSION,
 	}
 }
 
-export function resolveStatePath(agent: AgentDefinition): string {
-	return path.join(agent.skillsPath, STATE_FILENAME)
+export function resolveStatePath(agent: ResolvedAgent): string {
+	return path.join(agent.rootPath, STATE_FILENAME)
 }
 
 function parseState(
@@ -89,7 +89,7 @@ function parseState(
 
 	const version = value.version
 	const skills = value.skills
-	const updatedAt = value.updatedAt
+	const updatedAt = value.updated_at
 
 	if (typeof version !== "number" || !Number.isFinite(version)) {
 		return failure("State file version must be a number.", statePath)
@@ -122,14 +122,14 @@ function parseState(
 	}
 
 	if (typeof updatedAt !== "string" || !updatedAt.trim()) {
-		return failure("State file updatedAt must be a string.", statePath)
+		return failure("State file updated_at must be a string.", statePath)
 	}
 
 	return {
 		ok: true,
 		value: {
 			skills,
-			updatedAt,
+			updated_at: updatedAt,
 			version,
 		},
 	}

@@ -1,17 +1,17 @@
 import { cp, lstat, mkdir, rm, stat, symlink } from "node:fs/promises"
 import path from "node:path"
 import type {
-	AgentDefinition,
 	AgentInstallError,
 	AgentInstallResult,
 	InstallablePackage,
 	InstalledSkill,
+	ResolvedAgent,
 } from "@/src/core/agents/types"
 
 type InstallMode = "copy" | "symlink"
 
 export interface InstallTask {
-	agentId: AgentDefinition["id"]
+	agentId: ResolvedAgent["id"]
 	sourcePath: string
 	targetName: string
 	targetPath: string
@@ -20,7 +20,7 @@ export interface InstallTask {
 }
 
 export interface AgentInstallPlan {
-	agentId: AgentDefinition["id"]
+	agentId: ResolvedAgent["id"]
 	basePath: string
 	tasks: InstallTask[]
 }
@@ -89,7 +89,7 @@ export async function applyAgentInstall(
 }
 
 export function planAgentInstall(
-	agent: AgentDefinition,
+	agent: ResolvedAgent,
 	packages: InstallablePackage[],
 ): PlanResult {
 	// Validate raw input before resolving - empty/whitespace paths are invalid
@@ -167,7 +167,7 @@ export function planAgentInstall(
 function normalizeSegment(
 	value: string,
 	label: string,
-	agentId: AgentDefinition["id"],
+	agentId: ResolvedAgent["id"],
 ): { ok: true; value: string } | { ok: false; error: AgentInstallError } {
 	const trimmed = value.trim()
 	if (!trimmed) {
@@ -200,7 +200,7 @@ function isWithinBase(basePath: string, targetPath: string): boolean {
 
 async function ensureDirectory(
 	targetPath: string,
-	agentId: AgentDefinition["id"],
+	agentId: ResolvedAgent["id"],
 ): Promise<{ ok: true } | { ok: false; error: AgentInstallError }> {
 	const stats = await safeStat(targetPath, agentId)
 	if (!stats.ok) {
@@ -234,7 +234,7 @@ async function ensureDirectory(
 
 async function ensureExistingDirectory(
 	targetPath: string,
-	agentId: AgentDefinition["id"],
+	agentId: ResolvedAgent["id"],
 ): Promise<{ ok: true } | { ok: false; error: AgentInstallError }> {
 	const stats = await safeStat(targetPath, agentId)
 	if (!stats.ok) {
@@ -264,7 +264,7 @@ async function ensureExistingDirectory(
 
 async function prepareTarget(
 	targetPath: string,
-	agentId: AgentDefinition["id"],
+	agentId: ResolvedAgent["id"],
 	guard?: InstallGuard,
 ): Promise<{ ok: true } | { ok: false; error: AgentInstallError }> {
 	const stats = await safeLstat(targetPath, agentId)
@@ -290,7 +290,7 @@ async function prepareTarget(
 
 async function validateTargets(
 	tasks: InstallTask[],
-	agentId: AgentDefinition["id"],
+	agentId: ResolvedAgent["id"],
 	guard?: InstallGuard,
 ): Promise<{ ok: true } | { ok: false; error: AgentInstallError }> {
 	for (const task of tasks) {
@@ -318,7 +318,7 @@ async function validateTargets(
 
 async function removeTarget(
 	targetPath: string,
-	agentId: AgentDefinition["id"],
+	agentId: ResolvedAgent["id"],
 ): Promise<{ ok: true } | { ok: false; error: AgentInstallError }> {
 	try {
 		await rm(targetPath, { force: true, recursive: true })
@@ -336,7 +336,7 @@ async function removeTarget(
 async function copyDirectory(
 	sourcePath: string,
 	targetPath: string,
-	agentId: AgentDefinition["id"],
+	agentId: ResolvedAgent["id"],
 ): Promise<{ ok: true } | { ok: false; error: AgentInstallError }> {
 	try {
 		await cp(sourcePath, targetPath, { recursive: true })
@@ -354,7 +354,7 @@ async function copyDirectory(
 async function createSymlink(
 	sourcePath: string,
 	targetPath: string,
-	agentId: AgentDefinition["id"],
+	agentId: ResolvedAgent["id"],
 ): Promise<{ ok: true } | { ok: false; error: AgentInstallError }> {
 	try {
 		const linkType = process.platform === "win32" ? "junction" : "dir"
@@ -372,7 +372,7 @@ async function createSymlink(
 
 async function safeStat(
 	targetPath: string,
-	agentId: AgentDefinition["id"],
+	agentId: ResolvedAgent["id"],
 ): Promise<StatResult> {
 	try {
 		const stats = await stat(targetPath)
@@ -393,7 +393,7 @@ async function safeStat(
 
 async function safeLstat(
 	targetPath: string,
-	agentId: AgentDefinition["id"],
+	agentId: ResolvedAgent["id"],
 ): Promise<LStatResult> {
 	try {
 		const stats = await lstat(targetPath)
@@ -432,7 +432,7 @@ function formatErrorMessage(error: unknown, fallback: string): string {
 function failure(
 	type: AgentInstallError["type"],
 	message: string,
-	agentId: AgentDefinition["id"],
+	agentId: ResolvedAgent["id"],
 	pathValue?: string,
 ): { ok: false; error: AgentInstallError } {
 	return {

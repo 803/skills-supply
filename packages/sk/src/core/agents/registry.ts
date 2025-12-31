@@ -8,42 +8,49 @@ import type {
 	AgentListResult,
 	AgentLookupResult,
 	AgentRegistryError,
+	ResolvedAgent,
 } from "@/src/core/agents/types"
+import type { AbsolutePath } from "@/src/core/types/branded"
 
 interface AgentEntry {
 	id: AgentId
 	displayName: string
-	skillsPath: string
+	basePath: string
+	skillsDir: string
 	detectPath: string
 }
 
 const HOME_DIR = homedir()
 const AGENT_ENTRIES: AgentEntry[] = [
 	{
+		basePath: ".claude",
 		detectPath: path.join(HOME_DIR, ".claude"),
 		displayName: "Claude Code",
 		id: "claude-code",
-		skillsPath: path.join(HOME_DIR, ".claude", "skills"),
+		skillsDir: "skills",
 	},
 	{
+		basePath: ".codex",
 		detectPath: path.join(HOME_DIR, ".codex"),
 		displayName: "Codex",
 		id: "codex",
-		skillsPath: path.join(HOME_DIR, ".codex", "skills"),
+		skillsDir: "skills",
 	},
 	{
+		basePath: path.join(".config", "opencode"),
 		detectPath: path.join(HOME_DIR, ".config", "opencode"),
 		displayName: "OpenCode",
 		id: "opencode",
-		skillsPath: path.join(HOME_DIR, ".config", "opencode", "skill"),
+		skillsDir: "skill",
 	},
 ]
 
 const AGENT_REGISTRY: AgentDefinition[] = AGENT_ENTRIES.map((entry) => ({
+	basePath: entry.basePath,
 	detect: () => detectAgent(entry.id, entry.detectPath),
 	displayName: entry.displayName,
 	id: entry.id,
-	skillsPath: entry.skillsPath,
+	skillsDir: entry.skillsDir,
 }))
 
 const AGENT_IDS = new Set<AgentId>(AGENT_ENTRIES.map((entry) => entry.id))
@@ -67,6 +74,21 @@ export function getAgentById(agentId: string): AgentLookupResult {
 	}
 
 	return { ok: true, value: agent }
+}
+
+export type AgentScope =
+	| { type: "local"; projectRoot: AbsolutePath }
+	| { type: "global"; homeDir: AbsolutePath }
+
+export function resolveAgent(agent: AgentDefinition, scope: AgentScope): ResolvedAgent {
+	const root = scope.type === "local" ? scope.projectRoot : scope.homeDir
+	const rootPath = path.join(root, agent.basePath)
+	return {
+		displayName: agent.displayName,
+		id: agent.id,
+		rootPath,
+		skillsPath: path.join(rootPath, agent.skillsDir),
+	}
 }
 
 export async function detectInstalledAgents(): Promise<AgentListResult> {

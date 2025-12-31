@@ -1,7 +1,10 @@
 import { isCancel, multiselect } from "@clack/prompts"
 import { consola } from "consola"
-import { loadManifestForUpdate } from "@/src/commands/manifest-prompt"
-import { listAgents } from "@/src/core/agents/registry"
+import {
+	buildParentPromptMessage,
+	resolveLocalManifest,
+} from "@/src/commands/manifest-selection"
+import { detectInstalledAgents } from "@/src/core/agents/registry"
 import { saveManifest } from "@/src/core/manifest/fs"
 import { getAgent, setAgent } from "@/src/core/manifest/transform"
 import type { AgentId } from "@/src/core/types/branded"
@@ -11,22 +14,26 @@ export async function agentInteractive(): Promise<void> {
 	consola.info("sk agent")
 
 	try {
-		const manifestResult = await loadManifestForUpdate()
-		const agents = listAgents()
+		const selection = await resolveLocalManifest({
+			createIfMissing: false,
+			nonInteractive: false,
+			parentPrompt: {
+				buildMessage: (projectRoot, cwd) =>
+					buildParentPromptMessage(projectRoot, cwd, {
+						action: "modify",
+						warnAboutSkillVisibility: false,
+					}),
+			},
+			promptToCreate: true,
+		})
 		consola.start("Detecting installed agents...")
 
-		const installed = []
-		for (const agent of agents) {
-			const detected = await agent.detect()
-			if (!detected.ok) {
-				throw new Error(detected.error.message)
-			}
-
-			if (detected.value) {
-				installed.push(agent)
-			}
+		const detected = await detectInstalledAgents()
+		if (!detected.ok) {
+			throw new Error(detected.error.message)
 		}
 
+		const installed = detected.value
 		consola.success("Agent detection complete.")
 
 		if (installed.length === 0) {
@@ -35,7 +42,7 @@ export async function agentInteractive(): Promise<void> {
 			return
 		}
 		const enabled = new Set(
-			[...manifestResult.manifest.agents.entries()]
+			[...selection.manifest.agents.entries()]
 				.filter(([, isEnabled]) => isEnabled)
 				.map(([agentId]) => agentId),
 		)
@@ -57,7 +64,7 @@ export async function agentInteractive(): Promise<void> {
 		}
 
 		const selectedSet = new Set(selected)
-		let updatedManifest = manifestResult.manifest
+		let updatedManifest = selection.manifest
 		let changed = false
 		for (const agent of installed) {
 			const desired = selectedSet.has(agent.id)
@@ -70,14 +77,18 @@ export async function agentInteractive(): Promise<void> {
 
 		if (!changed) {
 			consola.info("No agent changes needed.")
-			consola.info(`Manifest: ${manifestResult.manifestPath} (no changes).`)
+			consola.info(`Manifest: ${selection.manifestPath} (no changes).`)
 			consola.success("Done.")
 			return
 		}
 
-		await saveManifest(updatedManifest, manifestResult.manifestPath)
+		await saveManifest(
+			updatedManifest,
+			selection.manifestPath,
+			selection.serializeOptions,
+		)
 		consola.success("Updated agent selections.")
-		consola.info(`Manifest: ${manifestResult.manifestPath} (updated).`)
+		consola.info(`Manifest: ${selection.manifestPath} (updated).`)
 		consola.success("Done.")
 	} catch (error) {
 		process.exitCode = 1

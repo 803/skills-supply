@@ -1,9 +1,13 @@
 import { readFile, writeFile } from "node:fs/promises"
-import path from "node:path"
 import { parseManifest } from "@/src/core/manifest/parse"
 import type { Manifest, ValidatedDependency } from "@/src/core/manifest/types"
-import { serializeManifest } from "@/src/core/manifest/write"
-import type { AbsolutePath, AgentId, Alias } from "@/src/core/types/branded"
+import { type SerializeOptions, serializeManifest } from "@/src/core/manifest/write"
+import type {
+	AbsolutePath,
+	AgentId,
+	Alias,
+	ManifestDiscoveredAt,
+} from "@/src/core/types/branded"
 
 export interface ManifestLoadResult {
 	created: boolean
@@ -19,41 +23,25 @@ export class ManifestNotFoundError extends Error {
 }
 
 /**
- * Load manifest from current working directory.
- * Optionally creates a new empty manifest if none exists.
+ * Load a manifest from a specific path.
  */
-export async function loadManifestFromCwd(options: {
-	createIfMissing: boolean
-}): Promise<ManifestLoadResult> {
-	const manifestPath = path.join(process.cwd(), "package.toml") as AbsolutePath
-	let manifest: Manifest
-	let created = false
-
+export async function loadManifest(
+	manifestPath: AbsolutePath,
+	discoveredAt: ManifestDiscoveredAt,
+): Promise<ManifestLoadResult> {
 	try {
 		const contents = await readFile(manifestPath, "utf8")
-		const parsed = parseManifest(contents, manifestPath, "cwd")
+		const parsed = parseManifest(contents, manifestPath, discoveredAt)
 		if (!parsed.ok) {
 			throw new Error(parsed.error.message)
 		}
-
-		manifest = parsed.value
+		return { created: false, manifest: parsed.value, manifestPath }
 	} catch (error) {
 		if (isNotFound(error)) {
-			if (!options.createIfMissing) {
-				throw new ManifestNotFoundError(
-					"package.toml not found in the current directory.",
-				)
-			}
-
-			// Create empty manifest with proper typed Maps
-			manifest = createEmptyManifest(manifestPath, "cwd")
-			created = true
-		} else {
-			throw error
+			throw new ManifestNotFoundError(`Manifest not found: ${manifestPath}`)
 		}
+		throw error
 	}
-
-	return { created, manifest, manifestPath }
 }
 
 /**
@@ -61,7 +49,7 @@ export async function loadManifestFromCwd(options: {
  */
 export function createEmptyManifest(
 	sourcePath: AbsolutePath,
-	discoveredAt: "cwd" | "parent" | "home" | "sk-global",
+	discoveredAt: ManifestDiscoveredAt,
 ): Manifest {
 	return {
 		agents: new Map<AgentId, boolean>(),
@@ -76,8 +64,9 @@ export function createEmptyManifest(
 export async function saveManifest(
 	manifest: Manifest,
 	manifestPath: AbsolutePath,
+	options?: SerializeOptions,
 ): Promise<void> {
-	const serialized = serializeManifest(manifest)
+	const serialized = serializeManifest(manifest, options)
 	await writeFile(manifestPath, serialized, "utf8")
 }
 
