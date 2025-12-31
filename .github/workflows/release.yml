@@ -86,10 +86,12 @@ jobs:
   homebrew:
     needs: release
     runs-on: ubuntu-latest
+    environment: prod
     steps:
       - uses: actions/checkout@v6
         with:
           repository: 803/homebrew-sk
+          token: ${{ secrets.SKILLS_SUPPLY_SK_RELEASE_PAT }}
       - uses: jdx/mise-action@v3
         with:
           install: true
@@ -103,10 +105,12 @@ jobs:
   scoop:
     needs: release
     runs-on: ubuntu-latest
+    environment: prod
     steps:
       - uses: actions/checkout@v6
         with:
           repository: 803/scoop-sk
+          token: ${{ secrets.SKILLS_SUPPLY_SK_RELEASE_PAT }}
       - uses: jdx/mise-action@v3
         with:
           install: true
