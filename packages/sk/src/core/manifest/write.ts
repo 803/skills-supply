@@ -1,5 +1,4 @@
 import { stringify } from "smol-toml"
-import type { GitRef } from "@/core/types/branded"
 import type {
 	Manifest,
 	ValidatedClaudePluginDependency,
@@ -10,6 +9,7 @@ import type {
 	ValidatedPackageMetadata,
 	ValidatedRegistryDependency,
 } from "@/core/manifest/types"
+import type { GitRef } from "@/core/types/branded"
 
 /**
  * Serialize a Manifest to TOML string.
@@ -41,9 +41,7 @@ export function serializeManifest(manifest: Manifest): string {
 	return toml.endsWith("\n") ? toml : `${toml}\n`
 }
 
-function serializePackageMetadata(
-	pkg: ValidatedPackageMetadata,
-): Record<string, string> {
+function serializePackageMetadata(pkg: ValidatedPackageMetadata): Record<string, string> {
 	const output: Record<string, string> = {
 		name: pkg.name,
 		version: pkg.version,
@@ -114,9 +112,7 @@ function serializeGithubDependency(
 	return output
 }
 
-function serializeGitDependency(
-	dep: ValidatedGitDependency,
-): Record<string, string> {
+function serializeGitDependency(dep: ValidatedGitDependency): Record<string, string> {
 	const output: Record<string, string> = { git: dep.url }
 
 	if (dep.ref) {
@@ -130,9 +126,7 @@ function serializeGitDependency(
 	return output
 }
 
-function serializeLocalDependency(
-	dep: ValidatedLocalDependency,
-): Record<string, string> {
+function serializeLocalDependency(dep: ValidatedLocalDependency): Record<string, string> {
 	return { path: dep.path }
 }
 
@@ -140,9 +134,9 @@ function serializeClaudePluginDependency(
 	dep: ValidatedClaudePluginDependency,
 ): Record<string, string> {
 	return {
-		type: "claude-plugin",
-		plugin: dep.plugin,
 		marketplace: dep.marketplace,
+		plugin: dep.plugin,
+		type: "claude-plugin",
 	}
 }
 

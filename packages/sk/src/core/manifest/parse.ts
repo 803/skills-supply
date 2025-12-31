@@ -1,8 +1,5 @@
 import { parse, TomlError } from "smol-toml"
 import { z } from "zod"
-import type { AbsolutePath, ManifestDiscoveredAt } from "@/core/types/branded"
-import { coerceAbsolutePathDirect } from "@/core/types/coerce"
-import { coerceManifest, type RawParsedManifest } from "./coerce.js"
 import type {
 	LegacyManifest,
 	LegacyManifestParseResult,
@@ -10,6 +7,9 @@ import type {
 	ManifestParseError,
 	ManifestParseResult,
 } from "@/core/manifest/types"
+import type { AbsolutePath, ManifestDiscoveredAt } from "@/core/types/branded"
+import { coerceAbsolutePathDirect } from "@/core/types/coerce"
+import { coerceManifest, type RawParsedManifest } from "./coerce.js"
 
 type ParseResult<T> = { ok: true; value: T } | { ok: false; error: ManifestParseError }
 
@@ -184,7 +184,11 @@ export function parseLegacyManifest(
 	const parsed = manifestSchema.safeParse(data)
 	if (!parsed.success) {
 		const absPath = coerceAbsolutePathDirect(sourcePath)
-		return failure("invalid_manifest", formatZodError(parsed.error), absPath ?? (sourcePath as AbsolutePath))
+		return failure(
+			"invalid_manifest",
+			formatZodError(parsed.error),
+			absPath ?? (sourcePath as AbsolutePath),
+		)
 	}
 
 	return {

@@ -4,26 +4,31 @@ import path from "node:path"
 import { promisify } from "node:util"
 import type { AgentDefinition } from "@/core/agents/types"
 import { readTextFile, safeStat } from "@/core/io/fs"
+import { coerceDependency } from "@/core/manifest/coerce"
 import type { DependencyDeclaration } from "@/core/manifest/types"
 import {
 	fetchGithubRepository,
 	fetchGitRepository,
 	parseGithubSlug,
 } from "@/core/packages/fetch"
-import { coerceDependency } from "@/core/manifest/coerce"
 import { resolveValidatedDependency } from "@/core/packages/resolve"
-import type { CanonicalPackage, ClaudePluginPackage, PackageOrigin } from "@/core/packages/types"
-import type { AbsolutePath, Alias } from "@/core/types/branded"
-import { coerceAbsolutePathDirect, coerceAlias } from "@/core/types/coerce"
+import type {
+	CanonicalPackage,
+	ClaudePluginPackage,
+	PackageOrigin,
+} from "@/core/packages/types"
 import { failSync } from "@/core/sync/errors"
 import { buildRepoDir, buildRepoKey } from "@/core/sync/repo"
 import type { SyncResult } from "@/core/sync/types"
+import type { AbsolutePath, Alias } from "@/core/types/branded"
+import { coerceAbsolutePathDirect, coerceAlias } from "@/core/types/coerce"
 
 // Create a fake origin for marketplace operations
 function createMarketplaceOrigin(manifestPath: string): PackageOrigin {
 	return {
-		manifestPath: coerceAbsolutePathDirect(manifestPath) ?? (manifestPath as AbsolutePath),
 		alias: coerceAlias("marketplace") ?? ("marketplace" as Alias),
+		manifestPath:
+			coerceAbsolutePathDirect(manifestPath) ?? (manifestPath as AbsolutePath),
 	}
 }
 
@@ -317,8 +322,8 @@ async function loadMarketplaceInfo(
 			const repoDir = buildRepoDir(tempRoot, key, "marketplace")
 			const marketplaceOrigin = createMarketplaceOrigin(sourcePath)
 			const repoResult = await fetchGithubRepository({
-				origin: marketplaceOrigin,
 				destination: repoDir,
+				origin: marketplaceOrigin,
 				owner: parsed.value.owner,
 				repo: parsed.value.repo,
 				source: parsed.value.slug,
@@ -332,8 +337,8 @@ async function loadMarketplaceInfo(
 			const repoDir = buildRepoDir(tempRoot, key, "marketplace")
 			const marketplaceOrigin = createMarketplaceOrigin(sourcePath)
 			const repoResult = await fetchGitRepository({
-				origin: marketplaceOrigin,
 				destination: repoDir,
+				origin: marketplaceOrigin,
 				remoteUrl: parsed.value.url,
 				source: parsed.value.url,
 			})
@@ -596,8 +601,8 @@ async function resolvePluginSource(
 
 	// Create origin for the plugin
 	const origin: PackageOrigin = {
-		manifestPath,
 		alias: coerceAlias(alias) ?? (alias as Alias),
+		manifestPath,
 	}
 
 	// Resolve to canonical package

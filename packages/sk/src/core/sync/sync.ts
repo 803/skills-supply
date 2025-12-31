@@ -31,8 +31,6 @@ import type {
 	GitRef,
 	PackageOrigin,
 } from "@/core/packages/types"
-import type { AbsolutePath } from "@/core/types/branded"
-import { coerceAbsolutePathDirect } from "@/core/types/coerce"
 import { failSync } from "@/core/sync/errors"
 import { resolveAgentPackages } from "@/core/sync/marketplace"
 import { buildRepoDir, buildRepoKey } from "@/core/sync/repo"
@@ -43,6 +41,8 @@ import type {
 	SyncSummary,
 } from "@/core/sync/types"
 import { validateExtractedPackages } from "@/core/sync/validate"
+import type { AbsolutePath } from "@/core/types/branded"
+import { coerceAbsolutePathDirect } from "@/core/types/coerce"
 
 interface AgentSyncSummary {
 	agent: AgentDefinition
@@ -386,8 +386,8 @@ async function fetchPackagesForAgent(
 		const repoResult =
 			group.type === "github"
 				? await fetchGithubRepository({
-						origin: group.origin,
 						destination: repoDir,
+						origin: group.origin,
 						owner: group.owner,
 						ref: group.ref,
 						repo: group.repo,
@@ -395,8 +395,8 @@ async function fetchPackagesForAgent(
 						sparsePaths,
 					})
 				: await fetchGitRepository({
-						origin: group.origin,
 						destination: repoDir,
+						origin: group.origin,
 						ref: group.ref,
 						remoteUrl: group.remoteUrl,
 						source: group.source,
@@ -489,9 +489,9 @@ function getOrCreateGithubGroup(
 	}
 
 	const group: GithubGroup = {
-		origin: pkg.origin,
 		fullCheckout: false,
 		key,
+		origin: pkg.origin,
 		owner,
 		packages: [],
 		ref: pkg.ref,
@@ -516,9 +516,9 @@ function getOrCreateGitGroup(
 	}
 
 	const group: GitGroup = {
-		origin: pkg.origin,
 		fullCheckout: false,
 		key,
+		origin: pkg.origin,
 		packages: [],
 		ref: pkg.ref,
 		remoteUrl: pkg.url,

@@ -18,16 +18,16 @@ import type {
 import {
 	coerceAbsolutePath,
 	coerceAlias,
+	coerceGithubRef,
 	coerceGitRef,
 	coerceGitUrl,
-	coerceGithubRef,
 	coerceNonEmpty,
 } from "@/core/types/coerce"
 import type {
 	ClaudePluginDeclaration,
 	DependencyDeclaration,
-	GitPackageDeclaration,
 	GithubPackageDeclaration,
+	GitPackageDeclaration,
 	LocalPackageDeclaration,
 	Manifest,
 	ManifestExports,
@@ -47,9 +47,7 @@ import type {
 // RESULT TYPE
 // =============================================================================
 
-type CoerceResult<T> =
-	| { ok: true; value: T }
-	| { ok: false; error: ManifestParseError }
+type CoerceResult<T> = { ok: true; value: T } | { ok: false; error: ManifestParseError }
 
 // =============================================================================
 // AGENT ID VALIDATION
@@ -71,9 +69,7 @@ function isGithubDeclaration(
 	return typeof decl === "object" && "gh" in decl
 }
 
-function isGitDeclaration(
-	decl: DependencyDeclaration,
-): decl is GitPackageDeclaration {
+function isGitDeclaration(decl: DependencyDeclaration): decl is GitPackageDeclaration {
 	return typeof decl === "object" && "git" in decl
 }
 
@@ -112,16 +108,16 @@ function parseRegistryString(
 		const version = coerceNonEmpty(versionStr!)
 		if (!org || !name || !version) {
 			return {
-				ok: false,
 				error: {
-					type: "coercion_failed",
+					key: alias,
 					message: `Invalid registry dependency format: ${value}`,
 					sourcePath,
-					key: alias,
+					type: "coercion_failed",
 				},
+				ok: false,
 			}
 		}
-		return { ok: true, value: { type: "registry", org, name, version } }
+		return { ok: true, value: { name, org, type: "registry", version } }
 	}
 
 	const simpleMatch = value.match(/^([^@]+)@(.+)$/)
@@ -131,26 +127,26 @@ function parseRegistryString(
 		const version = coerceNonEmpty(versionStr!)
 		if (!name || !version) {
 			return {
-				ok: false,
 				error: {
-					type: "coercion_failed",
+					key: alias,
 					message: `Invalid registry dependency format: ${value}`,
 					sourcePath,
-					key: alias,
+					type: "coercion_failed",
 				},
+				ok: false,
 			}
 		}
-		return { ok: true, value: { type: "registry", name, version } }
+		return { ok: true, value: { name, type: "registry", version } }
 	}
 
 	return {
-		ok: false,
 		error: {
-			type: "coercion_failed",
+			key: alias,
 			message: `Invalid registry dependency format: ${value}. Expected @org/name@version or name@version`,
 			sourcePath,
-			key: alias,
+			type: "coercion_failed",
 		},
+		ok: false,
 	}
 }
 
@@ -162,45 +158,47 @@ function coerceGithubDependency(
 	const gh = coerceGithubRef(decl.gh)
 	if (!gh) {
 		return {
-			ok: false,
 			error: {
-				type: "coercion_failed",
+				field: "gh",
+				key: alias,
 				message: `Invalid GitHub reference: ${decl.gh}. Expected owner/repo format.`,
 				sourcePath,
-				key: alias,
-				field: "gh",
+				type: "coercion_failed",
 			},
+			ok: false,
 		}
 	}
 
 	let ref: GitRef | undefined
 	try {
-		ref = coerceGitRef({ tag: decl.tag, branch: decl.branch, rev: decl.rev }) ?? undefined
+		ref =
+			coerceGitRef({ branch: decl.branch, rev: decl.rev, tag: decl.tag }) ??
+			undefined
 	} catch (e) {
 		return {
-			ok: false,
 			error: {
-				type: "coercion_failed",
+				key: alias,
 				message: e instanceof Error ? e.message : "Invalid git ref",
 				sourcePath,
-				key: alias,
+				type: "coercion_failed",
 			},
+			ok: false,
 		}
 	}
 
 	let validPath: NonEmptyString | undefined
-	if (decl.path) {
+	if (decl.path !== undefined) {
 		const coerced = coerceNonEmpty(decl.path)
 		if (!coerced) {
 			return {
-				ok: false,
 				error: {
-					type: "coercion_failed",
+					field: "path",
+					key: alias,
 					message: "path must be non-empty",
 					sourcePath,
-					key: alias,
-					field: "path",
+					type: "coercion_failed",
 				},
+				ok: false,
 			}
 		}
 		validPath = coerced
@@ -209,10 +207,10 @@ function coerceGithubDependency(
 	return {
 		ok: true,
 		value: {
-			type: "github",
 			gh,
-			ref,
 			path: validPath,
+			ref,
+			type: "github",
 		},
 	}
 }
@@ -225,45 +223,47 @@ function coerceGitDependency(
 	const url = coerceGitUrl(decl.git)
 	if (!url) {
 		return {
-			ok: false,
 			error: {
-				type: "coercion_failed",
+				field: "git",
+				key: alias,
 				message: `Invalid git URL: ${decl.git}`,
 				sourcePath,
-				key: alias,
-				field: "git",
+				type: "coercion_failed",
 			},
+			ok: false,
 		}
 	}
 
 	let ref: GitRef | undefined
 	try {
-		ref = coerceGitRef({ tag: decl.tag, branch: decl.branch, rev: decl.rev }) ?? undefined
+		ref =
+			coerceGitRef({ branch: decl.branch, rev: decl.rev, tag: decl.tag }) ??
+			undefined
 	} catch (e) {
 		return {
-			ok: false,
 			error: {
-				type: "coercion_failed",
+				key: alias,
 				message: e instanceof Error ? e.message : "Invalid git ref",
 				sourcePath,
-				key: alias,
+				type: "coercion_failed",
 			},
+			ok: false,
 		}
 	}
 
 	let validPath: NonEmptyString | undefined
-	if (decl.path) {
+	if (decl.path !== undefined) {
 		const coerced = coerceNonEmpty(decl.path)
 		if (!coerced) {
 			return {
-				ok: false,
 				error: {
-					type: "coercion_failed",
+					field: "path",
+					key: alias,
 					message: "path must be non-empty",
 					sourcePath,
-					key: alias,
-					field: "path",
+					type: "coercion_failed",
 				},
+				ok: false,
 			}
 		}
 		validPath = coerced
@@ -272,10 +272,10 @@ function coerceGitDependency(
 	return {
 		ok: true,
 		value: {
+			path: validPath,
+			ref,
 			type: "git",
 			url,
-			ref,
-			path: validPath,
 		},
 	}
 }
@@ -291,22 +291,22 @@ function coerceLocalDependency(
 
 	if (!absolutePath) {
 		return {
-			ok: false,
 			error: {
-				type: "coercion_failed",
+				field: "path",
+				key: alias,
 				message: `Invalid local path: ${decl.path}`,
 				sourcePath,
-				key: alias,
-				field: "path",
+				type: "coercion_failed",
 			},
+			ok: false,
 		}
 	}
 
 	return {
 		ok: true,
 		value: {
-			type: "local",
 			path: absolutePath,
+			type: "local",
 		},
 	}
 }
@@ -319,37 +319,37 @@ function coerceClaudePluginDependency(
 	const plugin = coerceNonEmpty(decl.plugin)
 	if (!plugin) {
 		return {
-			ok: false,
 			error: {
-				type: "coercion_failed",
+				field: "plugin",
+				key: alias,
 				message: "plugin must be non-empty",
 				sourcePath,
-				key: alias,
-				field: "plugin",
+				type: "coercion_failed",
 			},
+			ok: false,
 		}
 	}
 
 	const marketplace = coerceGitUrl(decl.marketplace)
 	if (!marketplace) {
 		return {
-			ok: false,
 			error: {
-				type: "coercion_failed",
+				field: "marketplace",
+				key: alias,
 				message: `Invalid marketplace URL: ${decl.marketplace}`,
 				sourcePath,
-				key: alias,
-				field: "marketplace",
+				type: "coercion_failed",
 			},
+			ok: false,
 		}
 	}
 
 	return {
 		ok: true,
 		value: {
-			type: "claude-plugin",
-			plugin,
 			marketplace,
+			plugin,
+			type: "claude-plugin",
 		},
 	}
 }
@@ -383,13 +383,13 @@ export function coerceDependency(
 	}
 
 	return {
-		ok: false,
 		error: {
-			type: "invalid_dependency",
+			key: alias,
 			message: `Unknown dependency type`,
 			sourcePath,
-			key: alias,
+			type: "invalid_dependency",
 		},
+		ok: false,
 	}
 }
 
@@ -404,37 +404,39 @@ function coercePackageMetadata(
 	const name = coerceNonEmpty(pkg.name)
 	if (!name) {
 		return {
-			ok: false,
 			error: {
-				type: "coercion_failed",
+				field: "package.name",
 				message: "package.name must be non-empty",
 				sourcePath,
-				field: "package.name",
+				type: "coercion_failed",
 			},
+			ok: false,
 		}
 	}
 
 	const version = coerceNonEmpty(pkg.version)
 	if (!version) {
 		return {
-			ok: false,
 			error: {
-				type: "coercion_failed",
+				field: "package.version",
 				message: "package.version must be non-empty",
 				sourcePath,
-				field: "package.version",
+				type: "coercion_failed",
 			},
+			ok: false,
 		}
 	}
 
 	return {
 		ok: true,
 		value: {
+			description: pkg.description
+				? (coerceNonEmpty(pkg.description) ?? undefined)
+				: undefined,
+			license: pkg.license ? (coerceNonEmpty(pkg.license) ?? undefined) : undefined,
 			name,
+			org: pkg.org ? (coerceNonEmpty(pkg.org) ?? undefined) : undefined,
 			version,
-			description: pkg.description ? coerceNonEmpty(pkg.description) ?? undefined : undefined,
-			license: pkg.license ? coerceNonEmpty(pkg.license) ?? undefined : undefined,
-			org: pkg.org ? coerceNonEmpty(pkg.org) ?? undefined : undefined,
 		},
 	}
 }
@@ -458,13 +460,13 @@ function coerceExports(
 	const coercedSkills = coerceNonEmpty(skills)
 	if (!coercedSkills) {
 		return {
-			ok: false,
 			error: {
-				type: "coercion_failed",
+				field: "exports.auto_discover.skills",
 				message: "exports.auto_discover.skills must be non-empty or false",
 				sourcePath,
-				field: "exports.auto_discover.skills",
+				type: "coercion_failed",
 			},
+			ok: false,
 		}
 	}
 
@@ -494,7 +496,7 @@ export function coerceManifest(
 	sourcePath: AbsolutePath,
 	discoveredAt: ManifestDiscoveredAt,
 ): CoerceResult<Manifest> {
-	const origin: ManifestOrigin = { sourcePath, discoveredAt }
+	const origin: ManifestOrigin = { discoveredAt, sourcePath }
 
 	// Coerce agents
 	const agents = new Map<AgentId, boolean>()
@@ -514,13 +516,13 @@ export function coerceManifest(
 			const alias = coerceAlias(aliasStr)
 			if (!alias) {
 				return {
-					ok: false,
 					error: {
-						type: "coercion_failed",
+						key: aliasStr,
 						message: `Invalid alias: ${aliasStr}. Aliases must not contain slashes, dots, or colons.`,
 						sourcePath,
-						key: aliasStr,
+						type: "coercion_failed",
 					},
+					ok: false,
 				}
 			}
 
@@ -556,11 +558,11 @@ export function coerceManifest(
 	return {
 		ok: true,
 		value: {
-			package: validatedPackage,
 			agents,
 			dependencies,
 			exports: validatedExports,
 			origin,
+			package: validatedPackage,
 		},
 	}
 }

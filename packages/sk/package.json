@@ -11,14 +11,20 @@
 		"zod": "^3.25.76"
 	},
 	"devDependencies": {
-		"@types/node": "^25"
+		"@types/node": "^25",
+		"@vitest/coverage-v8": "^4.0.16",
+		"vitest": "^4.0.16"
 	},
 	"name": "@skills-supply/sk",
 	"private": true,
 	"scripts": {
 		"build": "bun build ./src/cli.ts --outdir ./dist --target node",
 		"bundle": "bun build ./src/cli.ts --compile --outfile ./bin/sk",
-		"clean": "rm -rf dist bin"
+		"clean": "rm -rf dist bin",
+		"test": "vitest",
+		"test:coverage": "vitest --coverage",
+		"test:e2e": "vitest --config vitest.e2e.config.ts",
+		"test:unit": "vitest --exclude tests/e2e"
 	},
 	"type": "module",
 	"version": "0.1.0"

@@ -2,13 +2,13 @@ import { execFile } from "node:child_process"
 import { mkdir, stat } from "node:fs/promises"
 import path from "node:path"
 import { promisify } from "node:util"
-import type { PackageOrigin } from "@/core/types/branded"
 import type {
 	GitRef,
 	LocalPackage,
 	PackageFetchError,
 	PackageFetchResult,
 } from "@/core/packages/types"
+import type { PackageOrigin } from "@/core/types/branded"
 import { ensureGitAvailable } from "@/utils/git"
 
 const execFileAsync = promisify(execFile)
@@ -85,8 +85,8 @@ export async function fetchGithubRepository(plan: {
 }): Promise<RepoResult> {
 	const remoteUrl = `https://github.com/${plan.owner}/${plan.repo}.git`
 	return fetchRepository({
-		origin: plan.origin,
 		destination: plan.destination,
+		origin: plan.origin,
 		ref: plan.ref,
 		remoteUrl,
 		source: plan.source,

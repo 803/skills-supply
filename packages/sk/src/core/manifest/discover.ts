@@ -1,11 +1,11 @@
 import { stat } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
-import type { AbsolutePath } from "@/core/types/branded"
 import type {
 	ManifestDiscoveryError,
 	ManifestDiscoveryResult,
 } from "@/core/manifest/types"
+import type { AbsolutePath } from "@/core/types/branded"
 
 const MANIFEST_FILENAME = "package.toml"
 const USER_MANIFEST_DIR = ".sk"
@@ -73,7 +73,11 @@ export async function discoverManifests(
 		current = parent
 	}
 
-	const userManifestPath = path.join(homeDir, USER_MANIFEST_DIR, MANIFEST_FILENAME) as AbsolutePath
+	const userManifestPath = path.join(
+		homeDir,
+		USER_MANIFEST_DIR,
+		MANIFEST_FILENAME,
+	) as AbsolutePath
 	const userExistsResult = await fileExists(userManifestPath)
 	if (!userExistsResult.ok) {
 		return userExistsResult

@@ -1,4 +1,3 @@
-import type { AgentId, Alias, ManifestOrigin } from "@/core/types/branded"
 import type {
 	Manifest,
 	ManifestDependencyEntry,
@@ -7,6 +6,7 @@ import type {
 	MergedManifest,
 	ValidatedDependency,
 } from "@/core/manifest/types"
+import type { AgentId, Alias, ManifestOrigin } from "@/core/types/branded"
 
 /**
  * Merge multiple manifests into a single merged manifest.

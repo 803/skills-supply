@@ -7,12 +7,6 @@
  */
 
 import type {
-	Alias,
-	FetchStrategy,
-	NonEmptyString,
-	PackageOrigin,
-} from "@/core/types/branded"
-import type {
 	MergedManifest,
 	ValidatedClaudePluginDependency,
 	ValidatedDependency,
@@ -24,12 +18,18 @@ import type {
 import type {
 	CanonicalPackage,
 	ClaudePluginPackage,
-	GitPackage,
 	GithubPackage,
+	GitPackage,
 	LocalPackage,
 	RegistryPackage,
 	ResolveManifestPackagesResult,
 } from "@/core/packages/types"
+import type {
+	Alias,
+	FetchStrategy,
+	NonEmptyString,
+	PackageOrigin,
+} from "@/core/types/branded"
 
 const REGISTRY_NAME = "skills.supply" as NonEmptyString
 
@@ -37,15 +37,13 @@ const REGISTRY_NAME = "skills.supply" as NonEmptyString
  * Resolve all packages from a merged manifest.
  * Pure function - no IO, no validation.
  */
-export function resolveMergedPackages(
-	manifest: MergedManifest,
-): CanonicalPackage[] {
+export function resolveMergedPackages(manifest: MergedManifest): CanonicalPackage[] {
 	const resolved: CanonicalPackage[] = []
 
 	for (const [alias, entry] of manifest.dependencies) {
 		const origin: PackageOrigin = {
-			manifestPath: entry.origin.sourcePath,
 			alias,
+			manifestPath: entry.origin.sourcePath,
 		}
 		const canonical = resolveValidatedDependency(entry.dependency, origin)
 		resolved.push(canonical)
@@ -93,12 +91,12 @@ function resolveRegistryDep(
 	origin: PackageOrigin,
 ): RegistryPackage {
 	return {
-		type: "registry",
-		origin,
 		fetchStrategy: { mode: "clone", sparse: false },
-		registry: REGISTRY_NAME,
 		name: dep.name,
 		org: dep.org,
+		origin,
+		registry: REGISTRY_NAME,
+		type: "registry",
 		version: dep.version,
 	}
 }
@@ -108,26 +106,23 @@ function resolveGithubDep(
 	origin: PackageOrigin,
 ): GithubPackage {
 	return {
-		type: "github",
-		origin,
 		fetchStrategy: determineFetchStrategy(dep),
 		gh: dep.gh,
-		ref: dep.ref,
+		origin,
 		path: dep.path,
+		ref: dep.ref,
+		type: "github",
 	}
 }
 
-function resolveGitDep(
-	dep: ValidatedGitDependency,
-	origin: PackageOrigin,
-): GitPackage {
+function resolveGitDep(dep: ValidatedGitDependency, origin: PackageOrigin): GitPackage {
 	return {
-		type: "git",
-		origin,
 		fetchStrategy: determineFetchStrategy(dep),
-		url: dep.url,
-		ref: dep.ref,
+		origin,
 		path: dep.path,
+		ref: dep.ref,
+		type: "git",
+		url: dep.url,
 	}
 }
 
@@ -136,10 +131,10 @@ function resolveLocalDep(
 	origin: PackageOrigin,
 ): LocalPackage {
 	return {
-		type: "local",
-		origin,
-		fetchStrategy: { mode: "symlink" },
 		absolutePath: dep.path,
+		fetchStrategy: { mode: "symlink" },
+		origin,
+		type: "local",
 	}
 }
 
@@ -148,10 +143,10 @@ function resolveClaudePluginDep(
 	origin: PackageOrigin,
 ): ClaudePluginPackage {
 	return {
-		type: "claude-plugin",
-		origin,
 		fetchStrategy: { mode: "clone", sparse: false },
-		plugin: dep.plugin,
 		marketplace: dep.marketplace,
+		origin,
+		plugin: dep.plugin,
+		type: "claude-plugin",
 	}
 }

@@ -5,11 +5,7 @@ import type { AddOptions } from "@/commands/pkg/spec"
 import { buildPackageSpec } from "@/commands/pkg/spec"
 import { coerceDependency } from "@/core/manifest/coerce"
 import { loadManifestFromCwd, saveManifest } from "@/core/manifest/fs"
-import {
-	addDependency,
-	hasDependency,
-	removeDependency,
-} from "@/core/manifest/transform"
+import { addDependency, hasDependency, removeDependency } from "@/core/manifest/transform"
 import type { Alias } from "@/core/types/branded"
 import { coerceAlias } from "@/core/types/coerce"
 import { formatError } from "@/utils/errors"
@@ -180,7 +176,10 @@ async function handleRemove(): Promise<void> {
 
 	const choice = await select({
 		message: "Select a dependency to remove",
-		options: aliases.map((alias) => ({ label: String(alias), value: alias as Alias })),
+		options: aliases.map((alias) => ({
+			label: String(alias),
+			value: alias as Alias,
+		})),
 	})
 
 	if (isCancel(choice)) {

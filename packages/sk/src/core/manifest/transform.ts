@@ -64,9 +64,6 @@ export function getDependency(
 /**
  * Get an agent's enabled state, or undefined if not set.
  */
-export function getAgent(
-	manifest: Manifest,
-	agentId: AgentId,
-): boolean | undefined {
+export function getAgent(manifest: Manifest, agentId: AgentId): boolean | undefined {
 	return manifest.agents.get(agentId)
 }

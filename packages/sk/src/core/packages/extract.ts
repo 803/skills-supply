@@ -1,8 +1,6 @@
 import type { Dirent } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
-import type { AbsolutePath } from "@/core/types/branded"
-import { coerceAbsolutePathDirect, coerceNonEmpty } from "@/core/types/coerce"
 import { parseLegacyManifest } from "@/core/manifest/parse"
 import type {
 	DetectedPackage,
@@ -10,6 +8,8 @@ import type {
 	PackageExtractionResult,
 	Skill,
 } from "@/core/packages/types"
+import type { AbsolutePath } from "@/core/types/branded"
+import { coerceAbsolutePathDirect, coerceNonEmpty } from "@/core/types/coerce"
 
 const SKILL_FILENAME = "SKILL.md"
 
@@ -204,15 +204,20 @@ async function loadSkillFromDir(
 
 	const name = coerceNonEmpty(nameResult.value)
 	if (!name) {
-		return failure("invalid_skill", "Skill name must not be empty.", skillPath, origin)
+		return failure(
+			"invalid_skill",
+			"Skill name must not be empty.",
+			skillPath,
+			origin,
+		)
 	}
 
 	return {
 		ok: true,
 		value: {
 			name,
-			sourcePath: skillDir,
 			origin,
+			sourcePath: skillDir,
 		},
 	}
 }
@@ -378,9 +383,9 @@ function failure(
 	return {
 		error: {
 			message,
+			origin,
 			path: pathValue,
 			type,
-			origin,
 		},
 		ok: false,
 	}

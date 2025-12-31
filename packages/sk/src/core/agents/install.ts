@@ -92,8 +92,8 @@ export function planAgentInstall(
 	agent: AgentDefinition,
 	packages: InstallablePackage[],
 ): PlanResult {
-	const basePath = path.resolve(agent.skillsPath)
-	if (!basePath.trim()) {
+	// Validate raw input before resolving - empty/whitespace paths are invalid
+	if (!agent.skillsPath.trim()) {
 		return failure(
 			"invalid_target",
 			"Agent skills path cannot be empty.",
@@ -101,6 +101,7 @@ export function planAgentInstall(
 			agent.skillsPath,
 		)
 	}
+	const basePath = path.resolve(agent.skillsPath)
 
 	const tasks: InstallTask[] = []
 	const seenTargets = new Set<string>()

@@ -10,10 +10,10 @@
 
 import path from "node:path"
 import type {
-	Alias,
 	AbsolutePath,
-	GitRef,
+	Alias,
 	GithubRef,
+	GitRef,
 	NonEmptyString,
 	NormalizedGitUrl,
 } from "./branded.js"
@@ -40,7 +40,7 @@ export function isNonEmpty(s: string): s is NonEmptyString {
 // === ALIAS ===
 
 // Characters not allowed in aliases
-const ALIAS_INVALID_CHARS = /[\/\\.:]/
+const ALIAS_INVALID_CHARS = /[/\\.:]/
 
 /**
  * Coerce a string to Alias.
@@ -67,10 +67,7 @@ export function isAlias(s: string): s is Alias {
  * If relative, resolves against the provided base path.
  * Normalizes the path (resolves . and ..).
  */
-export function coerceAbsolutePath(
-	s: string,
-	basePath?: string,
-): AbsolutePath | null {
+export function coerceAbsolutePath(s: string, basePath?: string): AbsolutePath | null {
 	const trimmed = s.trim()
 	if (trimmed.length === 0) return null
 
@@ -109,7 +106,7 @@ export function isAbsolutePath(s: string): s is AbsolutePath {
 
 // Patterns for git URL normalization
 const SSH_GIT_PATTERN = /^git@([^:]+):(.+?)(?:\.git)?$/
-const HTTPS_GIT_PATTERN = /^https?:\/\/([^\/]+)\/(.+?)(?:\.git)?$/
+const HTTPS_GIT_PATTERN = /^https?:\/\/([^/]+)\/(.+?)(?:\.git)?$/
 
 /**
  * Coerce a string to NormalizedGitUrl.
@@ -244,26 +241,23 @@ export function coerceNonEmptyWithError(
 	const result = coerceNonEmpty(s)
 	if (result === null) {
 		return {
+			error: { field, reason: "must be non-empty", value: s },
 			ok: false,
-			error: { field, value: s, reason: "must be non-empty" },
 		}
 	}
 	return { ok: true, value: result }
 }
 
-export function coerceAliasWithError(
-	s: string,
-	field: string,
-): CoercionResult<Alias> {
+export function coerceAliasWithError(s: string, field: string): CoercionResult<Alias> {
 	const result = coerceAlias(s)
 	if (result === null) {
 		return {
-			ok: false,
 			error: {
 				field,
-				value: s,
 				reason: "must be non-empty and contain no slashes, dots, or colons",
+				value: s,
 			},
+			ok: false,
 		}
 	}
 	return { ok: true, value: result }
@@ -277,14 +271,14 @@ export function coerceAbsolutePathWithError(
 	const result = coerceAbsolutePath(s, basePath)
 	if (result === null) {
 		return {
-			ok: false,
 			error: {
 				field,
-				value: s,
 				reason: basePath
 					? "must be a valid path"
 					: "must be an absolute path (no base path provided)",
+				value: s,
 			},
+			ok: false,
 		}
 	}
 	return { ok: true, value: result }
@@ -297,13 +291,12 @@ export function coerceGitUrlWithError(
 	const result = coerceGitUrl(s)
 	if (result === null) {
 		return {
-			ok: false,
 			error: {
 				field,
+				reason: "must be a valid git URL (git@host:path or https://host/path format)",
 				value: s,
-				reason:
-					"must be a valid git URL (git@host:path or https://host/path format)",
 			},
+			ok: false,
 		}
 	}
 	return { ok: true, value: result }
@@ -316,8 +309,8 @@ export function coerceGithubRefWithError(
 	const result = coerceGithubRef(s)
 	if (result === null) {
 		return {
+			error: { field, reason: "must be in owner/repo format", value: s },
 			ok: false,
-			error: { field, value: s, reason: "must be in owner/repo format" },
 		}
 	}
 	return { ok: true, value: result }
