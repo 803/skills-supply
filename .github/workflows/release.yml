@@ -3,6 +3,10 @@ on:
   push:
     tags: ['sk@*']
 
+permissions:
+  id-token: write
+  contents: write
+
 env:
   # Extract version from tag (sk@0.1.0 -> 0.1.0)
   VERSION: ${{ github.ref_name }}
@@ -25,8 +29,12 @@ jobs:
             target: windows-x64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@v6
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+          reshim: true
       - run: bun install
       - run: bun run build:binary
         working-directory: packages/sk
@@ -36,7 +44,7 @@ jobs:
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: Compress-Archive -Path packages/sk/bin/sk.exe -DestinationPath sk-${{ matrix.target }}.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: sk-${{ matrix.target }}
           path: sk-${{ matrix.target }}.*
@@ -47,7 +55,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
       - name: Generate checksums
         run: |
           sha256sum sk-*/sk-* > SHASUMS256.txt
@@ -65,30 +73,31 @@ jobs:
       run:
         working-directory: packages/sk
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@v6
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+          reshim: true
       - run: bun install
         working-directory: .  # Install from repo root
       - run: bun run build:node
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
       - run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   homebrew:
     needs: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           repository: 803/homebrew-sk
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-      - uses: oven-sh/setup-bun@v2
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+          reshim: true
       - run: bun scripts/update-formula.ts ${{ github.ref_name }}
-      - uses: stefanzweifel/git-auto-commit-action@v5
+      - uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "Release ${{ github.ref_name }}"
 
@@ -96,12 +105,15 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           repository: 803/scoop-sk
-          token: ${{ secrets.SCOOP_BUCKET_TOKEN }}
-      - uses: oven-sh/setup-bun@v2
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+          reshim: true
       - run: bun scripts/update-manifest.ts ${{ github.ref_name }}
-      - uses: stefanzweifel/git-auto-commit-action@v5
+      - uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "Release ${{ github.ref_name }}"
