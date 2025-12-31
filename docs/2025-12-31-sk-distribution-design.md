@@ -31,11 +31,11 @@
 ## Release Flow
 
 ```
-Developer: npm version patch && git push && git push --tags
+Developer: git tag sk@0.1.0 && git push && git push --tags
                          │
                          ▼
                  ┌──────────────┐
-                 │ CI triggers  │  (on: push: tags: ['v*'])
+                 │ CI triggers  │  (on: push: tags: ['sk@*'])
                  └──────┬───────┘
                         │
                         ▼
@@ -141,20 +141,20 @@ class Sk < Formula
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/803/skillssupply/releases/download/v#{version}/sk-darwin-arm64.tar.gz"
+      url "https://github.com/803/skillssupply/releases/download/sk@#{version}/sk-darwin-arm64.tar.gz"
       sha256 "abc123..." # sk-darwin-arm64
     else
-      url "https://github.com/803/skillssupply/releases/download/v#{version}/sk-darwin-x64.tar.gz"
+      url "https://github.com/803/skillssupply/releases/download/sk@#{version}/sk-darwin-x64.tar.gz"
       sha256 "def456..." # sk-darwin-x64
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/803/skillssupply/releases/download/v#{version}/sk-linux-arm64.tar.gz"
+      url "https://github.com/803/skillssupply/releases/download/sk@#{version}/sk-linux-arm64.tar.gz"
       sha256 "ghi789..." # sk-linux-arm64
     else
-      url "https://github.com/803/skillssupply/releases/download/v#{version}/sk-linux-x64.tar.gz"
+      url "https://github.com/803/skillssupply/releases/download/sk@#{version}/sk-linux-x64.tar.gz"
       sha256 "jkl012..." # sk-linux-x64
     end
   end
@@ -182,10 +182,10 @@ sk --version
 **File: `.github/workflows/release.yml`**
 
 ```yaml
-name: Release
+name: Release sk
 on:
   push:
-    tags: ['v*']
+    tags: ['sk@*']
 
 jobs:
   build:
@@ -293,7 +293,7 @@ jobs:
 **File: `homebrew-sk/scripts/update-formula.ts`**
 
 ```typescript
-const version = process.argv[2]?.replace(/^v/, "");
+const version = process.argv[2]?.replace(/^sk@/, "");
 if (!version) {
   console.error("Usage: bun update-formula.ts <version>");
   process.exit(1);
@@ -310,7 +310,7 @@ const platforms = [
 ];
 
 // Fetch SHASUMS256.txt and parse hashes (faster than downloading all binaries)
-const shasumsUrl = `https://github.com/${REPO}/releases/download/v${version}/SHASUMS256.txt`;
+const shasumsUrl = `https://github.com/${REPO}/releases/download/sk@${version}/SHASUMS256.txt`;
 const response = await fetch(shasumsUrl);
 if (!response.ok) {
   console.error(`Failed to fetch ${shasumsUrl}: ${response.status}`);
@@ -339,7 +339,7 @@ for (const [platform, hash] of Object.entries(hashes)) {
 }
 
 await Bun.write(FORMULA_PATH, formula);
-console.log(`Updated ${FORMULA_PATH} to v${version}`);
+console.log(`Updated ${FORMULA_PATH} to sk@${version}`);
 
 // Create versioned formula (e.g., sk@0.2.0.rb with class SkAT020)
 const versionedClass = `class SkAT${version.replace(/\./g, "")}`;
@@ -356,10 +356,16 @@ console.log(`Created ${versionedPath}`);
 **To release a new version:**
 
 ```bash
-# 1. Update version (creates git tag automatically)
-npm version patch   # 0.1.0 → 0.1.1
+# 1. Update version in package.json
+cd packages/sk
+# Edit package.json version field
 
-# 2. Push commit and tag together to trigger CI
+# 2. Commit and create scoped tag
+git add packages/sk/package.json
+git commit -m "sk: bump to 0.1.1"
+git tag sk@0.1.1
+
+# 3. Push commit and tag to trigger CI
 git push && git push --tags
 ```
 
@@ -456,7 +462,7 @@ scoop-sk/
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/803/skillssupply/releases/download/v0.2.0/sk-windows-x64.zip",
+            "url": "https://github.com/803/skillssupply/releases/download/sk@0.2.0/sk-windows-x64.zip",
             "hash": "abc123..."
         }
     },
@@ -465,7 +471,7 @@ scoop-sk/
     "autoupdate": {
         "architecture": {
             "64bit": {
-                "url": "https://github.com/803/skillssupply/releases/download/v$version/sk-windows-x64.zip"
+                "url": "https://github.com/803/skillssupply/releases/download/sk@$version/sk-windows-x64.zip"
             }
         },
         "hash": {
@@ -489,7 +495,7 @@ sk --version
 **File: `scoop-sk/scripts/update-manifest.ts`**
 
 ```typescript
-const version = process.argv[2]?.replace(/^v/, "");
+const version = process.argv[2]?.replace(/^sk@/, "");
 if (!version) {
   console.error("Usage: bun update-manifest.ts <version>");
   process.exit(1);
@@ -499,7 +505,7 @@ const REPO = "803/skillssupply";
 const MANIFEST_PATH = "bucket/sk.json";
 
 // Fetch SHASUMS256.txt and parse Windows hash
-const shasumsUrl = `https://github.com/${REPO}/releases/download/v${version}/SHASUMS256.txt`;
+const shasumsUrl = `https://github.com/${REPO}/releases/download/sk@${version}/SHASUMS256.txt`;
 const response = await fetch(shasumsUrl);
 if (!response.ok) {
   console.error(`Failed to fetch ${shasumsUrl}: ${response.status}`);
@@ -526,11 +532,11 @@ if (!windowsHash) {
 const manifest = JSON.parse(await Bun.file(MANIFEST_PATH).text());
 manifest.version = version;
 manifest.architecture["64bit"].url =
-  `https://github.com/${REPO}/releases/download/v${version}/sk-windows-x64.zip`;
+  `https://github.com/${REPO}/releases/download/sk@${version}/sk-windows-x64.zip`;
 manifest.architecture["64bit"].hash = windowsHash;
 
 await Bun.write(MANIFEST_PATH, JSON.stringify(manifest, null, 4));
-console.log(`Updated ${MANIFEST_PATH} to v${version}`);
+console.log(`Updated ${MANIFEST_PATH} to sk@${version}`);
 ```
 
 ---

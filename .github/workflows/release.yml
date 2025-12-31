@@ -1,7 +1,11 @@
-name: Release
+name: Release sk
 on:
   push:
-    tags: ['v*']
+    tags: ['sk@*']
+
+env:
+  # Extract version from tag (sk@0.1.0 -> 0.1.0)
+  VERSION: ${{ github.ref_name }}
 
 jobs:
   build:
