@@ -6,17 +6,17 @@
 
 **Distribution channels:**
 - **npm** (`@skills-supply/sk`): Ships JS bundle. Users need Node.js. Accepts startup overhead for simplicity.
-- **Homebrew** (`skills-supply/sk/sk`): Ships standalone binaries for macOS/Linux. No Node.js required.
-- **Scoop** (`skills-supply` bucket): Ships standalone binary for Windows. No Node.js required.
+- **Homebrew** (`803/sk/sk`): Ships standalone binaries for macOS/Linux. No Node.js required.
+- **Scoop** (`803` bucket): Ships standalone binary for Windows. No Node.js required.
 - **Chocolatey** (future): Windows package manager. Deferred - Scoop is simpler.
 
 **Design decision**: npm ships JS bundle only (no native binaries). This is simpler than Bun's optionalDependencies pattern and acceptable for sk's use case. Native binary performance is available via Homebrew (macOS/Linux) or Scoop (Windows) for users who need it.
 
 **Repositories:**
 ```
-skills-supply/skillssupply     # Main repo - source code + CI
-skills-supply/homebrew-sk      # Homebrew formulas
-skills-supply/scoop-sk         # Scoop bucket
+803/skillssupply     # Main repo - source code + CI
+803/homebrew-sk      # Homebrew formulas
+803/scoop-sk         # Scoop bucket
 ```
 
 **Platforms (5 binaries):**
@@ -75,10 +75,10 @@ The existing JS bundle from `bun build ./src/cli.ts --outdir ./dist --target nod
   "version": "0.2.0",
   "description": "Skills Supply CLI - Install and manage AI agent skills",
   "keywords": ["skills", "ai", "agents", "cli", "claude", "mcp"],
-  "homepage": "https://github.com/skills-supply/skillssupply",
+  "homepage": "https://github.com/803/skillssupply",
   "repository": {
     "type": "git",
-    "url": "https://github.com/skills-supply/skillssupply.git"
+    "url": "https://github.com/803/skillssupply.git"
   },
   "author": "Skills Supply",
   "license": "MIT",
@@ -113,7 +113,7 @@ sk --version
 
 ## Homebrew Tap
 
-**New repository: `skills-supply/homebrew-sk`**
+**New repository: `803/homebrew-sk`**
 
 ```
 homebrew-sk/
@@ -128,33 +128,33 @@ homebrew-sk/
 └── LICENSE
 ```
 
-**Versioned installs:** Users can pin specific versions with `brew install skills-supply/sk/sk@0.2.0`.
+**Versioned installs:** Users can pin specific versions with `brew install 803/sk/sk@0.2.0`.
 
 **Formula (`Formula/sk.rb`):**
 
 ```ruby
 class Sk < Formula
   desc "Skills Supply CLI"
-  homepage "https://github.com/skills-supply/skillssupply"
+  homepage "https://github.com/803/skillssupply"
   license "MIT"
   version "0.2.0"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/skills-supply/skillssupply/releases/download/v#{version}/sk-darwin-arm64.tar.gz"
+      url "https://github.com/803/skillssupply/releases/download/v#{version}/sk-darwin-arm64.tar.gz"
       sha256 "abc123..." # sk-darwin-arm64
     else
-      url "https://github.com/skills-supply/skillssupply/releases/download/v#{version}/sk-darwin-x64.tar.gz"
+      url "https://github.com/803/skillssupply/releases/download/v#{version}/sk-darwin-x64.tar.gz"
       sha256 "def456..." # sk-darwin-x64
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/skills-supply/skillssupply/releases/download/v#{version}/sk-linux-arm64.tar.gz"
+      url "https://github.com/803/skillssupply/releases/download/v#{version}/sk-linux-arm64.tar.gz"
       sha256 "ghi789..." # sk-linux-arm64
     else
-      url "https://github.com/skills-supply/skillssupply/releases/download/v#{version}/sk-linux-x64.tar.gz"
+      url "https://github.com/803/skillssupply/releases/download/v#{version}/sk-linux-x64.tar.gz"
       sha256 "jkl012..." # sk-linux-x64
     end
   end
@@ -171,7 +171,7 @@ end
 
 **User experience:**
 ```bash
-brew install skills-supply/sk/sk
+brew install 803/sk/sk
 sk --version
 ```
 
@@ -263,7 +263,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: skills-supply/homebrew-sk
+          repository: 803/homebrew-sk
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
       - uses: oven-sh/setup-bun@v2
       - run: bun scripts/update-formula.ts ${{ github.ref_name }}
@@ -277,7 +277,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: skills-supply/scoop-sk
+          repository: 803/scoop-sk
           token: ${{ secrets.SCOOP_BUCKET_TOKEN }}
       - uses: oven-sh/setup-bun@v2
       - run: bun scripts/update-manifest.ts ${{ github.ref_name }}
@@ -299,7 +299,7 @@ if (!version) {
   process.exit(1);
 }
 
-const REPO = "skills-supply/skillssupply";
+const REPO = "803/skillssupply";
 const FORMULA_PATH = "Formula/sk.rb";
 
 const platforms = [
@@ -383,16 +383,16 @@ Before the first release, verify:
 
 ## One-Time Setup
 
-1. **Create `skills-supply` GitHub organization**
-   - Required for consistent package scoping across npm, Homebrew, and Scoop
-   - Transfer `skillssupply` repo to the org (or fork if needed)
+1. **Use `803` GitHub organization**
+   - All repos under github.com/803
+   - npm org is `@skills-supply`
 
-2. **Create `skills-supply/homebrew-sk` repo** with:
+2. **Create `803/homebrew-sk` repo** with:
    - `Formula/sk.rb` (initial formula)
    - `scripts/update-formula.ts`
    - `README.md`
 
-3. **Create `skills-supply/scoop-sk` repo** with:
+3. **Create `803/scoop-sk` repo** with:
    - `bucket/sk.json` (initial manifest)
    - Use [ScoopInstaller/BucketTemplate](https://github.com/ScoopInstaller/BucketTemplate) for auto-update workflow
 
@@ -420,10 +420,10 @@ Before the first release, verify:
 
 ```bash
 # Homebrew (macOS/Linux - standalone binary, no Node required)
-brew install skills-supply/sk/sk
+brew install 803/sk/sk
 
 # Scoop (Windows - standalone binary, no Node required)
-scoop bucket add skills-supply https://github.com/skills-supply/scoop-sk
+scoop bucket add 803 https://github.com/803/scoop-sk
 scoop install sk
 
 # npm (cross-platform, requires Node.js)
@@ -434,7 +434,7 @@ npm install -g @skills-supply/sk
 
 ## Scoop (Windows)
 
-**New repository: `skills-supply/scoop-sk`**
+**New repository: `803/scoop-sk`**
 
 ```
 scoop-sk/
@@ -452,11 +452,11 @@ scoop-sk/
 {
     "version": "0.2.0",
     "description": "Skills Supply CLI",
-    "homepage": "https://github.com/skills-supply/skillssupply",
+    "homepage": "https://github.com/803/skillssupply",
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/skills-supply/skillssupply/releases/download/v0.2.0/sk-windows-x64.zip",
+            "url": "https://github.com/803/skillssupply/releases/download/v0.2.0/sk-windows-x64.zip",
             "hash": "abc123..."
         }
     },
@@ -465,7 +465,7 @@ scoop-sk/
     "autoupdate": {
         "architecture": {
             "64bit": {
-                "url": "https://github.com/skills-supply/skillssupply/releases/download/v$version/sk-windows-x64.zip"
+                "url": "https://github.com/803/skillssupply/releases/download/v$version/sk-windows-x64.zip"
             }
         },
         "hash": {
@@ -477,7 +477,7 @@ scoop-sk/
 
 **User experience:**
 ```powershell
-scoop bucket add skills-supply https://github.com/skills-supply/scoop-sk
+scoop bucket add 803 https://github.com/803/scoop-sk
 scoop install sk
 sk --version
 ```
@@ -495,7 +495,7 @@ if (!version) {
   process.exit(1);
 }
 
-const REPO = "skills-supply/skillssupply";
+const REPO = "803/skillssupply";
 const MANIFEST_PATH = "bucket/sk.json";
 
 // Fetch SHASUMS256.txt and parse Windows hash

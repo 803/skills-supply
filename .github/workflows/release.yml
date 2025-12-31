@@ -1,0 +1,103 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true  # All-or-nothing: if any platform fails, abort entire release
+      matrix:
+        include:
+          - os: macos-latest
+            target: darwin-arm64
+          - os: macos-13
+            target: darwin-x64
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+          - os: windows-latest
+            target: windows-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun run build:binary
+        working-directory: packages/sk
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: tar -czvf sk-${{ matrix.target }}.tar.gz -C packages/sk/bin sk
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path packages/sk/bin/sk.exe -DestinationPath sk-${{ matrix.target }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sk-${{ matrix.target }}
+          path: sk-${{ matrix.target }}.*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Generate checksums
+        run: |
+          sha256sum sk-*/sk-* > SHASUMS256.txt
+          cat SHASUMS256.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            sk-*/sk-*
+            SHASUMS256.txt
+
+  npm:
+    needs: build  # Wait for all platform builds to succeed before publishing
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/sk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+        working-directory: .  # Install from repo root
+      - run: bun run build:node
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: 803/homebrew-sk
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      - uses: oven-sh/setup-bun@v2
+      - run: bun scripts/update-formula.ts ${{ github.ref_name }}
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Release ${{ github.ref_name }}"
+
+  scoop:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: 803/scoop-sk
+          token: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+      - uses: oven-sh/setup-bun@v2
+      - run: bun scripts/update-manifest.ts ${{ github.ref_name }}
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Release ${{ github.ref_name }}"
