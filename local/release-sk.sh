@@ -15,5 +15,5 @@ git commit -m "sk: release $VERSION"
 git tag "sk@$VERSION"
 
 echo ""
-echo "Created tag sk@$VERSION"
-echo "Run: git push && git push --tags"
+echo "Pushing sk@$VERSION..."
+git push && git push --tags
