@@ -24,44 +24,21 @@ import {
 	resolveValidatedDependency,
 } from "@/src/core/packages/resolve"
 import type {
-	AbsolutePath,
 	AgentId,
 	Alias,
-	GithubRef,
 	ManifestOrigin,
-	NonEmptyString,
-	NormalizedGitUrl,
 	PackageOrigin,
 } from "@/src/core/types/branded"
+import { abs, alias, ghRef, gitUrl, nes } from "@/tests/helpers/branded"
 
 // =============================================================================
-// TEST HELPERS - create branded types for test fixtures
+// TEST HELPERS - fixture builders using branded helpers
 // =============================================================================
-
-function alias(s: string): Alias {
-	return s as Alias
-}
-
-function nonEmpty(s: string): NonEmptyString {
-	return s as NonEmptyString
-}
-
-function absPath(s: string): AbsolutePath {
-	return s as AbsolutePath
-}
-
-function gitUrl(s: string): NormalizedGitUrl {
-	return s as NormalizedGitUrl
-}
-
-function ghRef(s: string): GithubRef {
-	return s as GithubRef
-}
 
 function makeOrigin(aliasStr: string, path = "/test/package.toml"): PackageOrigin {
 	return {
 		alias: alias(aliasStr),
-		manifestPath: absPath(path),
+		manifestPath: abs(path),
 	}
 }
 
@@ -71,7 +48,7 @@ function makeManifestOrigin(
 ): ManifestOrigin {
 	return {
 		discoveredAt,
-		sourcePath: absPath(path),
+		sourcePath: abs(path),
 	}
 }
 
@@ -83,10 +60,10 @@ describe("resolveValidatedDependency", () => {
 	describe("registry dependencies", () => {
 		it("resolves basic registry dependency", () => {
 			const dep: ValidatedRegistryDependency = {
-				name: nonEmpty("superpowers"),
-				org: nonEmpty("superpowers-marketplace"),
+				name: nes("superpowers"),
+				org: nes("superpowers-marketplace"),
 				type: "registry",
-				version: nonEmpty("1.0.0"),
+				version: nes("1.0.0"),
 			}
 			const origin = makeOrigin("superpowers")
 
@@ -113,9 +90,9 @@ describe("resolveValidatedDependency", () => {
 
 		it("resolves registry dependency without org", () => {
 			const dep: ValidatedRegistryDependency = {
-				name: nonEmpty("my-skill"),
+				name: nes("my-skill"),
 				type: "registry",
-				version: nonEmpty("2.0.0"),
+				version: nes("2.0.0"),
 			}
 			const origin = makeOrigin("my-skill")
 
@@ -132,9 +109,9 @@ describe("resolveValidatedDependency", () => {
 
 		it("preserves origin information", () => {
 			const dep: ValidatedRegistryDependency = {
-				name: nonEmpty("pkg"),
+				name: nes("pkg"),
 				type: "registry",
-				version: nonEmpty("1.0.0"),
+				version: nes("1.0.0"),
 			}
 			const origin = makeOrigin("custom-alias", "/custom/path/package.toml")
 
@@ -146,9 +123,9 @@ describe("resolveValidatedDependency", () => {
 
 		it("uses clone fetch strategy without sparse", () => {
 			const dep: ValidatedRegistryDependency = {
-				name: nonEmpty("pkg"),
+				name: nes("pkg"),
 				type: "registry",
-				version: nonEmpty("1.0.0"),
+				version: nes("1.0.0"),
 			}
 			const origin = makeOrigin("pkg")
 
@@ -193,7 +170,7 @@ describe("resolveValidatedDependency", () => {
 		it("resolves github dependency with tag ref", () => {
 			const dep: ValidatedGithubDependency = {
 				gh: ghRef("org/repo"),
-				ref: { type: "tag", value: nonEmpty("v1.0.0") },
+				ref: { type: "tag", value: nes("v1.0.0") },
 				type: "github",
 			}
 			const origin = makeOrigin("repo")
@@ -209,7 +186,7 @@ describe("resolveValidatedDependency", () => {
 		it("resolves github dependency with branch ref", () => {
 			const dep: ValidatedGithubDependency = {
 				gh: ghRef("org/repo"),
-				ref: { type: "branch", value: nonEmpty("develop") },
+				ref: { type: "branch", value: nes("develop") },
 				type: "github",
 			}
 			const origin = makeOrigin("repo")
@@ -225,7 +202,7 @@ describe("resolveValidatedDependency", () => {
 		it("resolves github dependency with rev ref", () => {
 			const dep: ValidatedGithubDependency = {
 				gh: ghRef("org/repo"),
-				ref: { type: "rev", value: nonEmpty("abc123") },
+				ref: { type: "rev", value: nes("abc123") },
 				type: "github",
 			}
 			const origin = makeOrigin("repo")
@@ -241,7 +218,7 @@ describe("resolveValidatedDependency", () => {
 		it("resolves github dependency with path (sparse clone)", () => {
 			const dep: ValidatedGithubDependency = {
 				gh: ghRef("org/monorepo"),
-				path: nonEmpty("packages/my-skill"),
+				path: nes("packages/my-skill"),
 				type: "github",
 			}
 			const origin = makeOrigin("my-skill")
@@ -270,8 +247,8 @@ describe("resolveValidatedDependency", () => {
 		it("resolves github dependency with all fields", () => {
 			const dep: ValidatedGithubDependency = {
 				gh: ghRef("superpowers-marketplace/elements-of-style"),
-				path: nonEmpty("skills"),
-				ref: { type: "tag", value: nonEmpty("v2.0.0") },
+				path: nes("skills"),
+				ref: { type: "tag", value: nes("v2.0.0") },
 				type: "github",
 			}
 			const origin = makeOrigin("elements")
@@ -334,7 +311,7 @@ describe("resolveValidatedDependency", () => {
 
 		it("resolves git dependency with ref", () => {
 			const dep: ValidatedGitDependency = {
-				ref: { type: "tag", value: nonEmpty("v1.0.0") },
+				ref: { type: "tag", value: nes("v1.0.0") },
 				type: "git",
 				url: gitUrl("https://gitlab.com/org/repo"),
 			}
@@ -351,7 +328,7 @@ describe("resolveValidatedDependency", () => {
 
 		it("resolves git dependency with path (sparse clone)", () => {
 			const dep: ValidatedGitDependency = {
-				path: nonEmpty("packages/core"),
+				path: nes("packages/core"),
 				type: "git",
 				url: gitUrl("https://bitbucket.org/org/monorepo"),
 			}
@@ -368,8 +345,8 @@ describe("resolveValidatedDependency", () => {
 
 		it("resolves git dependency with all fields", () => {
 			const dep: ValidatedGitDependency = {
-				path: nonEmpty("skills/utils"),
-				ref: { type: "branch", value: nonEmpty("main") },
+				path: nes("skills/utils"),
+				ref: { type: "branch", value: nes("main") },
 				type: "git",
 				url: gitUrl("https://gitlab.com/my-org/my-repo"),
 			}
@@ -406,7 +383,7 @@ describe("resolveValidatedDependency", () => {
 	describe("local dependencies", () => {
 		it("resolves local dependency", () => {
 			const dep: ValidatedLocalDependency = {
-				path: absPath("/home/user/projects/my-skill"),
+				path: abs("/home/user/projects/my-skill"),
 				type: "local",
 			}
 			const origin = makeOrigin("my-skill")
@@ -430,7 +407,7 @@ describe("resolveValidatedDependency", () => {
 
 		it("uses symlink fetch strategy for local packages", () => {
 			const dep: ValidatedLocalDependency = {
-				path: absPath("/some/path"),
+				path: abs("/some/path"),
 				type: "local",
 			}
 			const origin = makeOrigin("local-pkg")
@@ -442,7 +419,7 @@ describe("resolveValidatedDependency", () => {
 
 		it("preserves absolute path", () => {
 			const dep: ValidatedLocalDependency = {
-				path: absPath("/Users/developer/my-org/skills/my-skill"),
+				path: abs("/Users/developer/my-org/skills/my-skill"),
 				type: "local",
 			}
 			const origin = makeOrigin("my-skill")
@@ -466,7 +443,7 @@ describe("resolveValidatedDependency", () => {
 		it("resolves claude plugin dependency", () => {
 			const dep: ValidatedClaudePluginDependency = {
 				marketplace: gitUrl("https://github.com/anthropics/claude-plugins"),
-				plugin: nonEmpty("web-search"),
+				plugin: nes("web-search"),
 				type: "claude-plugin",
 			}
 			const origin = makeOrigin("web-search")
@@ -493,7 +470,7 @@ describe("resolveValidatedDependency", () => {
 		it("uses non-sparse clone for plugins", () => {
 			const dep: ValidatedClaudePluginDependency = {
 				marketplace: gitUrl("https://github.com/some-org/plugins"),
-				plugin: nonEmpty("my-plugin"),
+				plugin: nes("my-plugin"),
 				type: "claude-plugin",
 			}
 			const origin = makeOrigin("my-plugin")
@@ -540,8 +517,12 @@ describe("resolveMergedPackages", () => {
 		const result = resolveMergedPackages(manifest)
 
 		expect(result).toHaveLength(1)
-		expect(result[0].type).toBe("github")
-		expect(result[0].origin.alias).toBe("my-pkg")
+		const [resolved] = result
+		if (!resolved) {
+			throw new Error("Expected one resolved package")
+		}
+		expect(resolved.type).toBe("github")
+		expect(resolved.origin.alias).toBe("my-pkg")
 	})
 
 	it("resolves multiple dependencies", () => {
@@ -555,7 +536,7 @@ describe("resolveMergedPackages", () => {
 
 		const localEntry: ManifestDependencyEntry = {
 			dependency: {
-				path: absPath("/local/path"),
+				path: abs("/local/path"),
 				type: "local",
 			} as ValidatedLocalDependency,
 			origin: makeManifestOrigin(),
@@ -563,10 +544,10 @@ describe("resolveMergedPackages", () => {
 
 		const registryEntry: ManifestDependencyEntry = {
 			dependency: {
-				name: nonEmpty("skill"),
-				org: nonEmpty("my-org"),
+				name: nes("skill"),
+				org: nes("my-org"),
 				type: "registry",
-				version: nonEmpty("1.0.0"),
+				version: nes("1.0.0"),
 			} as ValidatedRegistryDependency,
 			origin: makeManifestOrigin(),
 		}
@@ -609,7 +590,11 @@ describe("resolveMergedPackages", () => {
 
 		const result = resolveMergedPackages(manifest)
 
-		expect(result[0].origin.manifestPath).toBe("/custom/manifest/path.toml")
+		const [resolved] = result
+		if (!resolved) {
+			throw new Error("Expected one resolved package")
+		}
+		expect(resolved.origin.manifestPath).toBe("/custom/manifest/path.toml")
 	})
 
 	it("handles mixed dependency types", () => {
@@ -629,8 +614,8 @@ describe("resolveMergedPackages", () => {
 				{
 					dependency: {
 						gh: ghRef("org/full"),
-						path: nonEmpty("packages/sub"),
-						ref: { type: "tag", value: nonEmpty("v1.0.0") },
+						path: nes("packages/sub"),
+						ref: { type: "tag", value: nes("v1.0.0") },
 						type: "github",
 					} as ValidatedGithubDependency,
 					origin: makeManifestOrigin(),
@@ -650,7 +635,7 @@ describe("resolveMergedPackages", () => {
 				alias("local-pkg"),
 				{
 					dependency: {
-						path: absPath("/home/user/local"),
+						path: abs("/home/user/local"),
 						type: "local",
 					} as ValidatedLocalDependency,
 					origin: makeManifestOrigin(),
@@ -661,7 +646,7 @@ describe("resolveMergedPackages", () => {
 				{
 					dependency: {
 						marketplace: gitUrl("https://github.com/anthropics/plugins"),
-						plugin: nonEmpty("my-plugin"),
+						plugin: nes("my-plugin"),
 						type: "claude-plugin",
 					} as ValidatedClaudePluginDependency,
 					origin: makeManifestOrigin(),
@@ -682,22 +667,22 @@ describe("resolveMergedPackages", () => {
 		// Verify each package was correctly resolved
 		const byAlias = new Map(result.map((p) => [p.origin.alias, p]))
 
-		const githubSimple = byAlias.get("github-simple")
+		const githubSimple = byAlias.get(alias("github-simple"))
 		expect(githubSimple?.type).toBe("github")
 		expect(githubSimple?.fetchStrategy).toEqual({ mode: "clone", sparse: false })
 
-		const githubFull = byAlias.get("github-full")
+		const githubFull = byAlias.get(alias("github-full"))
 		expect(githubFull?.type).toBe("github")
 		expect(githubFull?.fetchStrategy).toEqual({ mode: "clone", sparse: true })
 
-		const gitPkg = byAlias.get("git-pkg")
+		const gitPkg = byAlias.get(alias("git-pkg"))
 		expect(gitPkg?.type).toBe("git")
 
-		const localPkg = byAlias.get("local-pkg")
+		const localPkg = byAlias.get(alias("local-pkg"))
 		expect(localPkg?.type).toBe("local")
 		expect(localPkg?.fetchStrategy).toEqual({ mode: "symlink" })
 
-		const pluginPkg = byAlias.get("plugin-pkg")
+		const pluginPkg = byAlias.get(alias("plugin-pkg"))
 		expect(pluginPkg?.type).toBe("claude-plugin")
 	})
 })
@@ -709,7 +694,7 @@ describe("resolveMergedPackages", () => {
 describe("fetch strategy determination", () => {
 	it("local packages always use symlink", () => {
 		const dep: ValidatedLocalDependency = {
-			path: absPath("/any/path"),
+			path: abs("/any/path"),
 			type: "local",
 		}
 		const result = resolveValidatedDependency(dep, makeOrigin("pkg"))
@@ -728,7 +713,7 @@ describe("fetch strategy determination", () => {
 	it("github with path uses sparse clone", () => {
 		const dep: ValidatedGithubDependency = {
 			gh: ghRef("org/repo"),
-			path: nonEmpty("subdir"),
+			path: nes("subdir"),
 			type: "github",
 		}
 		const result = resolveValidatedDependency(dep, makeOrigin("pkg"))
@@ -746,7 +731,7 @@ describe("fetch strategy determination", () => {
 
 	it("git with path uses sparse clone", () => {
 		const dep: ValidatedGitDependency = {
-			path: nonEmpty("packages/pkg"),
+			path: nes("packages/pkg"),
 			type: "git",
 			url: gitUrl("https://example.com/repo"),
 		}
@@ -756,9 +741,9 @@ describe("fetch strategy determination", () => {
 
 	it("registry uses non-sparse clone", () => {
 		const dep: ValidatedRegistryDependency = {
-			name: nonEmpty("pkg"),
+			name: nes("pkg"),
 			type: "registry",
-			version: nonEmpty("1.0.0"),
+			version: nes("1.0.0"),
 		}
 		const result = resolveValidatedDependency(dep, makeOrigin("pkg"))
 		expect(result.fetchStrategy).toEqual({ mode: "clone", sparse: false })
@@ -767,7 +752,7 @@ describe("fetch strategy determination", () => {
 	it("claude-plugin uses non-sparse clone", () => {
 		const dep: ValidatedClaudePluginDependency = {
 			marketplace: gitUrl("https://github.com/org/plugins"),
-			plugin: nonEmpty("plugin"),
+			plugin: nes("plugin"),
 			type: "claude-plugin",
 		}
 		const result = resolveValidatedDependency(dep, makeOrigin("pkg"))

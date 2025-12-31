@@ -57,7 +57,7 @@ export interface LocalPackage extends CanonicalPackageBase {
 export interface ClaudePluginPackage extends CanonicalPackageBase {
 	readonly type: "claude-plugin"
 	readonly plugin: NonEmptyString
-	readonly marketplace: NormalizedGitUrl
+	readonly marketplace: NormalizedGitUrl | GithubRef
 }
 
 export type CanonicalPackage =

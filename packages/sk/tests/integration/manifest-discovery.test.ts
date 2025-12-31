@@ -267,12 +267,10 @@ describe("discoverManifests", () => {
 					// Filter to just the project manifests
 					const projectManifests = result.value.filter((p) => p.startsWith(dir))
 					// If there's a user manifest, it should come after project manifests
-					const lastProjectIdx =
-						projectManifests.length > 0
-							? result.value.indexOf(
-									projectManifests[projectManifests.length - 1],
-								)
-							: -1
+					const lastProject = projectManifests.at(-1)
+					const lastProjectIdx = lastProject
+						? result.value.indexOf(lastProject)
+						: -1
 
 					const userManifests = result.value.filter((p) => p.includes(".sk"))
 					for (const userManifest of userManifests) {

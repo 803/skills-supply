@@ -16,34 +16,11 @@ import {
 } from "@/src/core/agents/install"
 import type { AgentDefinition, InstallablePackage } from "@/src/core/agents/types"
 import type { CanonicalPackage, Skill } from "@/src/core/packages/types"
-import type { AbsolutePath, Alias, NonEmptyString } from "@/src/core/types/branded"
-import { exists, isDirectory, withTempDir } from "@/tests/helpers"
+import { abs, alias, exists, ghRef, isDirectory, nes, withTempDir } from "@/tests/helpers"
 
 // =============================================================================
 // TEST HELPERS
 // =============================================================================
-
-/**
- * Create a branded NonEmptyString for tests.
- * Only use in tests - production code uses coerce functions.
- */
-function nes(s: string): NonEmptyString {
-	return s as NonEmptyString
-}
-
-/**
- * Create a branded AbsolutePath for tests.
- */
-function abs(s: string): AbsolutePath {
-	return s as AbsolutePath
-}
-
-/**
- * Create a branded Alias for tests.
- */
-function alias(s: string): Alias {
-	return s as Alias
-}
 
 /**
  * Create a test agent definition.
@@ -78,7 +55,7 @@ function makeLocalPackage(absolutePath: string): CanonicalPackage {
 function makeGithubPackage(): CanonicalPackage {
 	return {
 		fetchStrategy: { mode: "clone", sparse: false },
-		gh: "org/repo" as NonEmptyString & { readonly [Symbol.species]: "GithubRef" },
+		gh: ghRef("org/repo"),
 		origin: {
 			alias: alias("github-pkg"),
 			manifestPath: abs("/test/package.toml"),
@@ -153,8 +130,12 @@ describe("planAgentInstall", () => {
 				expect(result.value.agentId).toBe("claude-code")
 				expect(result.value.basePath).toBe(join(dir, "agent-skills"))
 				expect(result.value.tasks).toHaveLength(1)
-				expect(result.value.tasks[0].targetName).toBe("my-pkg-my-skill")
-				expect(result.value.tasks[0].mode).toBe("symlink") // local package
+				const [task] = result.value.tasks
+				if (!task) {
+					throw new Error("Expected one install task")
+				}
+				expect(task.targetName).toBe("my-pkg-my-skill")
+				expect(task.mode).toBe("symlink") // local package
 			}
 		})
 	})
@@ -176,7 +157,12 @@ describe("planAgentInstall", () => {
 
 			expect(result).toBeOk()
 			if (result.ok) {
-				expect(result.value.tasks[0].mode).toBe("copy") // github package
+				expect(result.value.tasks).toHaveLength(1)
+				const [task] = result.value.tasks
+				if (!task) {
+					throw new Error("Expected one install task")
+				}
+				expect(task.mode).toBe("copy") // github package
 			}
 		})
 	})
@@ -421,8 +407,12 @@ describe("applyAgentInstall", () => {
 				expect(result).toBeOk()
 				if (result.ok) {
 					expect(result.value).toHaveLength(1)
-					expect(result.value[0].name).toBe("skill")
-					expect(result.value[0].targetPath).toBe(join(targetBase, "pkg-skill"))
+					const [installed] = result.value
+					if (!installed) {
+						throw new Error("Expected one installed skill")
+					}
+					expect(installed.name).toBe("skill")
+					expect(installed.targetPath).toBe(join(targetBase, "pkg-skill"))
 
 					// Verify files were copied
 					const targetDir = join(targetBase, "pkg-skill")

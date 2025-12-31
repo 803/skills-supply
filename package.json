@@ -31,7 +31,7 @@
 		"docs": "npx typedoc",
 		"lc": "tokei . -e --type=CSS,Elixir,JavaScript,TSX,TypeScript",
 		"test": "vitest run",
-		"tsc": "npx tsc --build",
+		"tsc": "npx turbo run tsc",
 		"tsx": "npx tsx --tsconfig tsconfig.tsxrepl.json"
 	},
 	"type": "module",

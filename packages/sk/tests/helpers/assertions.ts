@@ -156,10 +156,11 @@ expect.extend({
 
 // Extend Vitest's expect types
 declare module "vitest" {
-	interface Assertion<_T> {
+	// biome-ignore lint/suspicious/noExplicitAny: matches Vitest's Assertion default.
+	interface Assertion<T = any> {
 		toBeOk(): void
 		toBeErr(): void
-		toBeOkWith(predicate: (value: unknown) => boolean): void
+		toBeOkWith(predicate: (value: T) => boolean): void
 		toBeErrContaining(substring: string): void
 	}
 
