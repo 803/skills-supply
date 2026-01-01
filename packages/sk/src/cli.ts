@@ -57,8 +57,8 @@ async function main(): Promise<void> {
 
 	pkg.command("add")
 		.description("Add a package")
-		.argument("<type>", "Package type")
-		.argument("<spec>", "Package spec")
+		.argument("<typeOrUrl>", "Package type or URL")
+		.argument("[spec]", "Package spec")
 		.option("--tag <tag>", "Use a specific git tag")
 		.option("--branch <branch>", "Use a specific git branch")
 		.option("--rev <rev>", "Use a specific git commit")
@@ -69,8 +69,8 @@ async function main(): Promise<void> {
 		.option("--init", "Create a manifest if one does not exist")
 		.action(
 			async (
-				type: string,
-				spec: string,
+				typeOrUrl: string,
+				spec: string | undefined,
 				options: {
 					tag?: string
 					branch?: string
@@ -82,7 +82,7 @@ async function main(): Promise<void> {
 					init?: boolean
 				},
 			) => {
-				await pkgAdd(type, spec, {
+				await pkgAdd(typeOrUrl, spec, {
 					as: options.as,
 					branch: options.branch,
 					global: Boolean(options.global),

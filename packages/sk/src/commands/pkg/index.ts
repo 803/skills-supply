@@ -5,7 +5,7 @@ import {
 	resolveLocalManifest,
 } from "@/src/commands/manifest-selection"
 import type { AddOptions } from "@/src/commands/pkg/spec"
-import { buildPackageSpec } from "@/src/commands/pkg/spec"
+import { buildPackageSpec, normalizeAddOptions } from "@/src/commands/pkg/spec"
 import { coerceDependency } from "@/src/core/manifest/coerce"
 import { saveManifest } from "@/src/core/manifest/fs"
 import {
@@ -157,7 +157,7 @@ async function handleAdd(): Promise<void> {
 			`Skills will install under ${selection.scopeRoot}. Run agents from that directory to use them.`,
 		)
 	}
-	const pkgSpec = buildPackageSpec(type as string, spec, options)
+	const pkgSpec = buildPackageSpec(type as string, spec, normalizeAddOptions(options))
 
 	const aliasKey = coerceAlias(pkgSpec.alias)
 	if (!aliasKey) {

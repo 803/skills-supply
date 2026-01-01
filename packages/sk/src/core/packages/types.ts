@@ -84,7 +84,7 @@ export interface FetchedPackage {
 /**
  * Detection method metadata.
  */
-export type DetectionMethod = "manifest" | "plugin" | "subdir" | "single"
+export type DetectionMethod = "manifest" | "marketplace" | "plugin" | "subdir" | "single"
 
 /**
  * Detected package - uniform structure regardless of detection method.

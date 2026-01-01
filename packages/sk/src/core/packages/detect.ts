@@ -3,6 +3,7 @@ import { readdir, stat } from "node:fs/promises"
 import path from "node:path"
 import type {
 	CanonicalPackage,
+	DetectionMethod,
 	PackageDetectionError,
 	PackageDetectionResult,
 } from "@/src/core/packages/types"
@@ -13,6 +14,7 @@ const MANIFEST_FILENAME = "agents.toml"
 const SKILL_FILENAME = "SKILL.md"
 const PLUGIN_DIR = ".claude-plugin"
 const PLUGIN_FILENAME = "plugin.json"
+const MARKETPLACE_FILENAME = "marketplace.json"
 const PLUGIN_SKILLS_DIR = "skills"
 
 type ExistsResult =
@@ -27,6 +29,16 @@ type StatResult =
 type SkillPathsResult =
 	| { ok: true; value: AbsolutePath[] }
 	| { ok: false; error: PackageDetectionError }
+type PackageContentsResult =
+	| {
+			ok: true
+			value: {
+				method: DetectionMethod
+				manifestPath?: AbsolutePath
+				skillPaths: AbsolutePath[]
+			}
+	  }
+	| { ok: false; error: PackageDetectionError }
 
 /**
  * Detect the type of package at a given path.
@@ -36,6 +48,28 @@ export async function detectPackageType(
 	canonical: CanonicalPackage,
 	packagePath: AbsolutePath,
 ): Promise<PackageDetectionResult> {
+	const contents = await detectPackageContents(packagePath)
+	if (!contents.ok) {
+		return contents
+	}
+
+	return {
+		ok: true,
+		value: {
+			canonical,
+			detection: {
+				manifestPath: contents.value.manifestPath,
+				method: contents.value.method,
+			},
+			packagePath,
+			skillPaths: contents.value.skillPaths,
+		},
+	}
+}
+
+export async function detectPackageContents(
+	packagePath: AbsolutePath,
+): Promise<PackageContentsResult> {
 	const rootStat = await safeStat(packagePath, packagePath)
 	if (!rootStat.ok) {
 		return rootStat
@@ -77,9 +111,8 @@ export async function detectPackageType(
 		return {
 			ok: true,
 			value: {
-				canonical,
-				detection: { manifestPath, method: "manifest" },
-				packagePath,
+				manifestPath,
+				method: "manifest",
 				skillPaths: [], // Will be populated by extractSkills
 			},
 		}
@@ -93,6 +126,22 @@ export async function detectPackageType(
 	}
 
 	if (pluginDirExists.value) {
+		const marketplacePath = path.join(pluginDir, MARKETPLACE_FILENAME)
+		const marketplaceExists = await fileExists(marketplacePath, packagePath)
+		if (!marketplaceExists.ok) {
+			return marketplaceExists
+		}
+
+		if (marketplaceExists.value) {
+			return {
+				ok: true,
+				value: {
+					method: "marketplace",
+					skillPaths: [],
+				},
+			}
+		}
+
 		const pluginPath = path.join(pluginDir, PLUGIN_FILENAME)
 		const pluginFileExists = await fileExists(pluginPath, packagePath)
 		if (!pluginFileExists.ok) {
@@ -122,9 +171,7 @@ export async function detectPackageType(
 			return {
 				ok: true,
 				value: {
-					canonical,
-					detection: { method: "plugin" },
-					packagePath,
+					method: "plugin",
 					skillPaths: [],
 				},
 			}
@@ -133,9 +180,7 @@ export async function detectPackageType(
 		return {
 			ok: true,
 			value: {
-				canonical,
-				detection: { method: "plugin" },
-				packagePath,
+				method: "plugin",
 				skillPaths: skillPaths.value,
 			},
 		}
@@ -151,9 +196,7 @@ export async function detectPackageType(
 		return {
 			ok: true,
 			value: {
-				canonical,
-				detection: { method: "subdir" },
-				packagePath,
+				method: "subdir",
 				skillPaths: subdirSkills.value,
 			},
 		}
@@ -177,9 +220,7 @@ export async function detectPackageType(
 		return {
 			ok: true,
 			value: {
-				canonical,
-				detection: { method: "single" },
-				packagePath,
+				method: "single",
 				skillPaths: [packagePath], // The skill is in the root
 			},
 		}
@@ -187,7 +228,7 @@ export async function detectPackageType(
 
 	return failure(
 		"invalid_package",
-		"No agents.toml, plugin.json, or SKILL.md found in package.",
+		"No agents.toml, marketplace.json, plugin.json, or SKILL.md found in package.",
 		packagePath,
 	)
 }

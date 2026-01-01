@@ -2,6 +2,7 @@ import { execFile } from "node:child_process"
 import { mkdir, stat } from "node:fs/promises"
 import path from "node:path"
 import { promisify } from "node:util"
+import { normalizeSparsePathCore, sparsePathErrorMessage } from "@/src/core/packages/path"
 import type {
 	GitRef,
 	LocalPackage,
@@ -127,36 +128,17 @@ export function normalizeSparsePath(
 	origin: PackageOrigin,
 	source: string,
 ): SparsePathResult {
-	if (value === undefined) {
-		return { ok: true, value: undefined }
+	const result = normalizeSparsePathCore(value)
+	if (result.ok) {
+		return result
 	}
 
-	const trimmed = value.trim()
-	if (!trimmed) {
-		return failure("invalid_source", "Package path cannot be empty.", origin, source)
-	}
-
-	const cleaned = trimmed.replace(/\\/g, "/")
-	if (cleaned.startsWith("/")) {
-		return failure("invalid_source", "Package path must be relative.", origin, source)
-	}
-
-	const segments = cleaned.split("/")
-	if (segments.some((segment) => segment === "..")) {
-		return failure(
-			"invalid_source",
-			"Package path must not escape the repository.",
-			origin,
-			source,
-		)
-	}
-
-	const normalized = path.posix.normalize(cleaned).replace(/^\.\/+/, "")
-	if (!normalized || normalized === ".") {
-		return { ok: true, value: undefined }
-	}
-
-	return { ok: true, value: normalized }
+	return failure(
+		"invalid_source",
+		sparsePathErrorMessage(result.reason),
+		origin,
+		source,
+	)
 }
 
 export function joinRepoPath(repoDir: string, sparsePath: string): string {

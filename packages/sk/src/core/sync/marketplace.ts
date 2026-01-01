@@ -7,6 +7,10 @@ import { readTextFile, safeStat } from "@/src/core/io/fs"
 import { coerceDependency } from "@/src/core/manifest/coerce"
 import type { DependencyDeclaration } from "@/src/core/manifest/types"
 import {
+	type MarketplacePluginEntry,
+	parseMarketplaceJson,
+} from "@/src/core/marketplace/parse"
+import {
 	fetchGithubRepository,
 	fetchGitRepository,
 	parseGithubSlug,
@@ -37,11 +41,6 @@ function createMarketplaceOrigin(manifestPath: string): PackageOrigin {
 }
 
 const execFileAsync = promisify(execFile)
-
-interface MarketplacePluginEntry {
-	name: string
-	source: unknown
-}
 
 interface MarketplaceInfo {
 	manifestPath: string
@@ -362,7 +361,7 @@ async function loadMarketplaceInfo(
 
 	const parsedMarketplace = parseMarketplaceJson(manifestContents, manifestPath)
 	if (!parsedMarketplace.ok) {
-		return parsedMarketplace
+		return failSync("resolve", new Error(parsedMarketplace.error))
 	}
 
 	let pluginRootPath: string | undefined
@@ -494,94 +493,6 @@ async function fetchMarketplaceUrl(url: string): Promise<SyncResult<string>> {
 	} catch (error) {
 		return failSync("fetch", error, `Unable to fetch marketplace URL: ${url}`)
 	}
-}
-
-function parseMarketplaceJson(
-	contents: string,
-	manifestPath: string,
-): SyncResult<{ name: string; plugins: MarketplacePluginEntry[]; pluginRoot?: string }> {
-	let parsed: unknown
-	try {
-		parsed = JSON.parse(contents)
-	} catch (error) {
-		return failSync("resolve", error, `Invalid JSON in ${manifestPath}.`)
-	}
-
-	if (!isRecord(parsed)) {
-		return failSync(
-			"resolve",
-			new Error(`Marketplace manifest must be a JSON object.`),
-		)
-	}
-
-	const nameValue = parsed.name
-	if (typeof nameValue !== "string" || !nameValue.trim()) {
-		return failSync(
-			"resolve",
-			new Error("Marketplace manifest must include a non-empty name."),
-		)
-	}
-
-	const pluginsValue = parsed.plugins
-	if (!Array.isArray(pluginsValue)) {
-		return failSync(
-			"resolve",
-			new Error("Marketplace manifest must include a plugins array."),
-		)
-	}
-
-	const plugins: MarketplacePluginEntry[] = []
-	for (const entry of pluginsValue) {
-		if (!isRecord(entry)) {
-			return failSync("resolve", new Error("Marketplace plugins must be objects."))
-		}
-
-		const pluginName = entry.name
-		if (typeof pluginName !== "string" || !pluginName.trim()) {
-			return failSync(
-				"resolve",
-				new Error("Marketplace plugins must include a non-empty name."),
-			)
-		}
-
-		if (!("source" in entry)) {
-			return failSync(
-				"resolve",
-				new Error(`Marketplace plugin "${pluginName}" is missing source.`),
-			)
-		}
-
-		plugins.push({
-			name: pluginName.trim(),
-			source: entry.source,
-		})
-	}
-
-	let pluginRoot: string | undefined
-	if ("metadata" in parsed && parsed.metadata !== undefined) {
-		const metadata = parsed.metadata
-		if (!isRecord(metadata)) {
-			return failSync(
-				"resolve",
-				new Error("Marketplace metadata must be a JSON object."),
-			)
-		}
-
-		if ("pluginRoot" in metadata) {
-			const pluginRootValue = metadata.pluginRoot
-			if (typeof pluginRootValue !== "string" || !pluginRootValue.trim()) {
-				return failSync(
-					"resolve",
-					new Error(
-						"Marketplace metadata.pluginRoot must be a non-empty string.",
-					),
-				)
-			}
-			pluginRoot = pluginRootValue.trim()
-		}
-	}
-
-	return { ok: true, value: { name: nameValue.trim(), pluginRoot, plugins } }
 }
 
 async function resolvePluginSource(

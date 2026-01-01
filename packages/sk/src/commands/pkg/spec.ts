@@ -1,6 +1,6 @@
 import path from "node:path"
 import type {
-	DependencyDeclaration,
+	DependencyDraft,
 	GithubPackageDeclaration,
 	GitPackageDeclaration,
 	LocalPackageDeclaration,
@@ -14,16 +14,17 @@ export interface AddOptions {
 	as?: string
 }
 
-export interface PackageSpec {
-	alias: string
-	declaration: DependencyDeclaration
+export interface NormalizedAddOptions {
+	aliasOverride?: string
+	ref?: { tag: string } | { branch: string } | { rev: string }
+	path?: string
 }
 
 export function buildPackageSpec(
 	type: string,
 	spec: string,
-	options: AddOptions,
-): PackageSpec {
+	options: NormalizedAddOptions,
+): DependencyDraft {
 	const normalizedType = type.trim().toLowerCase()
 	if (!normalizedType) {
 		throw new Error("Package type is required.")
@@ -34,13 +35,9 @@ export function buildPackageSpec(
 		throw new Error("Package spec is required.")
 	}
 
-	const aliasOverride = options.as?.trim()
-	if (options.as !== undefined && !aliasOverride) {
-		throw new Error("--as must not be empty.")
-	}
-
-	const ref = resolveRefOptions(options)
-	const subPath = resolveSubPath(options)
+	const aliasOverride = options.aliasOverride
+	const ref = options.ref
+	const subPath = options.path
 
 	switch (normalizedType) {
 		case "claude-plugin":
@@ -134,6 +131,40 @@ export function buildPackageSpec(
 		default:
 			throw new Error(`Unsupported package type: ${type}`)
 	}
+}
+
+export function normalizeAddOptions(options: AddOptions): NormalizedAddOptions {
+	const aliasOverride = options.as?.trim()
+	if (options.as !== undefined && !aliasOverride) {
+		throw new Error("--as must not be empty.")
+	}
+
+	const ref = resolveRefOptions(options)
+	const subPath = resolveSubPath(options)
+
+	return {
+		aliasOverride,
+		path: subPath,
+		ref,
+	}
+}
+
+export function isAutoDetectUrl(input: string): boolean {
+	const trimmed = input.trim()
+	if (!trimmed) {
+		return false
+	}
+
+	// GitHub HTTPS (with or without .git suffix)
+	if (/^https:\/\/github\.com\/[^/]+\/[^/]+/.test(trimmed)) return true
+
+	// git+ssh format (with or without .git suffix)
+	if (/^git@[^:]+:.+/.test(trimmed)) return true
+
+	// Any HTTPS URL ending in .git
+	if (/^https:\/\/.+\.git$/.test(trimmed)) return true
+
+	return false
 }
 
 function resolveRefOptions(

@@ -38,6 +38,15 @@ export async function extractSkills(
 		return extractFromManifest(detected.detection.manifestPath, origin)
 	}
 
+	if (detected.detection.method === "marketplace") {
+		return failure(
+			"invalid_skill",
+			"Marketplace packages cannot be installed as skills. Add a plugin from the marketplace instead.",
+			detected.packagePath,
+			origin,
+		)
+	}
+
 	// For other detection methods, use pre-computed skillPaths
 	return buildSkillList(detected.skillPaths as AbsolutePath[], origin)
 }

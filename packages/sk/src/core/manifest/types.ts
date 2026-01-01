@@ -49,6 +49,11 @@ export type DependencyDeclaration =
 	| LocalPackageDeclaration
 	| ClaudePluginDeclaration
 
+export interface DependencyDraft {
+	alias: string
+	declaration: DependencyDeclaration
+}
+
 // =============================================================================
 // VALIDATED DEPENDENCY TYPES (after coercion at parse boundary)
 // These use branded types - validity is guaranteed by the type system.
