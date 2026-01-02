@@ -1,6 +1,6 @@
 # sk
 
-Manage AI agent skills across Claude Code, Codex, OpenCode, and others.
+Manage AI agent skills across Claude Code, Codex, OpenCode, Factory, and others.
 
 ```bash
 # Install
@@ -63,6 +63,7 @@ Creates `agents.toml` with detected agents:
 claude-code = true
 codex = true
 opencode = false
+factory = false
 
 [dependencies]
 ```
@@ -115,6 +116,7 @@ The **manifest** (`agents.toml`) declares which packages you want and which agen
 | Claude Code | `~/.claude/skills/` | `./.claude/skills/` |
 | Codex | `~/.codex/skills/` | `./.codex/skills/` |
 | OpenCode | `~/.config/opencode/skill/` | `./.opencode/skill/` |
+| Factory | `~/.factory/skills/` | `./.factory/skills/` |
 
 For global scope (`--global`), skills install to your home directory. For project scope (default), skills install within your project directory.
 
@@ -158,6 +160,7 @@ Project manifests are discovered by walking up from your current directory.
 claude-code = true    # Anthropic's Claude Code
 codex = true          # OpenAI Codex CLI
 opencode = false      # OpenCode (disabled)
+factory = true        # Factory (Droids)
 
 [dependencies]
 # Claude Code plugin (from marketplace)
@@ -556,10 +559,12 @@ If you need to start fresh:
 # For global scope: remove state files from home directory
 rm ~/.claude/.sk-state.json
 rm ~/.codex/.sk-state.json
+rm ~/.factory/.sk-state.json
 
 # For project scope: remove state files from project directory
 rm .claude/.sk-state.json
 rm .codex/.sk-state.json
+rm .factory/.sk-state.json
 
 # Re-sync
 sk sync
