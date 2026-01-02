@@ -21,7 +21,12 @@ import type {
 
 // === AGENT ID ===
 
-const VALID_AGENT_IDS: ReadonlySet<string> = new Set(["claude-code", "codex", "opencode"])
+const VALID_AGENT_IDS: ReadonlySet<string> = new Set([
+	"claude-code",
+	"codex",
+	"opencode",
+	"factory",
+])
 
 /**
  * Coerce a string to AgentId.

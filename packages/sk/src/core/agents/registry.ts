@@ -44,6 +44,13 @@ const AGENT_ENTRIES: AgentEntry[] = [
 		id: "opencode",
 		skillsDir: "skill",
 	},
+	{
+		basePath: ".factory",
+		detectPath: path.join(HOME_DIR, ".factory"),
+		displayName: "Factory",
+		id: "factory",
+		skillsDir: "skills",
+	},
 ]
 
 const AGENT_REGISTRY: AgentDefinition[] = AGENT_ENTRIES.map((entry) => ({

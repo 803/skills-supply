@@ -100,7 +100,7 @@ export type FetchStrategy =
 /**
  * Known agent identifiers.
  */
-export type AgentId = "claude-code" | "codex" | "opencode"
+export type AgentId = "claude-code" | "codex" | "opencode" | "factory"
 
 // === TYPE UTILITIES ===
 
