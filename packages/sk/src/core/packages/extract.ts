@@ -1,7 +1,7 @@
 import type { Dirent } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
-import { parseLegacyManifest } from "@/src/core/manifest/parse"
+import { parseManifest } from "@/src/core/manifest/parse"
 import type {
 	DetectedPackage,
 	PackageExtractionError,
@@ -68,7 +68,7 @@ async function extractFromManifest(
 		)
 	}
 
-	const parsed = parseLegacyManifest(contents, manifestPath)
+	const parsed = parseManifest(contents, manifestPath, "cwd")
 	if (!parsed.ok) {
 		return failure("invalid_skill", parsed.error.message, manifestPath, origin)
 	}
@@ -101,9 +101,9 @@ async function extractFromManifest(
 }
 
 function resolveAutoDiscoverSkills(
-	exports: { autoDiscover: { skills: string | false } } | undefined,
+	exports: { auto_discover?: { skills: string | false } } | undefined,
 ): string | false {
-	const value = exports?.autoDiscover.skills
+	const value = exports?.auto_discover?.skills
 	if (value === false) {
 		return false
 	}

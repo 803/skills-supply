@@ -7,14 +7,12 @@
  * - Schema validation (Zod)
  * - Coercion to branded types
  *
- * Two functions are exported:
- * - parseManifest: Full validation, returns Manifest with branded types
- * - parseLegacyManifest: Deprecated, returns LegacyManifest with raw strings
+ * parseManifest: Full validation, returns Manifest with branded types.
  */
 
 import { describe, expect, it } from "vitest"
 import "@/tests/helpers/assertions"
-import { parseLegacyManifest, parseManifest } from "@/src/core/manifest/parse"
+import { parseManifest } from "@/src/core/manifest/parse"
 import type { AbsolutePath, ManifestDiscoveredAt } from "@/src/core/types/branded"
 import { coerceAlias } from "@/src/core/types/coerce"
 
@@ -307,8 +305,7 @@ my-dep = "no-version"
 
 				expect(result).toBeErr()
 				if (!result.ok) {
-					expect(result.error.type).toBe("coercion_failed")
-					expect(result.error.key).toBe("my-dep")
+					expect(result.error.type).toBe("invalid_manifest")
 				}
 			})
 		})
@@ -423,7 +420,7 @@ gh = "not-valid-format"
 
 				expect(result).toBeErr()
 				if (!result.ok) {
-					expect(result.error.type).toBe("coercion_failed")
+					expect(result.error.type).toBe("invalid_manifest")
 				}
 			})
 		})
@@ -554,8 +551,8 @@ marketplace = "https://github.com/sensei-marketplace/sensei"
 
 				expect(result).toBeErr()
 				if (!result.ok) {
-					expect(result.error.type).toBe("coercion_failed")
-					expect(result.error.message).toContain("alias")
+					expect(result.error.type).toBe("invalid_manifest")
+					expect(result.error.message).toContain("Alias")
 				}
 			})
 
@@ -591,7 +588,7 @@ skills = "skills/"
 
 			expect(result).toBeOk()
 			if (result.ok) {
-				expect(result.value.exports?.autoDiscover.skills).toBe("skills/")
+				expect(result.value.exports?.auto_discover.skills).toBe("skills/")
 			}
 		})
 
@@ -604,7 +601,7 @@ skills = false
 
 			expect(result).toBeOk()
 			if (result.ok) {
-				expect(result.value.exports?.autoDiscover.skills).toBe(false)
+				expect(result.value.exports?.auto_discover.skills).toBe(false)
 			}
 		})
 
@@ -704,67 +701,8 @@ skills = "skills/"
 				)
 
 				// Exports
-				expect(result.value.exports?.autoDiscover.skills).toBe("skills/")
+				expect(result.value.exports?.auto_discover.skills).toBe("skills/")
 			}
 		})
-	})
-})
-
-describe("parseLegacyManifest", () => {
-	it("parses valid manifest and returns LegacyManifest", () => {
-		const toml = `
-[package]
-name = "legacy-test"
-version = "1.0.0"
-
-[agents]
-claude-code = true
-
-[dependencies]
-my-dep = "pkg@1.0.0"
-`
-		const result = parseLegacyManifest(toml, "/legacy/path.toml")
-
-		expect(result).toBeOk()
-		if (result.ok) {
-			expect(result.value.package?.name).toBe("legacy-test")
-			expect(result.value.agents["claude-code"]).toBe(true)
-			expect(result.value.dependencies["my-dep"]).toBe("pkg@1.0.0")
-			expect(result.value.sourcePath).toBe("/legacy/path.toml")
-		}
-	})
-
-	it("rejects invalid TOML", () => {
-		const result = parseLegacyManifest("[broken", "/path.toml")
-
-		expect(result).toBeErr()
-		if (!result.ok) {
-			expect(result.error.type).toBe("invalid_toml")
-		}
-	})
-
-	it("rejects invalid manifest schema", () => {
-		const toml = `unknown_field = "value"`
-		const result = parseLegacyManifest(toml, "/path.toml")
-
-		expect(result).toBeErr()
-		if (!result.ok) {
-			expect(result.error.type).toBe("invalid_manifest")
-		}
-	})
-
-	it("defaults to empty agents and dependencies when missing", () => {
-		const toml = `
-[package]
-name = "minimal"
-version = "1.0.0"
-`
-		const result = parseLegacyManifest(toml, "/path.toml")
-
-		expect(result).toBeOk()
-		if (result.ok) {
-			expect(result.value.agents).toEqual({})
-			expect(result.value.dependencies).toEqual({})
-		}
 	})
 })

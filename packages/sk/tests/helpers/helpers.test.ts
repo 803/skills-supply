@@ -15,13 +15,6 @@ import {
 	setupFixturePackage,
 	withTempDir,
 } from "@/tests/helpers/fs"
-import {
-	buildManifestWithGithubDeps,
-	buildManifestWithLocalDeps,
-	buildMultiAgentManifest,
-	buildRawManifest,
-} from "@/tests/helpers/manifest"
-
 // Import assertions to register custom matchers
 import "@/tests/helpers/assertions"
 
@@ -174,101 +167,6 @@ describe("setupFixturePackage", () => {
 
 			// But skills should exist (each skill is a directory with SKILL.md)
 			expect(await exists(join(pkgDir, "skills", "test", "SKILL.md"))).toBe(true)
-		})
-	})
-})
-
-describe("buildRawManifest", () => {
-	it("returns a valid manifest with defaults", () => {
-		const manifest = buildRawManifest()
-
-		expect(manifest.package).toBeDefined()
-		expect(manifest.package?.name).toBe("test-pkg")
-		expect(manifest.package?.version).toBe("1.0.0")
-		expect(manifest.agents).toEqual({ "claude-code": true })
-		expect(manifest.dependencies).toEqual({})
-		expect(manifest.sourcePath).toBe("/test/agents.toml")
-	})
-
-	it("allows overriding package metadata", () => {
-		const manifest = buildRawManifest({
-			package: { description: "My package", name: "custom-name", version: "3.0.0" },
-		})
-
-		expect(manifest.package?.name).toBe("custom-name")
-		expect(manifest.package?.version).toBe("3.0.0")
-		expect(manifest.package?.description).toBe("My package")
-	})
-
-	it("allows overriding agents", () => {
-		const manifest = buildRawManifest({
-			agents: { "claude-code": false, codex: true },
-		})
-
-		expect(manifest.agents).toEqual({ "claude-code": false, codex: true })
-	})
-
-	it("allows overriding dependencies", () => {
-		const manifest = buildRawManifest({
-			dependencies: {
-				"local-pkg": { path: "/local/path" },
-				"my-pkg": { gh: "org/repo" },
-			},
-		})
-
-		expect(manifest.dependencies["my-pkg"]).toEqual({ gh: "org/repo" })
-		expect(manifest.dependencies["local-pkg"]).toEqual({ path: "/local/path" })
-	})
-})
-
-describe("buildManifestWithGithubDeps", () => {
-	it("creates manifest with string shorthand deps", () => {
-		const manifest = buildManifestWithGithubDeps({
-			sensei: "sensei-marketplace/sensei",
-			superpowers: "superpowers-marketplace/superpowers",
-		})
-
-		expect(manifest.dependencies).toEqual({
-			sensei: { gh: "sensei-marketplace/sensei" },
-			superpowers: { gh: "superpowers-marketplace/superpowers" },
-		})
-	})
-
-	it("creates manifest with structured deps", () => {
-		const manifest = buildManifestWithGithubDeps({
-			branched: { branch: "main", gh: "org/repo" },
-			tagged: { gh: "org/repo", tag: "v1.0.0" },
-		})
-
-		expect(manifest.dependencies).toEqual({
-			branched: { branch: "main", gh: "org/repo" },
-			tagged: { gh: "org/repo", tag: "v1.0.0" },
-		})
-	})
-})
-
-describe("buildManifestWithLocalDeps", () => {
-	it("creates manifest with local path deps", () => {
-		const manifest = buildManifestWithLocalDeps({
-			local1: "/absolute/path",
-			local2: "../relative/path",
-		})
-
-		expect(manifest.dependencies).toEqual({
-			local1: { path: "/absolute/path" },
-			local2: { path: "../relative/path" },
-		})
-	})
-})
-
-describe("buildMultiAgentManifest", () => {
-	it("creates manifest with multiple agents enabled", () => {
-		const manifest = buildMultiAgentManifest(["claude-code", "codex", "opencode"])
-
-		expect(manifest.agents).toEqual({
-			"claude-code": true,
-			codex: true,
-			opencode: true,
 		})
 	})
 })

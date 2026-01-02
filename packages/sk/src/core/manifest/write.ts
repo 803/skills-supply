@@ -40,7 +40,7 @@ export function serializeManifest(
 	if (manifest.exports) {
 		output.exports = {
 			auto_discover: {
-				skills: manifest.exports.autoDiscover.skills,
+				skills: manifest.exports.auto_discover.skills,
 			},
 		}
 	}

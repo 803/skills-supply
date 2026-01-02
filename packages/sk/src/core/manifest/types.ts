@@ -127,11 +127,11 @@ export interface ManifestExportsAutoDiscover {
 }
 
 export interface ManifestExports {
-	autoDiscover: ManifestExportsAutoDiscover
+	auto_discover: ManifestExportsAutoDiscover
 }
 
 export interface ValidatedManifestExports {
-	readonly autoDiscover: {
+	readonly auto_discover: {
 		readonly skills: NonEmptyString | false
 	}
 }
@@ -140,40 +140,12 @@ export interface ValidatedManifestExports {
 // MANIFEST TYPES
 // =============================================================================
 
-/**
- * Raw manifest - as parsed from TOML, before validation.
- * Used internally during parsing.
- */
-export interface RawManifest {
-	package?: PackageMetadata
-	agents: Record<string, boolean>
-	dependencies: Record<string, DependencyDeclaration>
-	exports?: ManifestExports
-	sourcePath: string
-}
-
-/**
- * Validated manifest - all fields coerced to branded types.
- * This is what consumers should use.
- */
 export interface Manifest {
 	readonly package?: ValidatedPackageMetadata
 	readonly agents: ReadonlyMap<AgentId, boolean>
 	readonly dependencies: ReadonlyMap<Alias, ValidatedDependency>
 	readonly exports?: ValidatedManifestExports
 	readonly origin: ManifestOrigin
-}
-
-/**
- * Legacy manifest type - for gradual migration.
- * @deprecated Use Manifest instead
- */
-export interface LegacyManifest {
-	package?: PackageMetadata
-	agents: Record<string, boolean>
-	dependencies: Record<string, DependencyDeclaration>
-	exports?: ManifestExports
-	sourcePath: string
 }
 
 // =============================================================================
@@ -200,14 +172,6 @@ export interface ManifestParseError {
  */
 export type ManifestParseResult =
 	| { ok: true; value: Manifest }
-	| { ok: false; error: ManifestParseError }
-
-/**
- * Legacy parse result for gradual migration.
- * @deprecated Use ManifestParseResult instead
- */
-export type LegacyManifestParseResult =
-	| { ok: true; value: LegacyManifest }
 	| { ok: false; error: ManifestParseError }
 
 // =============================================================================

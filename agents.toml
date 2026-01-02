@@ -1,9 +1,0 @@
-[agents]
-claude-code = true
-codex = true
-opencode = false
-
-[dependencies.superpowers]
-marketplace = "obra/superpowers-marketplace"
-plugin = "superpowers"
-type = "claude-plugin"

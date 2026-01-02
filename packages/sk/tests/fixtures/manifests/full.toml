@@ -35,5 +35,5 @@ local-skills = { path = "../local-skills" }
 # Claude plugin
 claude-plugin-example = { type = "claude-plugin", plugin = "example", marketplace = "https://github.com/example/marketplace" }
 
-[exports.autoDiscover]
+[exports.auto_discover]
 skills = "skills"

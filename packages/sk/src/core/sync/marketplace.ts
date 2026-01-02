@@ -193,9 +193,11 @@ async function installClaudePlugins(
 		}
 
 		if (!addedMarketplaces.has(plugin.marketplace)) {
-			const addResult = await runClaudeCommand(
-				`/plugin marketplace add ${plugin.marketplace}`,
-			)
+			const addResult = await runClaudePluginCommand([
+				"marketplace",
+				"add",
+				plugin.marketplace,
+			])
 			if (!addResult.ok) {
 				return addResult
 			}
@@ -207,7 +209,7 @@ async function installClaudePlugins(
 			continue
 		}
 
-		const installResult = await runClaudeCommand(`/plugin install ${installKey}`)
+		const installResult = await runClaudePluginCommand(["install", installKey])
 		if (!installResult.ok) {
 			return installResult
 		}
@@ -732,13 +734,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-async function runClaudeCommand(command: string): Promise<SyncResult<void>> {
+async function runClaudePluginCommand(args: string[]): Promise<SyncResult<void>> {
 	try {
-		await execFileAsync("claude", ["--command", command], {
+		await execFileAsync("claude", ["plugin", ...args], {
 			encoding: "utf8",
 		})
 		return { ok: true, value: undefined }
 	} catch (error) {
-		return failSync("install", error, `Failed to run Claude command: ${command}`)
+		const message = error instanceof Error ? error.message : String(error)
+		// Treat "already installed" as success for marketplace add
+		if (message.includes("already installed")) {
+			return { ok: true, value: undefined }
+		}
+		return failSync(
+			"install",
+			error,
+			`Failed to run: claude plugin ${args.join(" ")}`,
+		)
 	}
 }
