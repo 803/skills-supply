@@ -7,7 +7,6 @@ import {
 import { detectInstalledAgents } from "@/src/core/agents/registry"
 import { saveManifest } from "@/src/core/manifest/fs"
 import { getAgent, setAgent } from "@/src/core/manifest/transform"
-import type { AgentId } from "@/src/core/types/branded"
 import { formatError } from "@/src/utils/errors"
 
 export async function agentInteractive(): Promise<void> {
@@ -68,9 +67,8 @@ export async function agentInteractive(): Promise<void> {
 		let changed = false
 		for (const agent of installed) {
 			const desired = selectedSet.has(agent.id)
-			const agentId = agent.id as AgentId
-			if (getAgent(updatedManifest, agentId) !== desired) {
-				updatedManifest = setAgent(updatedManifest, agentId, desired)
+			if (getAgent(updatedManifest, agent.id) !== desired) {
+				updatedManifest = setAgent(updatedManifest, agent.id, desired)
 				changed = true
 			}
 		}

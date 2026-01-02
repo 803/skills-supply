@@ -68,7 +68,126 @@ export async function isFile(path: string): Promise<boolean> {
  */
 export interface FixtureSkill {
 	name: string
-	content: string
+	content?: string
+}
+
+/**
+ * Options for setting up a plugin-style fixture package.
+ */
+export interface FixturePluginOptions {
+	/** Plugin name (defaults to directory basename) */
+	name?: string
+	/** Plugin version (defaults to "1.0.0") */
+	version?: string
+	/** Skills to include in the package */
+	skills?: FixtureSkill[]
+	/** Whether to include a marketplace.json file (defaults to false) */
+	includeMarketplace?: boolean
+	/** Marketplace name (defaults to "dev-marketplace") */
+	marketplaceName?: string
+}
+
+/**
+ * Creates a plugin-style package structure for testing.
+ * This creates a `.claude-plugin/plugin.json` and optionally a `marketplace.json`.
+ *
+ * @example
+ * await setupFixturePlugin(join(dir, 'my-plugin'), {
+ *   skills: [{ name: 'greeting' }],
+ *   includeMarketplace: true, // tests the dual plugin+marketplace case
+ * })
+ */
+export async function setupFixturePlugin(
+	pkgDir: string,
+	options: FixturePluginOptions = {},
+): Promise<void> {
+	const {
+		name = pkgDir.split("/").pop() ?? "test-plugin",
+		version = "1.0.0",
+		skills = [],
+		includeMarketplace = false,
+		marketplaceName = "dev-marketplace",
+	} = options
+
+	// Create package and .claude-plugin directories
+	const pluginMetaDir = join(pkgDir, ".claude-plugin")
+	await mkdir(pluginMetaDir, { recursive: true })
+
+	// Create plugin.json
+	const pluginJson = {
+		description: `Test plugin: ${name}`,
+		name,
+		version,
+	}
+	await writeFile(
+		join(pluginMetaDir, "plugin.json"),
+		JSON.stringify(pluginJson, null, 2),
+	)
+
+	// Optionally create marketplace.json (for testing dual plugin+marketplace packages)
+	if (includeMarketplace) {
+		const marketplaceJson = {
+			name: marketplaceName,
+			plugins: [{ name, source: "./", version }],
+		}
+		await writeFile(
+			join(pluginMetaDir, "marketplace.json"),
+			JSON.stringify(marketplaceJson, null, 2),
+		)
+	}
+
+	// Create skills directory with skill subdirectories
+	if (skills.length > 0) {
+		const skillsPath = join(pkgDir, "skills")
+		await mkdir(skillsPath, { recursive: true })
+
+		for (const skill of skills) {
+			const skillDirPath = join(skillsPath, skill.name)
+			await mkdir(skillDirPath, { recursive: true })
+
+			const skillContent = `---
+name: ${skill.name}
+---
+
+${skill.content ?? `# ${skill.name}\n\nA test skill.`}
+`
+			await writeFile(join(skillDirPath, "SKILL.md"), skillContent)
+		}
+	}
+}
+
+/**
+ * Creates a marketplace-only fixture (no plugin.json).
+ *
+ * @example
+ * await setupFixtureMarketplace(join(dir, 'my-marketplace'), {
+ *   plugins: [{ name: 'foo', source: 'github:org/repo' }],
+ * })
+ */
+export interface FixtureMarketplaceOptions {
+	/** Marketplace name */
+	name?: string
+	/** Plugins listed in the marketplace */
+	plugins?: Array<{ name: string; source: string }>
+}
+
+export async function setupFixtureMarketplace(
+	pkgDir: string,
+	options: FixtureMarketplaceOptions = {},
+): Promise<void> {
+	const { name = "test-marketplace", plugins = [] } = options
+
+	const pluginMetaDir = join(pkgDir, ".claude-plugin")
+	await mkdir(pluginMetaDir, { recursive: true })
+
+	const marketplaceJson = {
+		name,
+		plugins: plugins.map((p) => ({ name: p.name, source: p.source })),
+	}
+	await writeFile(
+		join(pluginMetaDir, "marketplace.json"),
+		JSON.stringify(marketplaceJson, null, 2),
+	)
 }
 
 /**

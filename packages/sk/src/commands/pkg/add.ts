@@ -12,6 +12,7 @@ import {
 	isAutoDetectUrl,
 	normalizeAddOptions,
 } from "@/src/commands/pkg/spec"
+import { syncWithSelection } from "@/src/commands/sync"
 import { coerceDependency } from "@/src/core/manifest/coerce"
 import { saveManifest } from "@/src/core/manifest/fs"
 import { addDependency, getDependency } from "@/src/core/manifest/transform"
@@ -24,6 +25,7 @@ export interface PkgAddCommandOptions extends AddOptions {
 	global: boolean
 	init: boolean
 	nonInteractive: boolean
+	sync: boolean
 }
 
 export async function pkgAdd(
@@ -81,6 +83,7 @@ export async function pkgAdd(
 
 		const current = getDependency(selection.manifest, alias)
 		const changed = !areDependenciesEqual(current, coerced.value)
+		let manifestForSync = selection.manifest
 
 		if (changed) {
 			const updated = addDependency(selection.manifest, alias, coerced.value)
@@ -89,6 +92,7 @@ export async function pkgAdd(
 				selection.manifestPath,
 				selection.serializeOptions,
 			)
+			manifestForSync = updated
 		}
 
 		consola.success("Dependency settings updated.")
@@ -99,13 +103,22 @@ export async function pkgAdd(
 		if (!changed) {
 			consola.info(`Dependency already present: ${pkgSpec.alias}.`)
 			consola.info(`Manifest: ${selection.manifestPath} (no changes).`)
-			consola.success("Done.")
-			return
+		} else {
+			consola.success(`Added dependency: ${pkgSpec.alias}.`)
+			consola.info(`Manifest: ${selection.manifestPath} (updated).`)
 		}
 
-		consola.success(`Added dependency: ${pkgSpec.alias}.`)
-		consola.info(`Manifest: ${selection.manifestPath} (updated).`)
-		consola.success("Done.")
+		let syncOk = true
+		if (options.sync) {
+			syncOk = await syncWithSelection(
+				{ ...selection, manifest: manifestForSync },
+				{ dryRun: false, nonInteractive: options.nonInteractive },
+			)
+		}
+
+		if (syncOk) {
+			consola.success("Done.")
+		}
 	} catch (error) {
 		process.exitCode = 1
 		consola.error(formatError(error))

@@ -23,6 +23,7 @@ import type {
 } from "@/src/core/types/branded"
 import {
 	coerceAbsolutePath,
+	coerceAgentId,
 	coerceAlias,
 	coerceGithubRef,
 	coerceGitUrl,
@@ -62,7 +63,16 @@ export function applyBrandedManifest(
 ): ManifestParseResult {
 	const agents = new Map<AgentId, boolean>()
 	for (const [id, enabled] of parsed.agents) {
-		agents.set(id as AgentId, enabled)
+		const agentId = coerceAgentId(id)
+		if (!agentId) {
+			return failure(
+				"coercion_failed",
+				`Unknown agent: ${id}. Valid agents: claude-code, codex, opencode.`,
+				sourcePath,
+				id,
+			)
+		}
+		agents.set(agentId, enabled)
 	}
 
 	const dependencies = new Map<Alias, ValidatedDependency>()

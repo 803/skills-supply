@@ -5,6 +5,7 @@ import {
 	resolveLocalManifest,
 	warnIfSubdirectory,
 } from "@/src/commands/manifest-selection"
+import { syncWithSelection } from "@/src/commands/sync"
 import { saveManifest } from "@/src/core/manifest/fs"
 import { hasDependency, removeDependency } from "@/src/core/manifest/transform"
 import { coerceAlias } from "@/src/core/types/coerce"
@@ -12,7 +13,7 @@ import { formatError } from "@/src/utils/errors"
 
 export async function pkgRemove(
 	alias: string,
-	options: { global: boolean; nonInteractive: boolean },
+	options: { global: boolean; nonInteractive: boolean; sync: boolean },
 ): Promise<void> {
 	consola.info("sk pkg remove")
 
@@ -62,7 +63,18 @@ export async function pkgRemove(
 		consola.success("Dependency settings updated.")
 		consola.success(`Removed dependency: ${trimmed}.`)
 		consola.info(`Manifest: ${selection.manifestPath} (updated).`)
-		consola.success("Done.")
+
+		let syncOk = true
+		if (options.sync) {
+			syncOk = await syncWithSelection(
+				{ ...selection, manifest: updated },
+				{ dryRun: false, nonInteractive: options.nonInteractive },
+			)
+		}
+
+		if (syncOk) {
+			consola.success("Done.")
+		}
 	} catch (error) {
 		process.exitCode = 1
 		consola.error(formatError(error))

@@ -235,7 +235,7 @@ describe("coerceDependency - git", () => {
 
 		expect(result).toBeOk()
 		if (result.ok && result.value.type === "git") {
-			expect(result.value.url).toBe("https://github.com/owner/repo")
+			expect(result.value.url).toBe("git@github.com:owner/repo")
 		}
 	})
 
@@ -396,9 +396,7 @@ describe("coerceDependency - claude-plugin", () => {
 
 		expect(result).toBeOk()
 		if (result.ok && result.value.type === "claude-plugin") {
-			expect(result.value.marketplace).toBe(
-				"https://github.com/org/sensei-marketplace",
-			)
+			expect(result.value.marketplace).toBe("git@github.com:org/sensei-marketplace")
 		}
 	})
 

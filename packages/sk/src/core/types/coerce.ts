@@ -11,12 +11,34 @@
 import path from "node:path"
 import type {
 	AbsolutePath,
+	AgentId,
 	Alias,
 	GithubRef,
 	GitRef,
+	GitUrl,
 	NonEmptyString,
-	NormalizedGitUrl,
 } from "@/src/core/types/branded"
+
+// === AGENT ID ===
+
+const VALID_AGENT_IDS: ReadonlySet<string> = new Set(["claude-code", "codex", "opencode"])
+
+/**
+ * Coerce a string to AgentId.
+ * Must be a known agent identifier.
+ */
+export function coerceAgentId(s: string): AgentId | null {
+	const trimmed = s.trim()
+	if (!VALID_AGENT_IDS.has(trimmed)) return null
+	return trimmed as AgentId
+}
+
+/**
+ * Type guard for AgentId.
+ */
+export function isAgentId(s: string): s is AgentId {
+	return coerceAgentId(s) !== null
+}
 
 // === NON-EMPTY STRING ===
 
@@ -102,19 +124,17 @@ export function isAbsolutePath(s: string): s is AbsolutePath {
 	return path.isAbsolute(s.trim())
 }
 
-// === NORMALIZED GIT URL ===
+// === GIT URL ===
 
 // Patterns for git URL normalization
 const SSH_GIT_PATTERN = /^git@([^:]+):(.+?)(?:\.git)?$/
-const HTTPS_GIT_PATTERN = /^https?:\/\/([^/]+)\/(.+?)(?:\.git)?$/
+const HTTP_GIT_PATTERN = /^(https?):\/\/([^/]+)\/(.+?)(?:\.git)?$/
 
 /**
- * Coerce a string to NormalizedGitUrl.
- * Converts git@host:path to https://host/path
- * Removes trailing .git
- * Always returns https:// URLs
+ * Coerce a string to GitUrl.
+ * Preserves SSH and HTTP(S) scheme, normalizes trailing .git.
  */
-export function coerceGitUrl(s: string): NormalizedGitUrl | null {
+export function coerceGitUrl(s: string): GitUrl | null {
 	const trimmed = s.trim()
 	if (trimmed.length === 0) return null
 
@@ -122,23 +142,23 @@ export function coerceGitUrl(s: string): NormalizedGitUrl | null {
 	const sshMatch = SSH_GIT_PATTERN.exec(trimmed)
 	if (sshMatch) {
 		const [, host, repoPath] = sshMatch
-		return `https://${host}/${repoPath}` as NormalizedGitUrl
+		return `git@${host}:${repoPath}` as GitUrl
 	}
 
-	// Try HTTPS format: https://github.com/owner/repo.git
-	const httpsMatch = HTTPS_GIT_PATTERN.exec(trimmed)
-	if (httpsMatch) {
-		const [, host, repoPath] = httpsMatch
-		return `https://${host}/${repoPath}` as NormalizedGitUrl
+	// Try HTTP(S) format: https://github.com/owner/repo.git
+	const httpMatch = HTTP_GIT_PATTERN.exec(trimmed)
+	if (httpMatch) {
+		const [, scheme, host, repoPath] = httpMatch
+		return `${scheme}://${host}/${repoPath}` as GitUrl
 	}
 
 	return null
 }
 
 /**
- * Type guard for NormalizedGitUrl.
+ * Type guard for GitUrl.
  */
-export function isNormalizedGitUrl(s: string): s is NormalizedGitUrl {
+export function isGitUrl(s: string): s is GitUrl {
 	return coerceGitUrl(s) !== null
 }
 
@@ -284,16 +304,13 @@ export function coerceAbsolutePathWithError(
 	return { ok: true, value: result }
 }
 
-export function coerceGitUrlWithError(
-	s: string,
-	field: string,
-): CoercionResult<NormalizedGitUrl> {
+export function coerceGitUrlWithError(s: string, field: string): CoercionResult<GitUrl> {
 	const result = coerceGitUrl(s)
 	if (result === null) {
 		return {
 			error: {
 				field,
-				reason: "must be a valid git URL (git@host:path or https://host/path format)",
+				reason: "must be a valid git URL (git@host:path or http(s)://host/path format)",
 				value: s,
 			},
 			ok: false,

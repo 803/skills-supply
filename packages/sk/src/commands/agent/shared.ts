@@ -8,7 +8,6 @@ import { getAgentById } from "@/src/core/agents/registry"
 import type { AgentDefinition } from "@/src/core/agents/types"
 import { saveManifest } from "@/src/core/manifest/fs"
 import { getAgent, setAgent } from "@/src/core/manifest/transform"
-import type { AgentId } from "@/src/core/types/branded"
 import { formatError } from "@/src/utils/errors"
 
 type AgentAction = "enable" | "disable"
@@ -87,11 +86,10 @@ async function updateAgentManifest(
 			})
 	const { manifest, manifestPath } = selection
 
-	const validatedAgentId = lookup.value.id as AgentId
-	const currentValue = getAgent(manifest, validatedAgentId)
+	const currentValue = getAgent(manifest, lookup.value.id)
 	const changed = currentValue !== desired
 	if (changed) {
-		const updated = setAgent(manifest, validatedAgentId, desired)
+		const updated = setAgent(manifest, lookup.value.id, desired)
 		await saveManifest(updated, manifestPath, selection.serializeOptions)
 	}
 

@@ -12,8 +12,8 @@ import type {
 	AbsolutePath,
 	Alias,
 	GithubRef,
+	GitUrl,
 	NonEmptyString,
-	NormalizedGitUrl,
 } from "@/src/core/types/branded"
 
 /** Cast string to NonEmptyString (test-only, no validation) */
@@ -28,5 +28,5 @@ export const alias = (s: string): Alias => s as Alias
 /** Cast string to GithubRef (test-only, no validation) */
 export const ghRef = (s: string): GithubRef => s as GithubRef
 
-/** Cast string to NormalizedGitUrl (test-only, no validation) */
-export const gitUrl = (s: string): NormalizedGitUrl => s as NormalizedGitUrl
+/** Cast string to GitUrl (test-only, no validation) */
+export const gitUrl = (s: string): GitUrl => s as GitUrl

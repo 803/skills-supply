@@ -3,8 +3,8 @@ import type {
 	FetchStrategy,
 	GithubRef,
 	GitRef,
+	GitUrl,
 	NonEmptyString,
-	NormalizedGitUrl,
 	PackageOrigin,
 } from "@/src/core/types/branded"
 
@@ -44,7 +44,7 @@ export interface GithubPackage extends CanonicalPackageBase {
 
 export interface GitPackage extends CanonicalPackageBase {
 	readonly type: "git"
-	readonly url: NormalizedGitUrl
+	readonly url: GitUrl
 	readonly ref?: GitRef
 	readonly path?: NonEmptyString
 }
@@ -57,7 +57,7 @@ export interface LocalPackage extends CanonicalPackageBase {
 export interface ClaudePluginPackage extends CanonicalPackageBase {
 	readonly type: "claude-plugin"
 	readonly plugin: NonEmptyString
-	readonly marketplace: NormalizedGitUrl | GithubRef
+	readonly marketplace: GitUrl | GithubRef
 }
 
 export type CanonicalPackage =

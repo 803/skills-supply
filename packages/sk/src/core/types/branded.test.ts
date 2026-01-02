@@ -23,8 +23,8 @@ import {
 	isAbsolutePath,
 	isAlias,
 	isGithubRef,
+	isGitUrl,
 	isNonEmpty,
-	isNormalizedGitUrl,
 } from "@/src/core/types/coerce"
 
 // ============================================================================
@@ -289,33 +289,33 @@ describe("isAbsolutePath", () => {
 })
 
 // ============================================================================
-// NormalizedGitUrl
+// GitUrl
 // ============================================================================
 
 describe("coerceGitUrl", () => {
 	describe("SSH format", () => {
-		it("converts git@github.com:owner/repo.git", () => {
+		it("normalizes git@github.com:owner/repo.git", () => {
 			const result = coerceGitUrl("git@github.com:owner/repo.git")
-			expect(result).toBe("https://github.com/owner/repo")
+			expect(result).toBe("git@github.com:owner/repo")
 		})
 
-		it("converts git@github.com:owner/repo without .git", () => {
+		it("preserves git@github.com:owner/repo without .git", () => {
 			const result = coerceGitUrl("git@github.com:owner/repo")
-			expect(result).toBe("https://github.com/owner/repo")
+			expect(result).toBe("git@github.com:owner/repo")
 		})
 
 		it("handles other git hosts", () => {
 			const result = coerceGitUrl("git@gitlab.com:org/project.git")
-			expect(result).toBe("https://gitlab.com/org/project")
+			expect(result).toBe("git@gitlab.com:org/project")
 		})
 
 		it("handles nested paths", () => {
 			const result = coerceGitUrl("git@github.com:org/nested/repo.git")
-			expect(result).toBe("https://github.com/org/nested/repo")
+			expect(result).toBe("git@github.com:org/nested/repo")
 		})
 	})
 
-	describe("HTTPS format", () => {
+	describe("HTTP(S) format", () => {
 		it("normalizes https with .git suffix", () => {
 			const result = coerceGitUrl("https://github.com/owner/repo.git")
 			expect(result).toBe("https://github.com/owner/repo")
@@ -326,9 +326,9 @@ describe("coerceGitUrl", () => {
 			expect(result).toBe("https://github.com/owner/repo")
 		})
 
-		it("converts http to https", () => {
+		it("preserves http scheme", () => {
 			const result = coerceGitUrl("http://github.com/owner/repo")
-			expect(result).toBe("https://github.com/owner/repo")
+			expect(result).toBe("http://github.com/owner/repo")
 		})
 
 		it("handles nested paths", () => {
@@ -340,7 +340,7 @@ describe("coerceGitUrl", () => {
 	describe("edge cases", () => {
 		it("trims whitespace", () => {
 			const result = coerceGitUrl("  git@github.com:owner/repo.git  ")
-			expect(result).toBe("https://github.com/owner/repo")
+			expect(result).toBe("git@github.com:owner/repo")
 		})
 
 		it("handles repos with dots in name", () => {
@@ -350,7 +350,7 @@ describe("coerceGitUrl", () => {
 
 		it("handles repos with hyphens", () => {
 			const result = coerceGitUrl("git@github.com:my-org/my-repo.git")
-			expect(result).toBe("https://github.com/my-org/my-repo")
+			expect(result).toBe("git@github.com:my-org/my-repo")
 		})
 	})
 
@@ -396,17 +396,17 @@ describe("coerceGitUrlWithError", () => {
 	})
 })
 
-describe("isNormalizedGitUrl", () => {
+describe("isGitUrl", () => {
 	it("returns true for SSH format", () => {
-		expect(isNormalizedGitUrl("git@github.com:owner/repo")).toBe(true)
+		expect(isGitUrl("git@github.com:owner/repo")).toBe(true)
 	})
 
 	it("returns true for HTTPS format", () => {
-		expect(isNormalizedGitUrl("https://github.com/owner/repo")).toBe(true)
+		expect(isGitUrl("https://github.com/owner/repo")).toBe(true)
 	})
 
 	it("returns false for invalid format", () => {
-		expect(isNormalizedGitUrl("owner/repo")).toBe(false)
+		expect(isGitUrl("owner/repo")).toBe(false)
 	})
 })
 

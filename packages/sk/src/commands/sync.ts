@@ -26,8 +26,6 @@ export async function syncCommand(options: {
 	global: boolean
 	nonInteractive: boolean
 }): Promise<void> {
-	consola.info("sk sync")
-
 	try {
 		const selection = options.global
 			? await resolveGlobalManifest({
@@ -48,17 +46,33 @@ export async function syncCommand(options: {
 					promptToCreate: true,
 				})
 
-		if (!options.global) {
+		await syncWithSelection(selection, {
+			dryRun: options.dryRun,
+			nonInteractive: options.nonInteractive,
+		})
+	} catch (error) {
+		consola.error(formatError(error))
+		consola.error("Sync failed.")
+		process.exitCode = 1
+	}
+}
+
+export async function syncWithSelection(
+	selection: ManifestSelection,
+	options: { dryRun: boolean; nonInteractive: boolean },
+): Promise<boolean> {
+	consola.info("sk sync")
+
+	try {
+		if (selection.scope === "local") {
 			warnIfSubdirectory(selection)
 		}
 
 		const agentResult = await resolveSyncAgents(selection, options.nonInteractive)
 		if (!agentResult.ok) {
-			if (agentResult.noAgentsConfigured) {
-				consola.info(
-					"No agents configured. Run interactively or add [agents] section.",
-				)
-				return
+			if (agentResult.noAgentsEnabled) {
+				consola.warn(agentResult.message)
+				return true
 			}
 			throw new Error(agentResult.message)
 		}
@@ -74,13 +88,13 @@ export async function syncCommand(options: {
 			consola.error(`[${result.error.stage}] ${result.error.message}`)
 			consola.error("Sync failed.")
 			process.exitCode = 1
-			return
+			return false
 		}
 
 		if (result.value.noOpReason === "no-dependencies") {
 			consola.success(options.dryRun ? "Plan complete." : "Sync complete.")
 			consola.info("No dependencies to sync.")
-			return
+			return true
 		}
 
 		consola.success(options.dryRun ? "Plan complete." : "Sync complete.")
@@ -103,10 +117,12 @@ export async function syncCommand(options: {
 		}
 
 		consola.success("Done.")
+		return true
 	} catch (error) {
 		consola.error(formatError(error))
 		consola.error("Sync failed.")
 		process.exitCode = 1
+		return false
 	}
 }
 
@@ -119,8 +135,12 @@ type SyncAgentsResult =
 	| {
 			ok: false
 			message: string
-			noAgentsConfigured: boolean
+			noAgentsEnabled: boolean
 	  }
+
+const NO_AGENTS_CONFIGURED = "No agents configured. Use `sk agent add` to enable agents."
+const NO_AGENTS_ENABLED =
+	"All agents are disabled. Use `sk agent add` or enable agents in the [agents] section."
 
 async function resolveSyncAgents(
 	selection: ManifestSelection,
@@ -130,8 +150,8 @@ async function resolveSyncAgents(
 	if (manifest.agents.size === 0) {
 		if (nonInteractive) {
 			return {
-				message: "No agents configured.",
-				noAgentsConfigured: true,
+				message: NO_AGENTS_CONFIGURED,
+				noAgentsEnabled: true,
 				ok: false,
 			}
 		}
@@ -140,7 +160,7 @@ async function resolveSyncAgents(
 		if (!detected.ok) {
 			return {
 				message: detected.error.message,
-				noAgentsConfigured: false,
+				noAgentsEnabled: false,
 				ok: false,
 			}
 		}
@@ -148,29 +168,41 @@ async function resolveSyncAgents(
 		if (detected.value.length === 0) {
 			return {
 				message: "No installed agents detected.",
-				noAgentsConfigured: false,
+				noAgentsEnabled: false,
 				ok: false,
 			}
 		}
 
-		const selected = await multiselect({
-			message: "Select enabled agents",
-			options: detected.value.map((agent) => ({
+		const agentOptions: { label: string; value: AgentId }[] = detected.value.map(
+			(agent) => ({
 				label: `${agent.displayName} (${agent.id})`,
 				value: agent.id,
-			})),
+			}),
+		)
+
+		const selected = await multiselect<{ label: string; value: AgentId }[], AgentId>({
+			initialValues: [],
+			message: "Select enabled agents",
+			options: agentOptions,
+			required: true,
 		})
 
 		if (isCancel(selected)) {
-			return { message: "Canceled.", noAgentsConfigured: false, ok: false }
+			return { message: "Canceled.", noAgentsEnabled: false, ok: false }
 		}
 
 		const selectedSet = new Set(selected)
+		if (selectedSet.size === 0) {
+			return {
+				message: "Select at least one agent to sync.",
+				noAgentsEnabled: false,
+				ok: false,
+			}
+		}
+
 		let updated = manifest
-		for (const agent of detected.value) {
-			const desired = selectedSet.has(agent.id)
-			const agentId = agent.id as AgentId
-			updated = setAgent(updated, agentId, desired)
+		for (const agentId of selectedSet) {
+			updated = setAgent(updated, agentId, true)
 		}
 
 		await saveManifest(updated, selection.manifestPath, selection.serializeOptions)
@@ -183,8 +215,8 @@ async function resolveSyncAgents(
 
 	if (enabled.length === 0) {
 		return {
-			message: "No agents are enabled in the manifest.",
-			noAgentsConfigured: false,
+			message: NO_AGENTS_ENABLED,
+			noAgentsEnabled: true,
 			ok: false,
 		}
 	}
@@ -199,7 +231,7 @@ async function resolveSyncAgents(
 		if (!lookup.ok) {
 			return {
 				message: lookup.error.message,
-				noAgentsConfigured: false,
+				noAgentsEnabled: false,
 				ok: false,
 			}
 		}

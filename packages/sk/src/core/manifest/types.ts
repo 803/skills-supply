@@ -4,9 +4,9 @@ import type {
 	Alias,
 	GithubRef,
 	GitRef,
+	GitUrl,
 	ManifestOrigin,
 	NonEmptyString,
-	NormalizedGitUrl,
 } from "@/src/core/types/branded"
 
 // =============================================================================
@@ -75,7 +75,7 @@ export interface ValidatedGithubDependency {
 
 export interface ValidatedGitDependency {
 	readonly type: "git"
-	readonly url: NormalizedGitUrl
+	readonly url: GitUrl
 	readonly ref?: GitRef
 	readonly path?: NonEmptyString
 }
@@ -88,7 +88,7 @@ export interface ValidatedLocalDependency {
 export interface ValidatedClaudePluginDependency {
 	readonly type: "claude-plugin"
 	readonly plugin: NonEmptyString
-	readonly marketplace: NormalizedGitUrl | GithubRef
+	readonly marketplace: GitUrl | GithubRef
 }
 
 export type ValidatedDependency =

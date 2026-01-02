@@ -126,6 +126,46 @@ export async function detectPackageContents(
 	}
 
 	if (pluginDirExists.value) {
+		// Check for plugin.json FIRST - a package with plugin.json is a plugin
+		// (even if it also has marketplace.json for dev purposes)
+		const pluginPath = path.join(pluginDir, PLUGIN_FILENAME)
+		const pluginFileExists = await fileExists(pluginPath, packagePath)
+		if (!pluginFileExists.ok) {
+			return pluginFileExists
+		}
+
+		if (pluginFileExists.value) {
+			// Discover skills in plugin's skills directory
+			const skillsRoot = coerceAbsolutePath(PLUGIN_SKILLS_DIR, packagePath)
+			if (!skillsRoot) {
+				return failure(
+					"invalid_package",
+					`Unable to resolve ${PLUGIN_SKILLS_DIR} under ${packagePath}.`,
+					packagePath,
+				)
+			}
+			const skillPaths = await discoverSkillPaths(skillsRoot, packagePath)
+			if (!skillPaths.ok) {
+				// Plugin might not have skills dir - that's okay
+				return {
+					ok: true,
+					value: {
+						method: "plugin",
+						skillPaths: [],
+					},
+				}
+			}
+
+			return {
+				ok: true,
+				value: {
+					method: "plugin",
+					skillPaths: skillPaths.value,
+				},
+			}
+		}
+
+		// No plugin.json - check for marketplace.json
 		const marketplacePath = path.join(pluginDir, MARKETPLACE_FILENAME)
 		const marketplaceExists = await fileExists(marketplacePath, packagePath)
 		if (!marketplaceExists.ok) {
@@ -142,48 +182,12 @@ export async function detectPackageContents(
 			}
 		}
 
-		const pluginPath = path.join(pluginDir, PLUGIN_FILENAME)
-		const pluginFileExists = await fileExists(pluginPath, packagePath)
-		if (!pluginFileExists.ok) {
-			return pluginFileExists
-		}
-
-		if (!pluginFileExists.value) {
-			return failure(
-				"invalid_package",
-				`Found ${PLUGIN_DIR} without ${PLUGIN_FILENAME}.`,
-				packagePath,
-			)
-		}
-
-		// Discover skills in plugin's skills directory
-		const skillsRoot = coerceAbsolutePath(PLUGIN_SKILLS_DIR, packagePath)
-		if (!skillsRoot) {
-			return failure(
-				"invalid_package",
-				`Unable to resolve ${PLUGIN_SKILLS_DIR} under ${packagePath}.`,
-				packagePath,
-			)
-		}
-		const skillPaths = await discoverSkillPaths(skillsRoot, packagePath)
-		if (!skillPaths.ok) {
-			// Plugin might not have skills dir - that's okay
-			return {
-				ok: true,
-				value: {
-					method: "plugin",
-					skillPaths: [],
-				},
-			}
-		}
-
-		return {
-			ok: true,
-			value: {
-				method: "plugin",
-				skillPaths: skillPaths.value,
-			},
-		}
+		// Has .claude-plugin dir but neither plugin.json nor marketplace.json
+		return failure(
+			"invalid_package",
+			`Found ${PLUGIN_DIR} without ${PLUGIN_FILENAME} or ${MARKETPLACE_FILENAME}.`,
+			packagePath,
+		)
 	}
 
 	// Check for subdirectory skills (dirs containing SKILL.md)

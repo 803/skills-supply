@@ -5,7 +5,7 @@
 	},
 	"dependencies": {
 		"@clack/prompts": "^0.7.0",
-		"@skills-supply/agents-toml": "file:../../../agents-toml",
+		"@skills-supply/agents-toml": "latest",
 		"commander": "^14.0.2",
 		"consola": "^3.4.2",
 		"open": "^11.0.0",

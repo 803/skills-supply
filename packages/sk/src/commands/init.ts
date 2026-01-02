@@ -97,7 +97,6 @@ type AgentSelectionResult =
 	| {
 			canceled: false
 			selected: Set<AgentId>
-			unselected: Set<AgentId>
 			warning?: string
 	  }
 
@@ -110,7 +109,6 @@ async function resolveAgentSelection(
 		return {
 			canceled: false,
 			selected: parsed,
-			unselected: new Set<AgentId>(),
 		}
 	}
 
@@ -118,7 +116,6 @@ async function resolveAgentSelection(
 		return {
 			canceled: false,
 			selected: new Set<AgentId>(),
-			unselected: new Set<AgentId>(),
 		}
 	}
 
@@ -131,18 +128,22 @@ async function resolveAgentSelection(
 		return {
 			canceled: false,
 			selected: new Set<AgentId>(),
-			unselected: new Set<AgentId>(),
 			warning:
 				"No installed agents detected; created manifest with empty [agents].",
 		}
 	}
 
-	const selected = await multiselect({
-		message: "Select enabled agents",
-		options: detected.value.map((agent) => ({
+	const agentOptions: { label: string; value: AgentId }[] = detected.value.map(
+		(agent) => ({
 			label: `${agent.displayName} (${agent.id})`,
 			value: agent.id,
-		})),
+		}),
+	)
+
+	const selected = await multiselect<{ label: string; value: AgentId }[], AgentId>({
+		initialValues: [],
+		message: "Select enabled agents",
+		options: agentOptions,
 		required: false,
 	})
 
@@ -150,15 +151,8 @@ async function resolveAgentSelection(
 		return { canceled: true }
 	}
 
-	const selectedSet = new Set(selected as AgentId[])
-	const unselectedSet = new Set<AgentId>()
-	for (const agent of detected.value) {
-		if (!selectedSet.has(agent.id)) {
-			unselectedSet.add(agent.id)
-		}
-	}
-
-	return { canceled: false, selected: selectedSet, unselected: unselectedSet }
+	const selectedSet = new Set(selected)
+	return { canceled: false, selected: selectedSet }
 }
 
 function parseAgentList(value: string): Set<AgentId> {
@@ -197,9 +191,6 @@ function applyAgentSelection(
 	let updated = manifest
 	for (const agentId of selection.selected) {
 		updated = setAgent(updated, agentId, true)
-	}
-	for (const agentId of selection.unselected) {
-		updated = setAgent(updated, agentId, false)
 	}
 
 	return updated

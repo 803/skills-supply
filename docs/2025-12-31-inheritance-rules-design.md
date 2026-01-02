@@ -220,7 +220,7 @@ opencode = false
 | Mode | Behavior |
 |------|----------|
 | `sk sync` (interactive) | Show multi-select of auto-detected installed agents. User chooses which to enable. Saves to manifest. |
-| `sk sync --non-interactive` | No-op with message: "No agents configured. Run interactively or add [agents] section." Exit 0. |
+| `sk sync --non-interactive` | No-op with message: "No agents enabled. Use `sk agent add` or update the [agents] section." Exit 0. |
 
 **Auto-detection populates options, user explicitly enables.** This balances convenience with explicitness.
 
@@ -308,7 +308,7 @@ sk sync --non-interactive:
   - Skip all prompts
   - Use discovered manifest (including parent if found there)
   - Error if no manifest found (CI should ensure manifest exists)
-  - Error if no agents configured in manifest
+  - Warn and no-op if no agents enabled in manifest
 
 Empty manifest behavior:
   - If manifest has zero dependencies AND no previously-installed skills: print "No dependencies to sync" and exit
@@ -549,7 +549,7 @@ No longer needed - single manifest per project, no merging.
 | Nested manifests (monorepo) | First found wins - closest to CWD is project root |
 | Empty `agents.toml` | Valid manifest with no dependencies |
 | `~/.sk/agents.toml` during local discovery | Ignored - only used with `--global` |
-| No `[agents]` section | Interactive: prompt with auto-detected options. Non-interactive: no-op with message. |
+| No `[agents]` section | Interactive: prompt with auto-detected options. Non-interactive: no-op with message "No agents enabled. Use `sk agent add` or update the [agents] section.". |
 
 ## Related Work
 

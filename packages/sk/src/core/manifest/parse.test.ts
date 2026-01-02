@@ -455,8 +455,7 @@ git = "git@gitlab.com:org/repo.git"
 					const dep = result.value.dependencies.get(alias("private"))
 					expect(dep?.type).toBe("git")
 					if (dep?.type === "git") {
-						// URL is normalized to HTTPS
-						expect(dep.url).toBe("https://gitlab.com/org/repo")
+						expect(dep.url).toBe("git@gitlab.com:org/repo")
 					}
 				}
 			})

@@ -1,6 +1,7 @@
 import type { CanonicalPackage, Skill } from "@/src/core/packages/types"
+import type { AgentId } from "@/src/core/types/branded"
 
-export type AgentId = "claude-code" | "codex" | "opencode"
+export type { AgentId }
 
 export interface AgentDefinition {
 	id: AgentId

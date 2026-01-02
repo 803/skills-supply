@@ -13,7 +13,7 @@
 declare const NonEmptyStringBrand: unique symbol
 declare const AliasBrand: unique symbol
 declare const AbsolutePathBrand: unique symbol
-declare const NormalizedGitUrlBrand: unique symbol
+declare const GitUrlBrand: unique symbol
 declare const GithubRefBrand: unique symbol
 
 // === BRANDED TYPES ===
@@ -37,10 +37,10 @@ export type Alias = string & { readonly [AliasBrand]: true }
 export type AbsolutePath = string & { readonly [AbsolutePathBrand]: true }
 
 /**
- * A normalized git URL.
- * Guarantees: https:// protocol, no trailing .git variance, trimmed
+ * A validated git URL.
+ * Guarantees: ssh or http(s) format, no trailing .git, trimmed
  */
-export type NormalizedGitUrl = string & { readonly [NormalizedGitUrlBrand]: true }
+export type GitUrl = string & { readonly [GitUrlBrand]: true }
 
 /**
  * A GitHub repository reference in owner/repo format.

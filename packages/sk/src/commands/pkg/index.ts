@@ -6,6 +6,7 @@ import {
 } from "@/src/commands/manifest-selection"
 import type { AddOptions } from "@/src/commands/pkg/spec"
 import { buildPackageSpec, normalizeAddOptions } from "@/src/commands/pkg/spec"
+import { syncWithSelection } from "@/src/commands/sync"
 import { coerceDependency } from "@/src/core/manifest/coerce"
 import { saveManifest } from "@/src/core/manifest/fs"
 import {
@@ -36,13 +37,17 @@ export async function pkgInteractive(): Promise<void> {
 		}
 
 		if (action === "add") {
-			await handleAdd()
-			consola.success("Done.")
+			const completed = await handleAdd()
+			if (completed) {
+				consola.success("Done.")
+			}
 			return
 		}
 
-		await handleRemove()
-		consola.success("Done.")
+		const completed = await handleRemove()
+		if (completed) {
+			consola.success("Done.")
+		}
 	} catch (error) {
 		process.exitCode = 1
 		consola.error(formatError(error))
@@ -50,7 +55,7 @@ export async function pkgInteractive(): Promise<void> {
 	}
 }
 
-async function handleAdd(): Promise<void> {
+async function handleAdd(): Promise<boolean> {
 	const type = await select({
 		message: "Package type",
 		options: [
@@ -170,7 +175,7 @@ async function handleAdd(): Promise<void> {
 		})
 		if (isCancel(overwrite) || !overwrite) {
 			consola.info("No changes made.")
-			return
+			return true
 		}
 	}
 
@@ -187,9 +192,21 @@ async function handleAdd(): Promise<void> {
 	const updated = addDependency(selection.manifest, aliasKey, coerced.value)
 	await saveManifest(updated, selection.manifestPath, selection.serializeOptions)
 	consola.success(`Updated ${selection.manifestPath}.`)
+
+	const shouldSync = await confirm({
+		message: "Sync skills now?",
+	})
+	if (isCancel(shouldSync) || !shouldSync) {
+		return true
+	}
+
+	return await syncWithSelection(
+		{ ...selection, manifest: updated },
+		{ dryRun: false, nonInteractive: false },
+	)
 }
 
-async function handleRemove(): Promise<void> {
+async function handleRemove(): Promise<boolean> {
 	const selection = await resolveLocalManifest({
 		createIfMissing: false,
 		nonInteractive: false,
@@ -210,7 +227,7 @@ async function handleRemove(): Promise<void> {
 	const aliases = [...selection.manifest.dependencies.keys()].sort()
 	if (aliases.length === 0) {
 		consola.info("No dependencies to remove.")
-		return
+		return true
 	}
 
 	const choice = await select({
@@ -228,4 +245,16 @@ async function handleRemove(): Promise<void> {
 	const updated = removeDependency(selection.manifest, choice as Alias)
 	await saveManifest(updated, selection.manifestPath, selection.serializeOptions)
 	consola.success(`Removed dependency: ${String(choice)}.`)
+
+	const shouldSync = await confirm({
+		message: "Sync skills now?",
+	})
+	if (isCancel(shouldSync) || !shouldSync) {
+		return true
+	}
+
+	return await syncWithSelection(
+		{ ...selection, manifest: updated },
+		{ dryRun: false, nonInteractive: false },
+	)
 }

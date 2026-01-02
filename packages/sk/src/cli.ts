@@ -64,6 +64,7 @@ async function main(): Promise<void> {
 		.option("--rev <rev>", "Use a specific git commit")
 		.option("--path <path>", "Use a subdirectory inside the repository")
 		.option("--as <alias>", "Override the package alias")
+		.option("--sync", "Run sync after updating the manifest")
 		.option("--global", "Use the global manifest")
 		.option("--non-interactive", "Run without prompts")
 		.option("--init", "Create a manifest if one does not exist")
@@ -77,6 +78,7 @@ async function main(): Promise<void> {
 					rev?: string
 					path?: string
 					as?: string
+					sync?: boolean
 					global?: boolean
 					nonInteractive?: boolean
 					init?: boolean
@@ -90,6 +92,7 @@ async function main(): Promise<void> {
 					nonInteractive: Boolean(options.nonInteractive),
 					path: options.path,
 					rev: options.rev,
+					sync: Boolean(options.sync),
 					tag: options.tag,
 				})
 			},
@@ -98,16 +101,18 @@ async function main(): Promise<void> {
 	pkg.command("remove")
 		.description("Remove a package")
 		.argument("<alias>", "Package alias")
+		.option("--sync", "Run sync after updating the manifest")
 		.option("--global", "Use the global manifest")
 		.option("--non-interactive", "Run without prompts")
 		.action(
 			async (
 				alias: string,
-				options: { global?: boolean; nonInteractive?: boolean },
+				options: { global?: boolean; nonInteractive?: boolean; sync?: boolean },
 			) => {
 				await pkgRemove(alias, {
 					global: Boolean(options.global),
 					nonInteractive: Boolean(options.nonInteractive),
+					sync: Boolean(options.sync),
 				})
 			},
 		)

@@ -11,6 +11,7 @@ import type {
 	ResolvedAgent,
 } from "@/src/core/agents/types"
 import type { AbsolutePath } from "@/src/core/types/branded"
+import { isAgentId } from "@/src/core/types/coerce"
 
 interface AgentEntry {
 	id: AgentId
@@ -52,8 +53,6 @@ const AGENT_REGISTRY: AgentDefinition[] = AGENT_ENTRIES.map((entry) => ({
 	id: entry.id,
 	skillsDir: entry.skillsDir,
 }))
-
-const AGENT_IDS = new Set<AgentId>(AGENT_ENTRIES.map((entry) => entry.id))
 
 type StatResult =
 	| { ok: true; value: Awaited<ReturnType<typeof stat>> | null }
@@ -106,10 +105,6 @@ export async function detectInstalledAgents(): Promise<AgentListResult> {
 	}
 
 	return { ok: true, value: installed }
-}
-
-function isAgentId(agentId: string): agentId is AgentId {
-	return AGENT_IDS.has(agentId as AgentId)
 }
 
 async function detectAgent(
