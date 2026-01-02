@@ -70,7 +70,7 @@ opencode = false
 ### 2. Add packages
 
 ```bash
-sk pkg add gh superpowers-marketplace/superpowers
+sk pkg add https://github.com/obra/superpowers
 ```
 
 ### 3. Sync to your agents
