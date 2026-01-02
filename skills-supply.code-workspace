@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../agents-toml"
+		},
+		{
+			"path": "../scoop-sk"
+		},
+		{
+			"path": "../homebrew-sk"
+		},
+		{
+			"path": "../skills-supply-docs"
+		}
+	],
+	"settings": {}
+}

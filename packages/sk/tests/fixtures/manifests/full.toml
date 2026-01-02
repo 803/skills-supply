@@ -1,0 +1,39 @@
+# Full manifest - all fields populated
+# Used for testing complete parsing and validation
+
+[package]
+name = "full-featured-pkg"
+version = "2.1.0"
+description = "A fully featured package for testing"
+license = "MIT"
+org = "test-org"
+
+[agents]
+claude-code = true
+codex = true
+opencode = false
+
+[dependencies]
+# Registry package (string shorthand)
+superpowers = "superpowers-marketplace/superpowers@1.0.0"
+
+# GitHub package with tag
+sensei = { gh = "sensei-marketplace/sensei", tag = "v2.0.0" }
+
+# GitHub package with branch
+feature-dev = { gh = "claude-plugins-official/feature-dev", branch = "main" }
+
+# GitHub package with path
+elements-of-style = { gh = "superpowers-marketplace/elements-of-style", path = "packages/core" }
+
+# Git URL package
+custom-git = { git = "https://gitlab.com/myorg/custom-skills.git", rev = "abc123" }
+
+# Local package
+local-skills = { path = "../local-skills" }
+
+# Claude plugin
+claude-plugin-example = { type = "claude-plugin", plugin = "example", marketplace = "https://github.com/example/marketplace" }
+
+[exports.auto_discover]
+skills = "skills"

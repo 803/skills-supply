@@ -1,0 +1,30 @@
+{
+	"compilerOptions": {
+		"noEmit": true
+	},
+	"exclude": [
+		"prior_art",
+		"_build",
+		"deps",
+		"node_modules",
+		"dist",
+		"**/node_modules",
+		"**/dist"
+	],
+	"extends": "./tsconfig.base.json",
+	"files": [],
+	"references": [
+		{
+			"path": "./packages/web"
+		},
+		{
+			"path": "./packages/database"
+		},
+		{
+			"path": "./packages/api"
+		},
+		{
+			"path": "./packages/sk"
+		}
+	]
+}

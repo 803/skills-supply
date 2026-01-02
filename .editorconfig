@@ -1,0 +1,32 @@
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+indent_style = tab
+indent_size = 2
+
+[*.{ex,exs}]
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_style = space
+indent_size = 4
+
+[*.{html,eex,leex,scss,json,jsonc}]
+indent_style = tab
+indent_size = 4
+
+[*.{md,yaml,yml}]
+indent_style = space
+indent_size = 2
+
+[*.{js,jsx,ts,tsx,mjs,cjs}]
+indent_style = tab
+indent_size = 4
+
+[Vagrantfile]
+indent_style = space
+indent_size = 2

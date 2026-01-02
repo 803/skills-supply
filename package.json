@@ -1,0 +1,42 @@
+{
+	"dependencies": {
+		"@awesome.me/kit-e146ba5a27": "^1.0.2",
+		"typedoc-github-theme": "^0.3.1"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.10",
+		"cheerio": "^1.1.2",
+		"consola": "^3.4.2",
+		"jsdom": "^27.4.0",
+		"semver": "^7.7.3",
+		"turbo": "^2.7.2",
+		"typedoc": "^0.28.15",
+		"typedoc-plugin-markdown": "^4.9.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.16",
+		"wrangler": "^4.55.0"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	},
+	"name": "@skills-supply",
+	"packageManager": "npm@11.7.0",
+	"private": true,
+	"scripts": {
+		"biome": "npx biome check --fix .",
+		"build": "npx turbo run build",
+		"check": "npm run biome && npm run tsc",
+		"clean": "npx turbo run clean && rm -rf node_modules .turbo",
+		"dev": "npx turbo run dev",
+		"docs": "npx typedoc",
+		"lc": "tokei . -e --type=CSS,Elixir,JavaScript,TSX,TypeScript",
+		"test": "vitest run",
+		"tsc": "npx turbo run tsc",
+		"tsx": "npx tsx --tsconfig tsconfig.tsxrepl.json"
+	},
+	"type": "module",
+	"version": "0.1.0",
+	"workspaces": [
+		"packages/*"
+	]
+}

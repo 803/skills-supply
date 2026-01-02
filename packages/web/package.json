@@ -1,0 +1,34 @@
+{
+	"dependencies": {
+		"@ai-sdk/react": "^3.0.5",
+		"@awesome.me/kit-e146ba5a27": "^1.0.2",
+		"ai": "^6.0.5",
+		"clsx": "^2.1.1",
+		"next": "16.1.1",
+		"react": "19.2.3",
+		"react-dom": "19.2.3",
+		"react-markdown": "^10.1.0",
+		"remark-gfm": "^4.0.1",
+		"shiki": "^3.20.0",
+		"tailwind-merge": "^3.4.0",
+		"vaul": "^1.1.2"
+	},
+	"devDependencies": {
+		"@svgr/webpack": "^8.1.0",
+		"@tailwindcss/postcss": "^4",
+		"@types/node": "^25",
+		"@types/react": "^19",
+		"@types/react-dom": "^19",
+		"babel-plugin-react-compiler": "1.0.0",
+		"tailwindcss": "^4",
+		"typescript": "^5"
+	},
+	"name": "@skills-supply/web",
+	"private": true,
+	"scripts": {
+		"build": "next build",
+		"dev": "next dev",
+		"start": "next start"
+	},
+	"version": "0.1.0"
+}

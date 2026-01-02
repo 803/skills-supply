@@ -1,0 +1,12 @@
+# Minimal manifest - just a package name
+# Used for testing basic parsing and empty dependency handling
+
+[package]
+name = "minimal-pkg"
+version = "1.0.0"
+
+[agents]
+claude-code = true
+
+[dependencies]
+# No dependencies

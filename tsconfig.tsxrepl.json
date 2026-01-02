@@ -1,0 +1,8 @@
+{
+	"$schema": "https://json.schemastore.org/tsconfig",
+	"compilerOptions": {
+		"paths": {
+			"server-only": ["./_tsxrepl/server-only"]
+		}
+	}
+}

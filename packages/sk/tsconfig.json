@@ -1,0 +1,15 @@
+{
+	"compilerOptions": {
+		"baseUrl": "./",
+		"composite": true,
+		"noEmit": true,
+		"paths": {
+			"@/*": ["./*"]
+		},
+		"rootDir": "./",
+		"types": ["node"]
+	},
+	"exclude": ["dist", "node_modules"],
+	"extends": "../../tsconfig.base.json",
+	"include": ["src/**/*", "tests/**/*"]
+}

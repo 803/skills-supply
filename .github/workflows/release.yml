@@ -1,0 +1,124 @@
+name: Release sk
+on:
+  push:
+    tags: ['sk@*']
+
+permissions:
+  id-token: write
+  contents: write
+
+env:
+  # Extract version from tag (sk@0.1.0 -> 0.1.0)
+  VERSION: ${{ github.ref_name }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true  # All-or-nothing: if any platform fails, abort entire release
+      matrix:
+        include:
+          - os: macos-latest
+            target: darwin-arm64
+          - os: macos-15-intel
+            target: darwin-x64
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+          - os: windows-latest
+            target: windows-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+          reshim: true
+      - run: npm install --workspace @skills-supply/sk
+      - run: npm run build:binary
+        working-directory: packages/sk
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: tar -czvf sk-${{ matrix.target }}.tar.gz -C packages/sk/bin sk
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path packages/sk/bin/sk.exe -DestinationPath sk-${{ matrix.target }}.zip
+      - uses: actions/upload-artifact@v6
+        with:
+          name: sk-${{ matrix.target }}
+          path: sk-${{ matrix.target }}.*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          merge-multiple: true
+      - name: Generate checksums
+        run: |
+          sha256sum sk-*.tar.gz sk-*.zip 2>/dev/null > SHASUMS256.txt || true
+          cat SHASUMS256.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            sk-*.tar.gz
+            sk-*.zip
+            SHASUMS256.txt
+
+  npm:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+          reshim: true
+      - run: npm install --workspace @skills-supply/sk
+      - run: npm run build:node
+        working-directory: packages/sk
+      - run: npm publish --access public
+        working-directory: packages/sk
+
+  homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: 803/homebrew-sk
+          token: ${{ secrets.SKILLS_SUPPLY_SK_RELEASE_PAT }}
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+          reshim: true
+      - run: bun scripts/update-formula.ts ${{ github.ref_name }}
+      - uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "Release ${{ github.ref_name }}"
+
+  scoop:
+    needs: release
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: 803/scoop-sk
+          token: ${{ secrets.SKILLS_SUPPLY_SK_RELEASE_PAT }}
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+          reshim: true
+      - run: bun scripts/update-manifest.ts ${{ github.ref_name }}
+      - uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "Release ${{ github.ref_name }}"
