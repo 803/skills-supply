@@ -27,9 +27,7 @@ const PROGRAM = new Command()
 	.option("--ci")
 	.argument("<string>")
 
-const ACTIONS: {
-	[key: string]: (config: ExtendedConfig) => Promise<void>
-} = {
+const ACTIONS = {
 	biome: async ({ folder }) => {
 		execSync(`${biomeBin()} check --write ${folder}`, {
 			stdio: "inherit",
@@ -77,9 +75,10 @@ const ACTIONS: {
 	up: async ({ migrator }) => {
 		debug(__filename, await migrator.migrateUp())
 	},
-}
+} satisfies Record<string, (config: ExtendedConfig) => Promise<void>>
 
-const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url))
+const __filename = fileURLToPath(import.meta.url)
+const CURRENT_DIR = path.dirname(__filename)
 const REPO_ROOT = path.resolve(CURRENT_DIR, "../..")
 const BIN_EXT = process.platform === "win32" ? ".cmd" : ""
 
@@ -106,6 +105,7 @@ async function run() {
 	if (!action || !(action in ACTIONS)) {
 		throw new Error(`Unknown action: ${action ?? "<missing>"}`)
 	}
+	const typedAction = action as keyof typeof ACTIONS
 	const folder = CURRENT_DIR
 	const config: Config = {
 		codegen: "kanel-kysely",
@@ -125,7 +125,7 @@ async function run() {
 		}),
 		...config,
 	}
-	const actions = [action]
+	const actions: (keyof typeof ACTIONS)[] = [typedAction]
 	if (!ci) {
 		if (autoCodegen) {
 			actions.push("codegen")
@@ -136,7 +136,8 @@ async function run() {
 	}
 	const uniquedActions = [...new Set(actions.reverse())].reverse()
 	for (const a of uniquedActions) {
-		await ACTIONS[a](extendedConfig)
+		const actionFn = ACTIONS[a]
+		await actionFn(extendedConfig)
 	}
 	await config.db.destroy()
 	process.exit(0)

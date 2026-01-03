@@ -6,7 +6,9 @@ const str = () => z.string().trim().min(1)
 export const schema = z.object({
 	// Database
 	DATABASE_POOL_SIZE: z.coerce.number().int().positive().max(50).optional().default(2),
-	DATABASE_URL: str(),
+	DATABASE_URL: str().default(
+		"postgresql://postgres:postgres@localhost:5877/skillssupply_dev",
+	),
 	// General
 	NODE_ENV: z.enum(["development", "production", "preview"]).default("development"),
 })

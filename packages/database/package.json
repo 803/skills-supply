@@ -24,7 +24,8 @@
 	"private": true,
 	"scripts": {
 		"build": "tsc --build",
-		"clean": "rm -rf dist"
+		"clean": "rm -rf dist",
+		"db:manage": "npx tsx manage.ts"
 	},
 	"type": "module",
 	"types": "./dist/index.d.ts",
