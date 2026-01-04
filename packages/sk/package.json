@@ -6,6 +6,7 @@
 	"dependencies": {
 		"@clack/prompts": "^0.11.0",
 		"@skills-supply/agents-toml": "latest",
+		"@skills-supply/core": "*",
 		"commander": "^14.0.2",
 		"consola": "^3.4.2",
 		"open": "^11.0.0",
@@ -20,8 +21,15 @@
 	"engines": {
 		"node": ">=18"
 	},
+	"exports": {
+		".": {
+			"default": "./dist/index.js",
+			"types": "./src/index.d.ts"
+		}
+	},
 	"files": [
 		"dist",
+		"src",
 		"LICENSE",
 		"README.md"
 	],
@@ -41,16 +49,18 @@
 		"url": "https://github.com/803/skills-supply.git"
 	},
 	"scripts": {
-		"build": "bun run build:binary && bun run build:node",
+		"build": "bun run build:binary && bun run build:node && bun run build:core",
 		"build:binary": "bun build ./src/cli.ts --compile --outfile ./bin/sk",
+		"build:core": "bun build ./src/index.ts --outdir ./dist --target node",
 		"build:node": "bun build ./src/cli.ts --outdir ./dist --target node",
 		"clean": "rm -rf dist bin",
 		"test": "vitest",
 		"test:coverage": "vitest --coverage",
 		"test:e2e": "vitest --include tests/e2e/**/*.test.ts",
 		"test:unit": "vitest --exclude tests/e2e",
-		"tsc": "npx tsc -p tsconfig.json"
+		"tsc": "bun run build:core && npx tsc -p tsconfig.json"
 	},
 	"type": "module",
+	"types": "./src/index.d.ts",
 	"version": "0.1.8"
 }
