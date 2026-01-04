@@ -47,9 +47,7 @@ type GitRef =
 
 Note: Using `?` (optional) rather than `| null` matches the codebase convention and avoids storing nulls.
 
-## Detection Priority (Authoritative Reference)
-
-`detectStructure()` returns ALL structures found (e.g., both plugin and marketplace). Applications choose which to use based on their needs.
+## Detection Priority
 
 ### sk add auto-detect flow (Authoritative Reference)
 
@@ -104,7 +102,7 @@ Detection follows this **strict priority order**:
 
 **Priority 2: plugin.json + marketplace.json both exist**
 
-- **Detection**: Both `.claude/plugin.json` and `.claude/marketplace.json` exist
+- **Detection**: Both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` exist
 - **Action**: Check if the plugin defined in `plugin.json` belongs to the `marketplace.json`
   - **Case A: Plugin belongs to marketplace** (plugin name from `plugin.json` matches one of the entries in `marketplace.json`)
     - Add as `claude-plugin` declaration
@@ -123,7 +121,7 @@ Detection follows this **strict priority order**:
 
 **Priority 3: marketplace.json only**
 
-- **Detection**: `.claude/marketplace.json` exists but `.claude/plugin.json` does NOT exist
+- **Detection**: `.claude-plugin/marketplace.json` exists but `.claude-plugin/plugin.json` does NOT exist
 - **Action**: Parse marketplace.json, show user the list of plugins, user selects one or more
 - **Declaration type**: `claude-plugin` (one per selected plugin)
 - **marketplace field**: the target (`GithubRef`, `GitUrl`, or `AbsolutePath`)
@@ -134,7 +132,7 @@ Detection follows this **strict priority order**:
 
 **Priority 4: plugin.json only**
 
-- **Detection**: `.claude/plugin.json` exists but `.claude/marketplace.json` does NOT exist
+- **Detection**: `.claude-plugin/plugin.json` exists but `.claude-plugin/marketplace.json` does NOT exist
 - **Action**: Cannot add as `claude-plugin` (no marketplace info). **Prompt user** to choose:
   1. **Add as github/git/local** → Add as `github`, `git`, or `local` declaration
   2. **Find external marketplace** → User provides the marketplace URL → Add as `claude-plugin` declaration
@@ -166,7 +164,7 @@ Detection follows this **strict priority order**:
 **Important constraints:**
 
 - **Marketplace subpath limitation (remote targets only)**: For `claude-plugin` declarations with `GithubRef` or `GitUrl` marketplace, the marketplace MUST be at the repo root. Claude-code's native plugin install does not support marketplace.json at subpaths. If user provides a remote URL with a subpath and detection finds marketplace.json at that subpath, this is an error—cannot create a valid `claude-plugin` declaration.
-- **Local paths can have marketplace at any depth**: Unlike remote targets, `AbsolutePath` targets can point directly to a directory containing `.claude/marketplace.json` at any depth. The `AbsolutePath` becomes the marketplace field directly.
+- **Local paths can have marketplace at any depth**: Unlike remote targets, `AbsolutePath` targets can point directly to a directory containing `.claude-plugin/marketplace.json` at any depth. The `AbsolutePath` becomes the marketplace field directly.
 - **Declaration type vs package structure**: Declaration type (`github`, `git`, `local`, `claude-plugin`) describes HOW to fetch/access the package. Package structure (`manifest`, `plugin`, `subdir`, `single`) describes WHAT the package contains. These are orthogonal.
 
 ---
@@ -194,12 +192,12 @@ Detection follows this **strict priority order**:
 
 **sk sync flow** (extracting skills from already-fetched package):
 
-| Structure | Skill extraction method |
-|-----------|------------------------|
-| manifest | `discoverSkillPathsForSubdir(auto_discover.skills)` |
-| plugin | `discoverSkillPathsForPlugin(skillsDir)` |
-| subdir | `discoverSkillPathsForSubdir(rootDir)` |
-| single | Extract directly |
+| Structure | Skill extraction behavior |
+|-----------|--------------------------|
+| manifest | Discover skills from configured auto_discover.skills path |
+| plugin | Discover skills from plugin's skills directory |
+| subdir | Discover skills from direct-descendant subdirs in the cwd |
+| single | Extract the single skill directly |
 
 **discovery scan flow** (what to index):
 
@@ -258,20 +256,16 @@ User manifest (agents.toml)
 Before describing each declaration type, we define two reusable extraction processes:
 
 **claude-plugin-skills-extraction-process:**
-```
-Given: a fetched plugin directory (containing .claude/plugin.json)
-  → parsePlugin(.claude/plugin.json) → PluginInfo
-  → if plugin has skillsDir: discoverSkillPathsForPlugin(skillsDir)
-  → extract skills from discovered paths
-```
+Given a fetched plugin directory (containing `.claude-plugin/plugin.json`):
+1. Parse the plugin manifest
+2. Discover skills from the `./skills` subdirectory (convention-based, not configurable)
+3. Extract skills from paths
 
 **manifest-skills-extraction-process:**
-```
-Given: a fetched package directory (containing agents.toml with [package])
-  → adaptManifest(agents.toml) → ManifestInfo
-  → if [exports.auto_discover.skills] defined: discoverSkillPathsForSubdir(skills_path)
-  → extract skills from discovered paths
-```
+Given a fetched package directory (containing `agents.toml` with `[package]` section):
+1. Parse the manifest to determine auto-discovery configuration
+2. Discover skills from `[exports.auto_discover.skills]` path, or fallback to defaults
+3. Extract skills from paths
 
 These processes are referenced multiple times below.
 
@@ -299,17 +293,14 @@ A `claude-plugin` declaration specifies a plugin name and a marketplace source.
 **For all other agents (codex, opencode, factory, etc.):**
 - sk must extract skills itself using the **two-phase download** process:
 
-```
 Phase 1: Download and parse marketplace
-  → fetch(marketplace) → marketplace directory
-  → parseMarketplace(.claude/marketplace.json) → MarketplaceInfo
-  → find the requested plugin in MarketplaceInfo.plugins
-  → resolvePluginSource(marketplace, pluginName) → ValidatedDeclaration for the actual plugin location
+1. Fetch the marketplace
+2. Parse .claude-plugin/marketplace.json to find available plugins
+3. Locate the requested plugin and resolve its source location
 
 Phase 2: Download plugin and extract skills
-  → fetch(resolved plugin location) → plugin directory
-  → apply claude-plugin-skills-extraction-process (defined above)
-```
+1. Fetch the resolved plugin location
+2. Apply **claude-plugin-skills-extraction-process** (defined above)
 
 **Why the difference?**
 - claude-code has native plugin support — it knows how to install plugins from marketplaces directly
@@ -332,8 +323,7 @@ Step 1: Fetch the package
   → apply subpath (if declared) and gitref (if declared, for github/git)
   → fetch/access the package directory
 
-Step 2: Detect package structure
-  → detectStructure(package directory) → DetectedStructure[]
+Step 2: Detect all matching package structures
   → apply priority order to select ONE structure (see below)
 
 Step 3: Extract skills based on detected structure
@@ -345,7 +335,7 @@ Step 3: Extract skills based on detected structure
 | Priority | Detection | Action |
 |----------|-----------|--------|
 | 1 | `agents.toml` with `[package]` section | Apply **manifest-skills-extraction-process** |
-| 2 | `.claude/plugin.json` exists | Apply **claude-plugin-skills-extraction-process** |
+| 2 | `.claude-plugin/plugin.json` exists | Apply **claude-plugin-skills-extraction-process** |
 | 3 | Subdirectories with `SKILL.md` files | Extract all skills from subdirectories |
 | 4 | Single `SKILL.md` at root | Extract the single skill |
 
@@ -358,7 +348,7 @@ Step 3: Extract skills based on detected structure
 - **Rationale**: Most explicit — the package author declared this as a distributable package
 
 **Priority 2: .claude/plugin.json exists**
-- **Detection**: `.claude/plugin.json` file exists
+- **Detection**: `.claude-plugin/plugin.json` file exists
 - **Action**: This is a Claude plugin structure
 - **Extraction**: Apply **claude-plugin-skills-extraction-process**
 - **Rationale**: Plugin structure is explicit and well-defined
@@ -367,7 +357,7 @@ Step 3: Extract skills based on detected structure
 **Priority 3: Subdirectories with SKILL.md files**
 - **Detection**: One or more direct subdirectories (not nested) contain a `SKILL.md` file with valid frontmatter
 - **Action**: This is a "skills package" — a directory of related skills
-- **Extraction**: `discoverSkillPathsForSubdir(rootDir)` → extract each skill
+- **Extraction**: Discover skills from direct-descendant subdirs in the cwd
 - **Rationale**: Convention-based detection for multi-skill packages
 
 **Priority 4: Single SKILL.md at root**
@@ -377,7 +367,7 @@ Step 3: Extract skills based on detected structure
 - **Rationale**: Simplest case — one skill, no subdirectories
 
 **Error case: marketplace.json without plugin.json**
-- **Detection**: `.claude/marketplace.json` exists but `.claude/plugin.json` does NOT exist
+- **Detection**: `.claude-plugin/marketplace.json` exists but `.claude-plugin/plugin.json` does NOT exist
 - **Action**: **ERROR** — A github/git/local declaration cannot install from a marketplace
 - **Rationale**: The declaration doesn't specify which plugin to install. If you want plugins from a marketplace, use a `claude-plugin` declaration with the plugin name.
 
@@ -402,7 +392,7 @@ Discovery scans repos to create a searchable INDEX of installable packages. Each
 
 ---
 
-#### Algorithm
+#### Algorithm (for Github repositories)
 
 For each repo to be indexed:
 
@@ -410,21 +400,22 @@ For each repo to be indexed:
 PHASE 1: Check repo root for primary package types (apply BOTH rules together)
 
   Rule A: Marketplace at root
-    → if .claude/marketplace.json exists at repo root:
-        → parseMarketplace() → get list of plugins
+    → if .claude-plugin/marketplace.json exists at repo root:
+        → parse marketplace.json to get list of plugins
         → for EACH plugin in the list:
-            → create IndexedPackage {
-                declaration: { type: "claude-plugin", marketplace: "owner/repo", plugin: plugin.name },
-                metadata: MarketplacePluginMetadata from marketplace.json entry
-              }
+            → create an IndexedPackage record with:
+                - declaration type: `claude-plugin`
+                - marketplace: GithubRef
+                - plugin: the plugin name from marketplace.json
+                - metadata: from marketplace.json entry (name, description, keywords, etc.)
         → add all to results list
 
   Rule B: Manifest with [package] at root
     → if agents.toml exists at repo root AND contains [package] section:
-        → create IndexedPackage {
-            declaration: { type: "github", gh: "owner/repo" },
-            metadata: ManifestPackageMetadata from [package] section
-          }
+        → create an IndexedPackage record :
+            - declaration type of: `github`
+            - gh: the repo reference (owner/repo) (GithubRef)
+            - metadata: from [package] section (name, version, description, license, org)
         → add to results list
 
   IMPORTANT: Apply BOTH rules. A repo can have both a marketplace AND a manifest package.
@@ -438,15 +429,16 @@ PHASE 2: Recursive scan for skills (only if Phase 1 found nothing)
 
   Starting from repo root, recursively scan directories:
 
-  scan_directory(dir, repo):
+  For each directory:
     → check if dir matches SUBDIR pattern:
         (one or more direct subdirectories contain SKILL.md with valid frontmatter)
 
       → if YES:
-          → create IndexedPackage {
-              declaration: { type: "github", gh: "owner/repo", path: relative_path_to_dir },
-              metadata: aggregated from SKILL.md frontmatters or directory name
-            }
+          → create an IndexedPackage record with:
+              - declaration type: `github`
+              - gh: the repo reference (GithubRef)
+              - path: relative path to this directory
+              - metadata: aggregated from SKILL.md frontmatters or directory name
           → add to results list
           → DO NOT recurse into this directory's children (subdir pattern "claims" this directory)
           → return
@@ -455,17 +447,16 @@ PHASE 2: Recursive scan for skills (only if Phase 1 found nothing)
           → check if dir contains a single SKILL.md at its root:
 
             → if YES:
-                → create IndexedPackage {
-                    declaration: { type: "github", gh: "owner/repo", path: relative_path_to_dir },
-                    metadata: SkillInfo from SKILL.md frontmatter
-                  }
+                → create an IndexedPackage record with:
+                    - declaration type: `github`
+                    - gh: the repo reference (GithubRef)
+                    - path: relative path to this directory
+                    - metadata: from SKILL.md frontmatter (name, description)
                 → add to results list
                 → return
 
             → if NO:
-                → recurse into each subdirectory of dir:
-                    for each child_dir in dir:
-                      scan_directory(child_dir, repo)
+                → recurse into each subdirectory
 
   → store all results in database
 ```
@@ -486,13 +477,13 @@ PHASE 2: Recursive scan for skills (only if Phase 1 found nothing)
 #### What Gets SKIPPED (Explicitly)
 
 **plugin.json only (no marketplace.json):**
-- **Detection**: `.claude/plugin.json` exists but `.claude/marketplace.json` does NOT exist
+- **Detection**: `.claude-plugin/plugin.json` exists but `.claude-plugin/marketplace.json` does NOT exist
 - **Action**: **SKIP — do not index**
 - **Rationale**: This plugin exists in a marketplace *somewhere*. Indexing it here would create duplicates. It will be indexed when we scan its containing marketplace.
 - **Note**: This case is implicitly skipped because Phase 1 only checks for marketplace.json and agents.toml with [package]. A repo with only plugin.json will fall through to Phase 2, where plugin.json is not checked.
 
 **marketplace.json at subpath (not root):**
-- **Detection**: `.claude/marketplace.json` exists but NOT at repo root
+- **Detection**: `.claude-plugin/marketplace.json` exists but NOT at repo root
 - **Action**: **SKIP — do not create claude-plugin declarations**
 - **Rationale**: `claude-plugin` declarations require `marketplace: GithubRef | GitUrl` with no path component. A subpath marketplace cannot be expressed.
 
@@ -505,12 +496,12 @@ PHASE 2: Recursive scan for skills (only if Phase 1 found nothing)
 
 #### Metadata Sources
 
-| Detection | Metadata type | Source |
-|-----------|--------------|--------|
-| marketplace.json | `MarketplacePluginMetadata` | marketplace.json entry (name, description, keywords, version, author, etc.) |
-| agents.toml + [package] | `ManifestPackageMetadata` | [package] section (name, version, description, license, org) |
-| subdir pattern | `SkillInfo` or directory name | Aggregated from SKILL.md frontmatters |
-| single SKILL.md | `SkillInfo` | SKILL.md frontmatter (name, description) |
+| Detection | Source |
+|-----------|--------|
+| marketplace.json | marketplace.json entry (name, description, keywords, version, author, etc.) |
+| agents.toml + [package] | [package] section (name, version, description, license, org) |
+| subdir pattern | Aggregated from SKILL.md frontmatters or directory name |
+| single SKILL.md | SKILL.md frontmatter (name, description) |
 
 **Uniform marketplace handling:**
 - Discovery reads ONLY marketplace.json, never plugin.json for individual plugins
@@ -540,6 +531,8 @@ PHASE 2: Recursive scan for skills (only if Phase 1 found nothing)
 - If a directory matches the subdir pattern, its children are skills, not separate packages
 - Don't recurse into children — they're part of this package
 
+---
+
 ### Notes on detection flows
 
 **Critical distinction between sk and discovery:**
@@ -551,26 +544,24 @@ PHASE 2: Recursive scan for skills (only if Phase 1 found nothing)
 
 Discovery does NOT index dependencies. Dependencies are external references to other repos—those repos get indexed when discovery scans *them* directly. Indexing dependencies would create duplicates and use stale/incomplete metadata (the dependency's own repo is the source of truth).
 
+---
+
 ## Claude-Plugin Two-Stage Fetch
 
 The `claude-plugin` type is an indirection layer requiring two fetches:
 
-```
-ValidatedDeclaration { type: "claude-plugin", plugin: "x", marketplace: {...} }
-    ↓
-fetch(marketplace) → FetchedPackage (marketplace repo)
-    ↓
-detectStructure() → DetectedStructure[] (find marketplace in list)
-    ↓
-parseMarketplace(marketplaceJsonPath) → MarketplaceInfo { plugins: [...] }
-    ↓
-resolvePluginSource(info, "x") → ValidatedDeclaration { type: "github", ... }
-    ↓
-fetch(plugin) → FetchedPackage (actual plugin repo)
-    ↓
-detectStructure() → DetectedStructure[] (find plugin/manifest/subdir/single in list)
-    ↓
-extract skills based on detected structure
-```
+1. **Fetch marketplace**: Download the marketplace repository (or use local path)
+2. **Parse marketplace**: Read marketplace.json to find the requested plugin entry
+3. **Resolve plugin source**: Follow the source reference defined in the marketplace entry (marketplace.json defines its own source format)
+4. **Fetch plugin**: Download from the resolved location
+5. **Extract skills**: Discover skills from the plugin's `./skills` subdirectory
 
-After `resolvePluginSource`, the claude-plugin declaration "unwraps" to a regular github/git/local declaration.
+**Structural guarantee**: A resolved plugin's `./skills` directory MUST match the SUBDIR detection pattern — at least one direct subdirectory contains a SKILL.md file with valid frontmatter.
+
+**Important notes**:
+
+- **No type conversion**: A `claude-plugin` declaration remains `claude-plugin` throughout the resolution process. We do not "unwrap" or convert it to `github`/`git`/`local` declarations.
+
+- **Plugin sources are opaque**: The source references in marketplace.json follow their own schema defined by Claude plugins. They do not need to conform to our `GithubRef`, `GitUrl`, or other branded types — marketplace.json data structures are their own.
+
+- **Skills extraction is predictable**: Regardless of how the plugin source is defined in marketplace.json, the skills extraction always follows the same pattern: discover skills from the `./skills` subdirectory using SUBDIR detection logic.
