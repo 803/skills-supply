@@ -1,0 +1,21 @@
+{
+	"dependencies": {
+		"@skills-supply/agents-toml": "^0.1.2",
+		"gray-matter": "^4.0.3",
+		"zod": "^3.25.76"
+	},
+	"devDependencies": {
+		"@types/node": "^25"
+	},
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"name": "@skills-supply/core",
+	"private": true,
+	"scripts": {
+		"tsc": "tsc --build"
+	},
+	"type": "module",
+	"types": "./src/index.ts",
+	"version": "0.1.0"
+}

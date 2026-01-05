@@ -1,12 +1,15 @@
 {
 	"compilerOptions": {
+		"baseUrl": "./",
 		"composite": true,
-		"noEmit": false,
-		"outDir": "./dist",
+		"paths": {
+			"@/*": ["./*"]
+		},
 		"rootDir": "./",
 		"types": ["node"]
 	},
 	"exclude": ["dist", "node_modules"],
 	"extends": "../../tsconfig.base.json",
-	"include": ["**/*.ts", "**/*.tsx"]
+	"include": ["**/*.ts", "**/*.tsx"],
+	"references": [{ "path": "../core" }, { "path": "../database" }]
 }

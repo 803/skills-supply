@@ -1,12 +1,8 @@
-import { resolve } from "node:path"
+import tsconfigPaths from "vite-tsconfig-paths"
 import { defineConfig } from "vitest/config"
 
 export default defineConfig({
-	resolve: {
-		alias: {
-			"@": resolve(__dirname, "./"),
-		},
-	},
+	plugins: [tsconfigPaths()],
 	test: {
 		coverage: {
 			exclude: ["src/**/*.test.ts"],

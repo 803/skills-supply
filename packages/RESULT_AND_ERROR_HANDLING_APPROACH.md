@@ -115,9 +115,14 @@ Bad additions:
 Because all domain errors extend BaseError, any error can be handled generically at package boundaries:
 
 ```typescript
-function formatError(error: BaseError): string {
-  // Works for IoError, SyncError, NetworkError, anything
-  return `[${error.type}] ${error.message}`
+function formatErrorChain(error: BaseError): string {
+  const lines: string[] = []
+  let current: BaseError | undefined = error
+  while (current) {
+    lines.push(`[${current.type}] ${current.message}`)
+    current = current.cause
+  }
+  return lines.join("\nCaused by: ")
 }
 ```
 
@@ -239,14 +244,14 @@ function toCommandResult<T>(result: Result<T, BaseError>): CommandResult<T> {
 ### Formatting For Humans
 
 ```typescript
-function formatError(error: BaseError): string {
-  let output = `[${error.type}] ${error.message}`
-
-  if (error.cause) {
-    output += `\n  Caused by: ${formatError(error.cause)}`
+function formatErrorChain(error: BaseError): string {
+  const lines: string[] = []
+  let current: BaseError | undefined = error
+  while (current) {
+    lines.push(`[${current.type}] ${current.message}`)
+    current = current.cause
   }
-
-  return output
+  return lines.join("\nCaused by: ")
 }
 ```
 

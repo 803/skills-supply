@@ -1,0 +1,29 @@
+{
+	"dependencies": {
+		"@skills-supply/core": "*",
+		"@skills-supply/database": "*",
+		"commander": "^14.0.2",
+		"consola": "^3.4.2",
+		"dotenv": "^17.2.3",
+		"kysely": "^0.28.9",
+		"pg-boss": "^12.5.4",
+		"zod": "^3.25.76"
+	},
+	"devDependencies": {
+		"@types/node": "^25"
+	},
+	"name": "@skills-supply/discovery",
+	"private": true,
+	"scripts": {
+		"build": "tsc --build",
+		"clean": "rm -rf dist",
+		"draft": "npx tsx --tsconfig tsconfig.json src/cli.ts draft",
+		"enqueue": "npx tsx --tsconfig tsconfig.json src/cli.ts enqueue",
+		"list": "npx tsx --tsconfig tsconfig.json src/cli.ts list",
+		"tsc": "tsc --build",
+		"tsx": "npx tsx --tsconfig tsconfig.json src/cli.ts",
+		"worker": "npx tsx --tsconfig tsconfig.json src/cli.ts worker"
+	},
+	"type": "module",
+	"version": "0.1.0"
+}

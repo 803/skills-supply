@@ -498,7 +498,7 @@ PHASE 2: Recursive scan for skills (only if Phase 1 found nothing)
 
 | Detection | Source |
 |-----------|--------|
-| marketplace.json | marketplace.json entry (name, description, keywords, version, author, etc.) |
+| marketplace.json | marketplace.json entry (name, description, keywords, version, author, etc.). Plugin `source` is not recorded during discovery indexing. |
 | agents.toml + [package] | [package] section (name, version, description, license, org) |
 | subdir pattern | Aggregated from SKILL.md frontmatters or directory name |
 | single SKILL.md | SKILL.md frontmatter (name, description) |
@@ -506,8 +506,9 @@ PHASE 2: Recursive scan for skills (only if Phase 1 found nothing)
 **Uniform marketplace handling:**
 - Discovery reads ONLY marketplace.json, never plugin.json for individual plugins
 - Metadata comes from the marketplace.json entry only
-- Plugin sources are recorded as-is — NO cloning for remote sources, NO reading plugin.json even for local sources
-- This is uniform: all plugin sources treated the same regardless of local vs remote
+- Plugin sources are treated as opaque and are NOT stored in discovery metadata
+- Discovery does not clone or resolve plugin sources (remote or local); install-time flows handle resolution
+- This is uniform: discovery behavior is the same regardless of local vs remote marketplaces
 - At install time, sk reads the real plugin.json anyway
 
 ---

@@ -22,7 +22,8 @@
 			"dependsOn": ["^build"]
 		},
 		"tsc": {
-			"cache": false
+			"cache": true,
+			"dependsOn": ["^tsc"]
 		}
 	}
 }

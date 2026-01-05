@@ -5,7 +5,6 @@
 	},
 	"dependencies": {
 		"@clack/prompts": "^0.11.0",
-		"@skills-supply/agents-toml": "latest",
 		"@skills-supply/core": "*",
 		"commander": "^14.0.2",
 		"consola": "^3.4.2",
@@ -22,10 +21,7 @@
 		"node": ">=18"
 	},
 	"exports": {
-		".": {
-			"default": "./dist/index.js",
-			"types": "./src/index.d.ts"
-		}
+		".": "./dist/index.js"
 	},
 	"files": [
 		"dist",
