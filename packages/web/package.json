@@ -1,8 +1,8 @@
 {
 	"dependencies": {
-		"@ai-sdk/react": "^3.0.5",
+		"@ai-sdk/react": "^3.0.6",
 		"@awesome.me/kit-e146ba5a27": "^1.0.2",
-		"ai": "^6.0.5",
+		"ai": "^6.0.6",
 		"clsx": "^2.1.1",
 		"next": "16.1.1",
 		"react": "19.2.3",

@@ -13,8 +13,9 @@ import {
 	readAgentState,
 	resolveStatePath,
 	writeAgentState,
-} from "@/src/core/agents/state"
-import type { AgentId, ResolvedAgent } from "@/src/core/agents/types"
+} from "@/agents/state"
+import type { AgentId, ResolvedAgent } from "@/agents/types"
+import { abs } from "@/tests/helpers/branded"
 import { exists, isFile, withTempDir } from "@/tests/helpers/fs"
 
 // Import assertions to register custom matchers
@@ -27,8 +28,8 @@ function createTestAgent(rootPath: string, id: AgentId = "claude-code"): Resolve
 	return {
 		displayName: "Test Agent",
 		id,
-		rootPath,
-		skillsPath: join(rootPath, "skills"),
+		rootPath: abs(rootPath),
+		skillsPath: abs(join(rootPath, "skills")),
 	}
 }
 

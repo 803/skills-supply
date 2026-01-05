@@ -6,7 +6,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { findGlobalRoot, findProjectRoot } from "@/src/core/manifest/discover"
+import { findGlobalRoot, findProjectRoot } from "@/manifest/discover"
 import { withTempDir } from "@/tests/helpers/fs"
 
 import "@/tests/helpers/assertions"
@@ -59,8 +59,12 @@ describe("findProjectRoot", () => {
 
 		expect(result).toBeErr()
 		if (!result.ok) {
-			expect(result.error.type).toBe("invalid_start")
-			expect(result.error.message).toContain("does not exist")
+			expect(result.error.type).toBe("validation")
+			if (result.error.type === "validation") {
+				expect(result.error.source).toBe("manual")
+				expect(result.error.field).toBe("start")
+				expect(result.error.message).toContain("does not exist")
+			}
 		}
 	})
 
@@ -73,8 +77,12 @@ describe("findProjectRoot", () => {
 
 			expect(result).toBeErr()
 			if (!result.ok) {
-				expect(result.error.type).toBe("invalid_start")
-				expect(result.error.message).toContain("must be a directory")
+				expect(result.error.type).toBe("validation")
+				if (result.error.type === "validation") {
+					expect(result.error.source).toBe("manual")
+					expect(result.error.field).toBe("start")
+					expect(result.error.message).toContain("must be a directory")
+				}
 			}
 		})
 	})
@@ -87,7 +95,7 @@ describe("findProjectRoot", () => {
 
 			expect(result).toBeErr()
 			if (!result.ok) {
-				expect(result.error.type).toBe("io_error")
+				expect(result.error.type).toBe("io")
 				expect(result.error.message).toContain("not a file")
 			}
 		})

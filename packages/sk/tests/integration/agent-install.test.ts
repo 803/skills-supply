@@ -7,15 +7,16 @@
 
 import { lstat, mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
+import type { AbsolutePath } from "@skills-supply/core"
 import { describe, expect, it } from "vitest"
 import {
 	type AgentInstallPlan,
 	applyAgentInstall,
 	type InstallGuard,
 	planAgentInstall,
-} from "@/src/core/agents/install"
-import type { InstallablePackage, ResolvedAgent } from "@/src/core/agents/types"
-import type { CanonicalPackage, Skill } from "@/src/core/packages/types"
+} from "@/agents/install"
+import type { InstallablePackage, ResolvedAgent } from "@/agents/types"
+import type { CanonicalPackage, Skill } from "@/packages/types"
 import { abs, alias, exists, ghRef, isDirectory, nes, withTempDir } from "@/tests/helpers"
 
 // =============================================================================
@@ -29,8 +30,8 @@ function makeAgent(skillsPath: string): ResolvedAgent {
 	return {
 		displayName: "Claude Code",
 		id: "claude-code",
-		rootPath: dirname(skillsPath),
-		skillsPath,
+		rootPath: abs(dirname(skillsPath)),
+		skillsPath: abs(skillsPath),
 	}
 }
 
@@ -96,13 +97,13 @@ async function createSkillSource(
 	baseDir: string,
 	skillName: string,
 	files: Record<string, string>,
-): Promise<string> {
+): Promise<AbsolutePath> {
 	const skillDir = join(baseDir, skillName)
 	await mkdir(skillDir, { recursive: true })
 	for (const [name, content] of Object.entries(files)) {
 		await writeFile(join(skillDir, name), content)
 	}
-	return skillDir
+	return abs(skillDir)
 }
 
 // =============================================================================
@@ -178,8 +179,11 @@ describe("planAgentInstall", () => {
 
 			expect(result).toBeErr()
 			if (!result.ok) {
-				expect(result.error.type).toBe("invalid_input")
-				expect(result.error.message).toContain("no skills")
+				expect(result.error.type).toBe("validation")
+				if (result.error.type === "validation") {
+					expect(result.error.field).toBe("skills")
+					expect(result.error.message).toContain("no skills")
+				}
 			}
 		})
 	})
@@ -228,8 +232,11 @@ describe("planAgentInstall", () => {
 
 			expect(result).toBeErr()
 			if (!result.ok) {
-				expect(result.error.type).toBe("invalid_input")
-				expect(result.error.message).toContain("path separators")
+				expect(result.error.type).toBe("validation")
+				if (result.error.type === "validation") {
+					expect(result.error.field).toBe("prefix")
+					expect(result.error.message).toContain("path separators")
+				}
 			}
 		})
 	})
@@ -251,7 +258,10 @@ describe("planAgentInstall", () => {
 
 			expect(result).toBeErr()
 			if (!result.ok) {
-				expect(result.error.type).toBe("invalid_input")
+				expect(result.error.type).toBe("validation")
+				if (result.error.type === "validation") {
+					expect(result.error.field).toBe("skill name")
+				}
 			}
 		})
 	})
@@ -273,8 +283,11 @@ describe("planAgentInstall", () => {
 
 			expect(result).toBeErr()
 			if (!result.ok) {
-				expect(result.error.type).toBe("invalid_target")
-				expect(result.error.message).toContain("empty")
+				expect(result.error.type).toBe("validation")
+				if (result.error.type === "validation") {
+					expect(result.error.field).toBe("skillsPath")
+					expect(result.error.message).toContain("empty")
+				}
 			}
 		})
 	})
@@ -322,7 +335,7 @@ describe("applyAgentInstall", () => {
 					"index.md": "# Test Skill",
 				})
 
-				const targetBase = join(dir, "nonexistent", "nested", "path")
+				const targetBase = abs(join(dir, "nonexistent", "nested", "path"))
 				expect(await exists(targetBase)).toBe(false)
 
 				const plan: AgentInstallPlan = {
@@ -335,7 +348,7 @@ describe("applyAgentInstall", () => {
 							skillName: "skill",
 							sourcePath: skillSource,
 							targetName: "pkg-skill",
-							targetPath: join(targetBase, "pkg-skill"),
+							targetPath: abs(join(targetBase, "pkg-skill")),
 						},
 					],
 				}
@@ -353,7 +366,7 @@ describe("applyAgentInstall", () => {
 					"index.md": "# Test",
 				})
 
-				const targetBase = join(dir, "existing-dir")
+				const targetBase = abs(join(dir, "existing-dir"))
 				await mkdir(targetBase, { recursive: true })
 
 				const plan: AgentInstallPlan = {
@@ -366,7 +379,7 @@ describe("applyAgentInstall", () => {
 							skillName: "skill",
 							sourcePath: skillSource,
 							targetName: "pkg-skill",
-							targetPath: join(targetBase, "pkg-skill"),
+							targetPath: abs(join(targetBase, "pkg-skill")),
 						},
 					],
 				}
@@ -386,7 +399,7 @@ describe("applyAgentInstall", () => {
 					"index.md": "# My Skill\nContent here",
 				})
 
-				const targetBase = join(dir, "agent-skills")
+				const targetBase = abs(join(dir, "agent-skills"))
 				const plan: AgentInstallPlan = {
 					agentId: "claude-code",
 					basePath: targetBase,
@@ -397,7 +410,7 @@ describe("applyAgentInstall", () => {
 							skillName: "skill",
 							sourcePath: skillSource,
 							targetName: "pkg-skill",
-							targetPath: join(targetBase, "pkg-skill"),
+							targetPath: abs(join(targetBase, "pkg-skill")),
 						},
 					],
 				}
@@ -430,13 +443,13 @@ describe("applyAgentInstall", () => {
 
 		it("copies nested directory structures", async () => {
 			await withTempDir(async (dir) => {
-				const skillSource = join(dir, "skill")
+				const skillSource = abs(join(dir, "skill"))
 				await mkdir(join(skillSource, "sub", "nested"), { recursive: true })
 				await writeFile(join(skillSource, "root.md"), "root")
 				await writeFile(join(skillSource, "sub", "child.md"), "child")
 				await writeFile(join(skillSource, "sub", "nested", "deep.md"), "deep")
 
-				const targetBase = join(dir, "agent-skills")
+				const targetBase = abs(join(dir, "agent-skills"))
 				const plan: AgentInstallPlan = {
 					agentId: "claude-code",
 					basePath: targetBase,
@@ -447,7 +460,7 @@ describe("applyAgentInstall", () => {
 							skillName: "skill",
 							sourcePath: skillSource,
 							targetName: "pkg-skill",
-							targetPath: join(targetBase, "pkg-skill"),
+							targetPath: abs(join(targetBase, "pkg-skill")),
 						},
 					],
 				}
@@ -472,7 +485,7 @@ describe("applyAgentInstall", () => {
 					"index.md": "# Symlinked Skill",
 				})
 
-				const targetBase = join(dir, "agent-skills")
+				const targetBase = abs(join(dir, "agent-skills"))
 				const plan: AgentInstallPlan = {
 					agentId: "claude-code",
 					basePath: targetBase,
@@ -483,7 +496,7 @@ describe("applyAgentInstall", () => {
 							skillName: "skill",
 							sourcePath: skillSource,
 							targetName: "pkg-skill",
-							targetPath: join(targetBase, "pkg-skill"),
+							targetPath: abs(join(targetBase, "pkg-skill")),
 						},
 					],
 				}
@@ -511,8 +524,8 @@ describe("applyAgentInstall", () => {
 					"index.md": "# New Version",
 				})
 
-				const targetBase = join(dir, "agent-skills")
-				const targetPath = join(targetBase, "pkg-skill")
+				const targetBase = abs(join(dir, "agent-skills"))
+				const targetPath = abs(join(targetBase, "pkg-skill"))
 
 				// Create existing "stale" skill
 				await mkdir(targetPath, { recursive: true })
@@ -554,8 +567,8 @@ describe("applyAgentInstall", () => {
 					"index.md": "# Test",
 				})
 
-				const targetBase = join(dir, "agent-skills")
-				const targetPath = join(targetBase, "pkg-skill")
+				const targetBase = abs(join(dir, "agent-skills"))
+				const targetPath = abs(join(targetBase, "pkg-skill"))
 
 				// Create existing untracked skill
 				await mkdir(targetPath, { recursive: true })
@@ -596,8 +609,8 @@ describe("applyAgentInstall", () => {
 					"index.md": "# Test",
 				})
 
-				const targetBase = join(dir, "agent-skills")
-				const targetPath = join(targetBase, "pkg-skill")
+				const targetBase = abs(join(dir, "agent-skills"))
+				const targetPath = abs(join(targetBase, "pkg-skill"))
 
 				// Create existing skill
 				await mkdir(targetPath, { recursive: true })
@@ -631,7 +644,7 @@ describe("applyAgentInstall", () => {
 	describe("error cases", () => {
 		it("fails when source directory does not exist", async () => {
 			await withTempDir(async (dir) => {
-				const targetBase = join(dir, "agent-skills")
+				const targetBase = abs(join(dir, "agent-skills"))
 				const plan: AgentInstallPlan = {
 					agentId: "claude-code",
 					basePath: targetBase,
@@ -640,9 +653,9 @@ describe("applyAgentInstall", () => {
 							agentId: "claude-code",
 							mode: "copy",
 							skillName: "skill",
-							sourcePath: join(dir, "nonexistent-source"),
+							sourcePath: abs(join(dir, "nonexistent-source")),
 							targetName: "pkg-skill",
-							targetPath: join(targetBase, "pkg-skill"),
+							targetPath: abs(join(targetBase, "pkg-skill")),
 						},
 					],
 				}
@@ -651,18 +664,21 @@ describe("applyAgentInstall", () => {
 
 				expect(result).toBeErr()
 				if (!result.ok) {
-					expect(result.error.type).toBe("invalid_input")
-					expect(result.error.message).toContain("does not exist")
+					expect(result.error.type).toBe("validation")
+					if (result.error.type === "validation") {
+						expect(result.error.field).toBe("sourcePath")
+						expect(result.error.message).toContain("does not exist")
+					}
 				}
 			})
 		})
 
 		it("fails when source is a file, not a directory", async () => {
 			await withTempDir(async (dir) => {
-				const sourceFile = join(dir, "source-file.md")
+				const sourceFile = abs(join(dir, "source-file.md"))
 				await writeFile(sourceFile, "# Not a directory")
 
-				const targetBase = join(dir, "agent-skills")
+				const targetBase = abs(join(dir, "agent-skills"))
 				const plan: AgentInstallPlan = {
 					agentId: "claude-code",
 					basePath: targetBase,
@@ -673,7 +689,7 @@ describe("applyAgentInstall", () => {
 							skillName: "skill",
 							sourcePath: sourceFile,
 							targetName: "pkg-skill",
-							targetPath: join(targetBase, "pkg-skill"),
+							targetPath: abs(join(targetBase, "pkg-skill")),
 						},
 					],
 				}
@@ -682,8 +698,11 @@ describe("applyAgentInstall", () => {
 
 				expect(result).toBeErr()
 				if (!result.ok) {
-					expect(result.error.type).toBe("invalid_input")
-					expect(result.error.message).toContain("not a directory")
+					expect(result.error.type).toBe("validation")
+					if (result.error.type === "validation") {
+						expect(result.error.field).toBe("sourcePath")
+						expect(result.error.message).toContain("not a directory")
+					}
 				}
 			})
 		})
@@ -694,7 +713,7 @@ describe("applyAgentInstall", () => {
 					"index.md": "# Test",
 				})
 
-				const targetBase = join(dir, "not-a-dir")
+				const targetBase = abs(join(dir, "not-a-dir"))
 				await writeFile(targetBase, "I am a file")
 
 				const plan: AgentInstallPlan = {
@@ -707,7 +726,7 @@ describe("applyAgentInstall", () => {
 							skillName: "skill",
 							sourcePath: skillSource,
 							targetName: "pkg-skill",
-							targetPath: join(targetBase, "pkg-skill"),
+							targetPath: abs(join(targetBase, "pkg-skill")),
 						},
 					],
 				}
@@ -716,8 +735,11 @@ describe("applyAgentInstall", () => {
 
 				expect(result).toBeErr()
 				if (!result.ok) {
-					expect(result.error.type).toBe("invalid_target")
-					expect(result.error.message).toContain("Expected directory")
+					expect(result.error.type).toBe("validation")
+					if (result.error.type === "validation") {
+						expect(result.error.field).toBe("targetPath")
+						expect(result.error.message).toContain("Expected directory")
+					}
 				}
 			})
 		})
@@ -736,7 +758,7 @@ describe("applyAgentInstall", () => {
 					"3.md": "Third",
 				})
 
-				const targetBase = join(dir, "agent-skills")
+				const targetBase = abs(join(dir, "agent-skills"))
 				const plan: AgentInstallPlan = {
 					agentId: "claude-code",
 					basePath: targetBase,
@@ -747,7 +769,7 @@ describe("applyAgentInstall", () => {
 							skillName: "skill1",
 							sourcePath: skill1,
 							targetName: "pkg-skill1",
-							targetPath: join(targetBase, "pkg-skill1"),
+							targetPath: abs(join(targetBase, "pkg-skill1")),
 						},
 						{
 							agentId: "claude-code",
@@ -755,7 +777,7 @@ describe("applyAgentInstall", () => {
 							skillName: "skill2",
 							sourcePath: skill2,
 							targetName: "pkg-skill2",
-							targetPath: join(targetBase, "pkg-skill2"),
+							targetPath: abs(join(targetBase, "pkg-skill2")),
 						},
 						{
 							agentId: "claude-code",
@@ -763,7 +785,7 @@ describe("applyAgentInstall", () => {
 							skillName: "skill3",
 							sourcePath: skill3,
 							targetName: "pkg-skill3",
-							targetPath: join(targetBase, "pkg-skill3"),
+							targetPath: abs(join(targetBase, "pkg-skill3")),
 						},
 					],
 				}
@@ -802,7 +824,7 @@ describe("applyAgentInstall", () => {
 					"3.md": "Third",
 				})
 
-				const targetBase = join(dir, "agent-skills")
+				const targetBase = abs(join(dir, "agent-skills"))
 				const plan: AgentInstallPlan = {
 					agentId: "claude-code",
 					basePath: targetBase,
@@ -813,15 +835,15 @@ describe("applyAgentInstall", () => {
 							skillName: "skill1",
 							sourcePath: skill1,
 							targetName: "pkg-skill1",
-							targetPath: join(targetBase, "pkg-skill1"),
+							targetPath: abs(join(targetBase, "pkg-skill1")),
 						},
 						{
 							agentId: "claude-code",
 							mode: "copy",
 							skillName: "skill2",
-							sourcePath: join(dir, "nonexistent"), // Will fail
+							sourcePath: abs(join(dir, "nonexistent")), // Will fail
 							targetName: "pkg-skill2",
-							targetPath: join(targetBase, "pkg-skill2"),
+							targetPath: abs(join(targetBase, "pkg-skill2")),
 						},
 						{
 							agentId: "claude-code",
@@ -829,7 +851,7 @@ describe("applyAgentInstall", () => {
 							skillName: "skill3",
 							sourcePath: skill3,
 							targetName: "pkg-skill3",
-							targetPath: join(targetBase, "pkg-skill3"),
+							targetPath: abs(join(targetBase, "pkg-skill3")),
 						},
 					],
 				}

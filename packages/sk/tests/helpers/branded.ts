@@ -4,7 +4,7 @@
  * These cast strings directly to branded types without validation.
  * Only use in tests where you control the input values.
  *
- * For production code, use the coerce functions from @/src/core/types/coerce
+ * For production code, use the coerce functions from @skills-supply/core
  * which validate input and return null on invalid values.
  */
 
@@ -14,7 +14,7 @@ import type {
 	GithubRef,
 	GitUrl,
 	NonEmptyString,
-} from "@/src/core/types/branded"
+} from "@skills-supply/core"
 
 /** Cast string to NonEmptyString (test-only, no validation) */
 export const nes = (s: string): NonEmptyString => s as NonEmptyString

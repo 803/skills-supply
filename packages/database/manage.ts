@@ -4,6 +4,7 @@ import * as path from "node:path"
 import { fileURLToPath } from "node:url"
 import { Command } from "commander"
 import { FileMigrationProvider, type Kysely, Migrator } from "kysely"
+import type { ZodError } from "zod"
 import { env } from "./env"
 import { db as database } from "./index"
 import { debug } from "./log"
@@ -21,6 +22,56 @@ interface ExtendedConfig extends Config {
 	migrator: Migrator
 }
 
+interface BaseError {
+	type: string
+	message: string
+	cause?: BaseError
+	rawError?: Error
+}
+
+type ValidationError =
+	| (BaseError & {
+			type: "validation"
+			source: "zod"
+			field: string
+			zodError: ZodError
+	  })
+	| (BaseError & {
+			type: "validation"
+			source: "manual"
+			field: string
+	  })
+
+type IoError = BaseError & {
+	type: "io"
+	operation: string
+	path: string
+}
+
+type CommandError = BaseError & {
+	type: "command"
+	command: string
+	exitCode?: number
+}
+
+type MigrationError = BaseError & {
+	type: "migration"
+	action: string
+}
+
+type DbManageError = ValidationError | IoError | CommandError | MigrationError
+
+type Result<T> = { ok: true; value: T } | { ok: false; error: DbManageError }
+
+type PrintableError = BaseError & {
+	field?: string
+	path?: string
+	operation?: string
+	source?: string
+	target?: string
+	zodError?: ZodError
+}
+
 const PROGRAM = new Command()
 	.option("--no-auto-biome")
 	.option("--no-auto-codegen")
@@ -28,54 +79,102 @@ const PROGRAM = new Command()
 	.argument("<string>")
 
 const ACTIONS = {
-	biome: async ({ folder }) => {
-		execSync(`${biomeBin()} check --write ${folder}`, {
-			stdio: "inherit",
-		})
+	biome: async ({ folder }): Promise<Result<void>> => {
+		return runCommand(`${biomeBin()} check --write ${folder}`, { stdio: "inherit" })
 	},
-	codegen: async ({ codegen, dbUrl, folder }) => {
+	codegen: async ({ codegen, dbUrl, folder }): Promise<Result<void>> => {
 		if (codegen === "kanel-kysely") {
-			execSync(`${kanelBin()} -d ${dbUrl} -o ${path.join(folder, "models")}`, {
-				cwd: folder,
-				stdio: "inherit",
-			})
-		} else if (codegen === "kysely-codegen") {
-			execSync(
+			return runCommand(
+				`${kanelBin()} -d ${dbUrl} -o ${path.join(folder, "models")}`,
+				{ cwd: folder, stdio: "inherit" },
+			)
+		}
+		if (codegen === "kysely-codegen") {
+			return runCommand(
 				`${kyselyCodegenBin()} --url ${dbUrl} --out-file=${path.join(folder, "models/index.d.ts")}`,
 				{ cwd: folder, stdio: "inherit" },
 			)
-		} else {
-			throw new Error()
+		}
+		return {
+			error: {
+				field: "codegen",
+				message: "Unsupported codegen option.",
+				source: "manual",
+				type: "validation",
+			},
+			ok: false,
 		}
 	},
-	down: async ({ migrator }) => {
-		debug(__filename, await migrator.migrateDown())
+	down: async ({ migrator }): Promise<Result<void>> => {
+		return runMigration("down", async () => migrator.migrateDown())
 	},
-	downup: async ({ migrator }) => {
-		debug(__filename, await migrator.migrateDown())
-		debug(__filename, await migrator.migrateUp())
+	downup: async ({ migrator }): Promise<Result<void>> => {
+		const down = await runMigration("down", async () => migrator.migrateDown())
+		if (!down.ok) {
+			return down
+		}
+		return runMigration("up", async () => migrator.migrateUp())
 	},
-	drop: async ({ drop, db, dbUrl }) => {
+	drop: async ({ drop, db, dbUrl }): Promise<Result<void>> => {
 		if (drop === "schema") {
-			await db.schema.dropSchema("public").ifExists().cascade().execute()
-			await db.schema.createSchema("public").execute()
-		} else if (drop === "file") {
-			await fs.writeFile(dbUrl, "")
-		} else {
-			throw new Error()
+			try {
+				await db.schema.dropSchema("public").ifExists().cascade().execute()
+				await db.schema.createSchema("public").execute()
+				return { ok: true, value: undefined }
+			} catch (error) {
+				return {
+					error: {
+						message: "Schema drop failed.",
+						operation: "dropSchema",
+						path: "db",
+						rawError: error instanceof Error ? error : undefined,
+						type: "io",
+					},
+					ok: false,
+				}
+			}
+		}
+		if (drop === "file") {
+			try {
+				await fs.writeFile(dbUrl, "")
+				return { ok: true, value: undefined }
+			} catch (error) {
+				return {
+					error: {
+						message: "Failed to clear database file.",
+						operation: "writeFile",
+						path: dbUrl,
+						rawError: error instanceof Error ? error : undefined,
+						type: "io",
+					},
+					ok: false,
+				}
+			}
+		}
+		return {
+			error: {
+				field: "drop",
+				message: "Unsupported drop option.",
+				source: "manual",
+				type: "validation",
+			},
+			ok: false,
 		}
 	},
-	latest: async ({ migrator }) => {
-		debug(__filename, await migrator.migrateToLatest())
+	latest: async ({ migrator }): Promise<Result<void>> => {
+		return runMigration("latest", async () => migrator.migrateToLatest())
 	},
-	reset: async (config) => {
-		await ACTIONS.drop(config)
-		await ACTIONS.latest(config)
+	reset: async (config): Promise<Result<void>> => {
+		const dropped = await ACTIONS.drop(config)
+		if (!dropped.ok) {
+			return dropped
+		}
+		return ACTIONS.latest(config)
 	},
-	up: async ({ migrator }) => {
-		debug(__filename, await migrator.migrateUp())
+	up: async ({ migrator }): Promise<Result<void>> => {
+		return runMigration("up", async () => migrator.migrateUp())
 	},
-} satisfies Record<string, (config: ExtendedConfig) => Promise<void>>
+} satisfies Record<string, (config: ExtendedConfig) => Promise<Result<void>>>
 
 const __filename = fileURLToPath(import.meta.url)
 const CURRENT_DIR = path.dirname(__filename)
@@ -98,12 +197,137 @@ function biomeBin(): string {
 	return binPath("biome")
 }
 
-async function run() {
+function runCommand(
+	command: string,
+	options: Parameters<typeof execSync>[1],
+): Result<void> {
+	try {
+		execSync(command, options)
+		return { ok: true, value: undefined }
+	} catch (error) {
+		return {
+			error: {
+				command,
+				exitCode: getExitCode(error),
+				message: `Command failed: ${command}`,
+				rawError: error instanceof Error ? error : undefined,
+				type: "command",
+			},
+			ok: false,
+		}
+	}
+}
+
+async function runMigration(
+	action: string,
+	migrate: () => Promise<Awaited<ReturnType<Migrator["migrateUp"]>>>,
+): Promise<Result<void>> {
+	const result = await migrate()
+	debug(__filename, result)
+	if (result.error) {
+		return {
+			error: {
+				action,
+				message: `Migration ${action} failed.`,
+				rawError: result.error instanceof Error ? result.error : undefined,
+				type: "migration",
+			},
+			ok: false,
+		}
+	}
+	return { ok: true, value: undefined }
+}
+
+function printError(error: PrintableError): void {
+	console.error(formatErrorChain(error))
+	printRawErrors(error)
+}
+
+function formatErrorChain(error: PrintableError): string {
+	return formatErrorChainLines(error, 0).join("\n")
+}
+
+function formatErrorChainLines(error: PrintableError, indent: number): string[] {
+	const prefix = " ".repeat(indent)
+	const detailParts = buildDetailParts(error)
+	const details = detailParts.length ? ` (${detailParts.join(", ")})` : ""
+	const lines = [`${prefix}[${error.type}] ${error.message}${details}`]
+
+	if (error.zodError) {
+		lines.push(`${prefix}  Zod issues:`)
+		for (const issue of error.zodError.issues) {
+			const pathLabel = issue.path.length > 0 ? issue.path.join(".") : "<root>"
+			lines.push(`${prefix}  - ${pathLabel}: ${issue.message}`)
+		}
+	}
+
+	if (error.cause) {
+		lines.push(`${prefix}Caused by:`)
+		lines.push(...formatErrorChainLines(error.cause, indent + 2))
+	}
+
+	return lines
+}
+
+function printRawErrors(error: PrintableError): void {
+	if (error.rawError) {
+		console.error(error.rawError)
+	}
+	if (error.cause) {
+		printRawErrors(error.cause)
+	}
+}
+
+function buildDetailParts(error: PrintableError): string[] {
+	const details: string[] = []
+	if ("field" in error && typeof error.field === "string") {
+		details.push(`field=${error.field}`)
+	}
+	if ("path" in error && typeof error.path === "string") {
+		details.push(`path=${error.path}`)
+	}
+	if ("operation" in error && typeof error.operation === "string") {
+		details.push(`operation=${error.operation}`)
+	}
+	if ("command" in error && typeof error.command === "string") {
+		details.push(`command=${error.command}`)
+	}
+	if ("exitCode" in error && typeof error.exitCode === "number") {
+		details.push(`exitCode=${error.exitCode}`)
+	}
+	if ("action" in error && typeof error.action === "string") {
+		details.push(`action=${error.action}`)
+	}
+	if ("source" in error && typeof error.source === "string") {
+		details.push(`source=${error.source}`)
+	}
+	return details
+}
+
+function getExitCode(error: unknown): number | undefined {
+	if (error && typeof error === "object" && "status" in error) {
+		const status = (error as { status?: unknown }).status
+		if (typeof status === "number") {
+			return status
+		}
+	}
+	return undefined
+}
+
+async function run(): Promise<Result<void>> {
 	const p = PROGRAM.parse()
 	const action = p.args[0]
 	const { autoCodegen, autoBiome, ci } = p.opts()
 	if (!action || !(action in ACTIONS)) {
-		throw new Error(`Unknown action: ${action ?? "<missing>"}`)
+		return {
+			error: {
+				field: "action",
+				message: `Unknown action: ${action ?? "<missing>"}`,
+				source: "manual",
+				type: "validation",
+			},
+			ok: false,
+		}
 	}
 	const typedAction = action as keyof typeof ACTIONS
 	const folder = CURRENT_DIR
@@ -137,10 +361,32 @@ async function run() {
 	const uniquedActions = [...new Set(actions.reverse())].reverse()
 	for (const a of uniquedActions) {
 		const actionFn = ACTIONS[a]
-		await actionFn(extendedConfig)
+		const result = await actionFn(extendedConfig)
+		if (!result.ok) {
+			return result
+		}
 	}
-	await config.db.destroy()
-	process.exit(0)
+	try {
+		await config.db.destroy()
+	} catch (error) {
+		return {
+			error: {
+				message: "Failed to close database connection.",
+				operation: "destroy",
+				path: "db",
+				rawError: error instanceof Error ? error : undefined,
+				type: "io",
+			},
+			ok: false,
+		}
+	}
+	return { ok: true, value: undefined }
 }
 
-run()
+run().then((result) => {
+	if (!result.ok) {
+		printError(result.error)
+		process.exit(1)
+	}
+	process.exit(0)
+})

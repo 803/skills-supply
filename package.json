@@ -4,7 +4,7 @@
 		"typedoc-github-theme": "^0.3.1"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.3.10",
+		"@biomejs/biome": "^2.3.11",
 		"cheerio": "^1.1.2",
 		"consola": "^3.4.2",
 		"jsdom": "^27.4.0",
@@ -14,8 +14,7 @@
 		"typedoc-plugin-markdown": "^4.9.0",
 		"typescript": "^5.9.3",
 		"vite-tsconfig-paths": "^6.0.3",
-		"vitest": "^4.0.16",
-		"wrangler": "^4.55.0"
+		"vitest": "^4.0.16"
 	},
 	"engines": {
 		"node": ">=20.0.0"

@@ -5,10 +5,10 @@ export default defineConfig({
 	plugins: [tsconfigPaths()],
 	test: {
 		coverage: {
-			exclude: ["src/**/*.test.ts"],
-			include: ["src/**/*.ts"],
+			exclude: ["**/*.test.ts", "tests/**/*.ts"],
+			include: ["**/*.ts"],
 		},
-		include: ["src/**/*.test.ts", "tests/**/*.test.ts"],
+		include: ["**/*.test.ts"],
 		name: "sk",
 		testTimeout: 30000,
 	},

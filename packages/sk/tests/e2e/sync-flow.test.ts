@@ -10,25 +10,27 @@
 
 import { readdir, readFile, rm } from "node:fs/promises"
 import { join } from "node:path"
+import { coerceAbsolutePathDirect } from "@skills-supply/core"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import type { ResolvedAgent } from "@/src/core/agents/types"
-import { loadManifest } from "@/src/core/manifest/fs"
-import { runSync } from "@/src/core/sync/sync"
-import { coerceAbsolutePathDirect } from "@/src/core/types/coerce"
+import type { ResolvedAgent } from "@/agents/types"
+import { loadManifest } from "@/manifest/fs"
+import { runSync } from "@/sync/sync"
 import {
 	createTestProject,
 	exists,
 	isDirectory,
 	setupFixturePackage,
+	setupFixturePlugin,
 	withTempDir,
 } from "@/tests/helpers"
+import { abs } from "@/tests/helpers/branded"
 
 function createResolvedAgent(rootPath: string, skillsPath: string): ResolvedAgent {
 	return {
 		displayName: "Test Agent",
 		id: "claude-code",
-		rootPath,
-		skillsPath,
+		rootPath: abs(rootPath),
+		skillsPath: abs(skillsPath),
 	}
 }
 
@@ -43,7 +45,10 @@ async function loadProjectManifest(projectDir: string) {
 		throw new Error("Invalid manifest path.")
 	}
 	const loaded = await loadManifest(manifestPath, "cwd")
-	return loaded.manifest
+	if (!loaded.ok) {
+		throw new Error(`Failed to load manifest: ${loaded.error.message}`)
+	}
+	return loaded.value.manifest
 }
 
 /**
@@ -212,6 +217,44 @@ describe("sync e2e", () => {
 					// Error is expected for packages with no skills
 					expect(result.error.stage).toMatch(/extract|install/)
 				}
+			})
+		})
+
+		it("warns and skips plugin packages with no skills", async () => {
+			await withTempDir(async (dir) => {
+				tempDir = dir
+
+				const pluginDir = join(dir, "broken-plugin")
+				await setupFixturePlugin(pluginDir, { name: "broken-plugin" })
+
+				const projectDir = join(dir, "project")
+				await createTestProject(projectDir, {
+					agents: ["claude-code"],
+					dependencies: {
+						broken: `local:${pluginDir}`,
+					},
+					name: "test-project",
+				})
+
+				const { rootPath: agentRootDir, skillsPath: agentSkillsDir } =
+					buildAgentPaths(dir)
+				const agent = createResolvedAgent(agentRootDir, agentSkillsDir)
+				const manifest = await loadProjectManifest(projectDir)
+
+				const result = await runSync({
+					agents: [agent],
+					dryRun: false,
+					manifest,
+				})
+
+				expect(result.ok).toBe(true)
+				if (!result.ok) {
+					return
+				}
+
+				expect(result.value.warnings.length).toBeGreaterThan(0)
+				expect(result.value.warnings.join(" ")).toContain("Skipping plugin")
+				expect(result.value.installed).toBe(0)
 			})
 		})
 	})

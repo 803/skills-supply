@@ -7,7 +7,7 @@
 		"dotenv": "^17.2.3",
 		"kysely": "^0.28.9",
 		"pg-boss": "^12.5.4",
-		"zod": "^3.25.76"
+		"zod": "^4.3.5"
 	},
 	"devDependencies": {
 		"@types/node": "^25"
@@ -17,12 +17,12 @@
 	"scripts": {
 		"build": "tsc --build",
 		"clean": "rm -rf dist",
-		"draft": "npx tsx --tsconfig tsconfig.json src/cli.ts draft",
-		"enqueue": "npx tsx --tsconfig tsconfig.json src/cli.ts enqueue",
-		"list": "npx tsx --tsconfig tsconfig.json src/cli.ts list",
+		"draft": "npx tsx --tsconfig tsconfig.json cli.ts draft",
+		"enqueue": "npx tsx --tsconfig tsconfig.json cli.ts enqueue",
+		"list": "npx tsx --tsconfig tsconfig.json cli.ts list",
 		"tsc": "tsc --build",
-		"tsx": "npx tsx --tsconfig tsconfig.json src/cli.ts",
-		"worker": "npx tsx --tsconfig tsconfig.json src/cli.ts worker"
+		"tsx": "npx tsx --tsconfig tsconfig.json cli.ts",
+		"worker": "npx tsx --tsconfig tsconfig.json cli.ts worker"
 	},
 	"type": "module",
 	"version": "0.1.0"

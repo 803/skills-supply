@@ -6,9 +6,9 @@
 
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { createEmptyManifest } from "@/src/core/manifest/fs"
-import type { SyncOptions, SyncResult, SyncSummary } from "@/src/core/sync/types"
-import { coerceAbsolutePathDirect } from "@/src/core/types/coerce"
+import { coerceAbsolutePathDirect } from "@skills-supply/core"
+import { createEmptyManifest } from "@/manifest/fs"
+import type { SyncOptions, SyncResult, SyncSummary } from "@/sync/types"
 
 /**
  * Options for running sync in tests.

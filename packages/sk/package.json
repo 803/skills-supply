@@ -25,7 +25,6 @@
 	},
 	"files": [
 		"dist",
-		"src",
 		"LICENSE",
 		"README.md"
 	],
@@ -46,9 +45,9 @@
 	},
 	"scripts": {
 		"build": "bun run build:binary && bun run build:node && bun run build:core",
-		"build:binary": "bun build ./src/cli.ts --compile --outfile ./bin/sk",
-		"build:core": "bun build ./src/index.ts --outdir ./dist --target node",
-		"build:node": "bun build ./src/cli.ts --outdir ./dist --target node",
+		"build:binary": "bun build ./cli.ts --compile --outfile ./bin/sk",
+		"build:core": "bun build ./index.ts --outdir ./dist --target node",
+		"build:node": "bun build ./cli.ts --outdir ./dist --target node",
 		"clean": "rm -rf dist bin",
 		"test": "vitest",
 		"test:coverage": "vitest --coverage",
@@ -57,6 +56,6 @@
 		"tsc": "bun run build:core && npx tsc -p tsconfig.json"
 	},
 	"type": "module",
-	"types": "./src/index.d.ts",
+	"types": "./index.d.ts",
 	"version": "0.1.8"
 }
