@@ -35,7 +35,7 @@ import type {
 	GitPackage,
 } from "@/packages/types"
 import { failSync } from "@/sync/errors"
-import { resolveAgentPackages } from "@/sync/marketplace"
+import { type ResolvedClaudePlugin, resolveAgentPackages } from "@/sync/marketplace"
 import { buildRepoDir, buildRepoKey } from "@/sync/repo"
 import type { ExtractedPackage, SyncOptions, SyncResult, SyncSummary } from "@/sync/types"
 import { validateExtractedPackages } from "@/sync/validate"
@@ -206,6 +206,7 @@ async function syncAgent(
 
 		warnings = warnings.concat(packageResolution.value.warnings)
 		const resolvedPackages = packageResolution.value.packages
+		const resolvedPlugins = packageResolution.value.plugins
 
 		const fetchedResult = await fetchPackagesForAgent(
 			resolvedPackages,
@@ -216,7 +217,19 @@ async function syncAgent(
 			return result
 		}
 
-		const extractedResult = await detectAndExtractPackages(fetchedResult.value)
+		const pluginFetchResult = await fetchClaudePluginPackages(
+			resolvedPlugins,
+			tempRootResult.value,
+		)
+		if (!pluginFetchResult.ok) {
+			result = pluginFetchResult
+			return result
+		}
+
+		const extractedResult = await detectAndExtractPackages([
+			...fetchedResult.value,
+			...pluginFetchResult.value,
+		])
 		if (!extractedResult.ok) {
 			result = extractedResult
 			return result
@@ -462,6 +475,141 @@ async function fetchPackagesForAgent(
 	return { ok: true, value: fetched }
 }
 
+async function fetchClaudePluginPackages(
+	plugins: ResolvedClaudePlugin[],
+	tempRoot: AbsolutePath,
+): Promise<SyncResult<FetchedPackage[]>> {
+	if (plugins.length === 0) {
+		return { ok: true, value: [] }
+	}
+
+	const fetched: FetchedPackage[] = []
+	const repoCache = new Map<string, AbsolutePath>()
+
+	for (const plugin of plugins) {
+		const source = plugin.source
+
+		if (source.type === "local") {
+			const stats = await safeStat(source.path)
+			if (!stats.ok) {
+				return failSync("fetch", stats.error)
+			}
+
+			if (!stats.value) {
+				return failSync("fetch", {
+					field: "source",
+					message: `Plugin source does not exist: ${source.path}`,
+					path: source.path,
+					source: "manual",
+					type: "validation",
+				})
+			}
+
+			if (!stats.value.isDirectory()) {
+				return failSync("fetch", {
+					field: "source",
+					message: `Plugin source is not a directory: ${source.path}`,
+					path: source.path,
+					source: "manual",
+					type: "validation",
+				})
+			}
+
+			fetched.push({
+				canonical: plugin.canonical,
+				packagePath: source.path,
+				repoPath: source.path,
+			})
+			continue
+		}
+
+		if (source.type === "github") {
+			const parsed = parseGithubSlug(source.gh, plugin.canonical.origin)
+			if (!parsed.ok) {
+				return failSync("fetch", parsed.error)
+			}
+
+			const key = buildRepoKey("github", source.gh, undefined)
+			let repoPath = repoCache.get(key)
+			if (!repoPath) {
+				const repoDir = buildRepoDir(
+					String(tempRoot),
+					key,
+					String(plugin.canonical.origin.alias),
+				)
+				const repoResult = await fetchGithubRepository({
+					destination: repoDir,
+					origin: plugin.canonical.origin,
+					owner: parsed.value.owner,
+					repo: parsed.value.repo,
+					spec: source.gh,
+				})
+				if (!repoResult.ok) {
+					return failSync("fetch", repoResult.error)
+				}
+
+				const resolved = coerceAbsolutePathDirect(repoResult.value.repoPath)
+				if (!resolved) {
+					return failSync("fetch", {
+						field: "path",
+						message: `Invalid repo path: ${repoResult.value.repoPath}`,
+						source: "manual",
+						type: "validation",
+					})
+				}
+				repoPath = resolved
+				repoCache.set(key, repoPath)
+			}
+
+			fetched.push({
+				canonical: plugin.canonical,
+				packagePath: repoPath,
+				repoPath,
+			})
+			continue
+		}
+
+		const key = buildRepoKey("git", source.url, undefined)
+		let repoPath = repoCache.get(key)
+		if (!repoPath) {
+			const repoDir = buildRepoDir(
+				String(tempRoot),
+				key,
+				String(plugin.canonical.origin.alias),
+			)
+			const repoResult = await fetchGitRepository({
+				destination: repoDir,
+				origin: plugin.canonical.origin,
+				remoteUrl: source.url,
+				spec: source.url,
+			})
+			if (!repoResult.ok) {
+				return failSync("fetch", repoResult.error)
+			}
+
+			const resolved = coerceAbsolutePathDirect(repoResult.value.repoPath)
+			if (!resolved) {
+				return failSync("fetch", {
+					field: "path",
+					message: `Invalid repo path: ${repoResult.value.repoPath}`,
+					source: "manual",
+					type: "validation",
+				})
+			}
+			repoPath = resolved
+			repoCache.set(key, repoPath)
+		}
+
+		fetched.push({
+			canonical: plugin.canonical,
+			packagePath: repoPath,
+			repoPath,
+		})
+	}
+
+	return { ok: true, value: fetched }
+}
+
 function buildRepoGroups(packages: CanonicalPackage[]): SyncResult<RepoGroup[]> {
 	const groups = new Map<string, RepoGroup>()
 
@@ -626,6 +774,24 @@ export async function selectDetectedStructure(
 	canonical: CanonicalPackage,
 	structures: DetectedStructure[],
 ): Promise<Result<DetectedStructure, SkError>> {
+	if (canonical.type === "claude-plugin") {
+		const plugin = structures.find((entry) => entry.method === "plugin")
+		if (plugin) {
+			return { ok: true, value: plugin }
+		}
+
+		return {
+			error: {
+				field: "structure",
+				message:
+					"Claude plugins must include .claude-plugin/plugin.json in the plugin source.",
+				source: "manual",
+				type: "validation",
+			},
+			ok: false,
+		}
+	}
+
 	const plugin = structures.find((entry) => entry.method === "plugin")
 	const manifest = structures.find((entry) => entry.method === "manifest")
 	const subdir = structures.find((entry) => entry.method === "subdir")

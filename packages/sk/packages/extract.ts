@@ -1,26 +1,18 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
-import type { AbsolutePath } from "@skills-supply/core"
+import type { AbsolutePath, ExtractedSkill } from "@skills-supply/core"
 import {
 	type CoreError,
 	coerceAbsolutePath,
-	discoverSkillPathsForPlugin,
-	discoverSkillPathsForSubdir,
+	coerceAbsolutePathDirect,
+	extractSkillsFromPlugin,
+	extractSkillsFromSingle,
+	extractSkillsFromSubdir,
 	PLUGIN_SKILLS_DIR,
-	parseFrontmatter,
-	SKILL_FILENAME,
+	resolveAutoDiscoverSkills,
 } from "@skills-supply/core"
 import { parseManifest } from "@/manifest/parse"
-import type {
-	DetectedPackage,
-	PackageExtractionError,
-	PackageExtractionResult,
-	Skill,
-} from "@/packages/types"
-
-type SkillResult =
-	| { ok: true; value: Skill }
-	| { ok: false; error: PackageExtractionError }
+import type { DetectedPackage, PackageExtractionResult, Skill } from "@/packages/types"
 
 export async function extractSkills(
 	detected: DetectedPackage,
@@ -49,14 +41,16 @@ export async function extractSkills(
 				}
 			}
 
-			const skillDirs = await discoverSkillPathsForPlugin(
-				detected.detection.skillsDir,
-			)
-			if (!skillDirs.ok) {
-				return mapCoreError(skillDirs.error, detected.detection.skillsDir, origin)
+			const extracted = await extractSkillsFromPlugin({
+				mode: "strict",
+				packageRoot: detected.packagePath,
+				skillsDir: detected.detection.skillsDir,
+			})
+			if (!extracted.ok) {
+				return mapCoreError(extracted.error, detected.detection.skillsDir, origin)
 			}
 
-			if (skillDirs.value.length === 0) {
+			if (extracted.value.skills.length === 0) {
 				const message = `No skills found in ${detected.detection.skillsDir}.`
 				return {
 					error: {
@@ -71,16 +65,18 @@ export async function extractSkills(
 				}
 			}
 
-			return buildSkillList(skillDirs.value, origin)
+			return buildSkillList(extracted.value.skills, origin)
 		}
 		case "subdir": {
-			const skillDirs = await discoverSkillPathsForSubdir(
-				detected.detection.rootDir,
-			)
-			if (!skillDirs.ok) {
-				return mapCoreError(skillDirs.error, detected.detection.rootDir, origin)
+			const extracted = await extractSkillsFromSubdir({
+				mode: "strict",
+				packageRoot: detected.detection.rootDir,
+				rootDir: detected.detection.rootDir,
+			})
+			if (!extracted.ok) {
+				return mapCoreError(extracted.error, detected.detection.rootDir, origin)
 			}
-			if (skillDirs.value.length === 0) {
+			if (extracted.value.skills.length === 0) {
 				const message = `No skills found in ${detected.detection.rootDir}.`
 				return {
 					error: {
@@ -94,10 +90,10 @@ export async function extractSkills(
 					ok: false,
 				}
 			}
-			return buildSkillList(skillDirs.value, origin)
+			return buildSkillList(extracted.value.skills, origin)
 		}
 		case "single":
-			return buildSkillList([detected.detection.skillPath], origin)
+			return buildSkillListFromSingle(detected.detection.skillPath, origin)
 	}
 
 	return {
@@ -203,11 +199,31 @@ async function extractFromManifest(
 		}
 	}
 
-	const skillDirs = await discoverSkillPathsForSubdir(skillsRoot)
-	if (!skillDirs.ok) {
-		return mapCoreError(skillDirs.error, skillsRoot, origin)
+	const packageRoot = coerceAbsolutePathDirect(path.dirname(manifestPath))
+	if (!packageRoot) {
+		const message = `Manifest root is not absolute: ${manifestPath}`
+		return {
+			error: {
+				field: "manifest",
+				message,
+				origin,
+				path: manifestPath,
+				source: "manual",
+				type: "validation",
+			},
+			ok: false,
+		}
 	}
-	if (skillDirs.value.length === 0) {
+
+	const extracted = await extractSkillsFromSubdir({
+		mode: "strict",
+		packageRoot,
+		rootDir: skillsRoot,
+	})
+	if (!extracted.ok) {
+		return mapCoreError(extracted.error, skillsRoot, origin)
+	}
+	if (extracted.value.skills.length === 0) {
 		const message = `No skills found in ${skillsRoot}.`
 		return {
 			error: {
@@ -222,69 +238,41 @@ async function extractFromManifest(
 		}
 	}
 
-	return buildSkillList(skillDirs.value, origin)
-}
-
-function resolveAutoDiscoverSkills(
-	exportsValue: { auto_discover?: { skills: string | false } } | undefined,
-): string | false {
-	const value = exportsValue?.auto_discover?.skills
-	if (value === false) {
-		return false
-	}
-
-	if (typeof value === "string") {
-		return value
-	}
-
-	return "./skills"
+	return buildSkillList(extracted.value.skills, origin)
 }
 
 async function buildSkillList(
-	skillDirs: readonly AbsolutePath[],
+	skills: ExtractedSkill[],
 	origin: Skill["origin"],
 ): Promise<PackageExtractionResult> {
-	const skills: Skill[] = []
-	const seen = new Set<string>()
-
-	for (const skillDir of skillDirs) {
-		const skillResult = await loadSkillFromDir(skillDir, origin)
-		if (!skillResult.ok) {
-			return skillResult
-		}
-
-		if (seen.has(skillResult.value.name)) {
-			const message = `Duplicate skill name "${skillResult.value.name}" found.`
-			return {
-				error: {
-					field: "skills",
-					message,
-					origin,
-					path: skillDir,
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
-		}
-
-		seen.add(skillResult.value.name)
-		skills.push(skillResult.value)
+	return {
+		ok: true,
+		value: skills.map((skill) => ({
+			name: skill.name,
+			origin,
+			sourcePath: skill.sourcePath,
+		})),
 	}
-
-	return { ok: true, value: skills }
 }
 
-async function loadSkillFromDir(
+async function buildSkillListFromSingle(
 	skillDir: AbsolutePath,
 	origin: Skill["origin"],
-): Promise<SkillResult> {
-	const skillPath = coerceAbsolutePath(SKILL_FILENAME, skillDir)
-	if (!skillPath) {
-		const message = `Unable to resolve ${SKILL_FILENAME} under ${skillDir}.`
+): Promise<PackageExtractionResult> {
+	const extracted = await extractSkillsFromSingle({
+		mode: "strict",
+		packageRoot: skillDir,
+		skillDir,
+	})
+	if (!extracted.ok) {
+		return mapCoreError(extracted.error, skillDir, origin)
+	}
+
+	if (extracted.value.skills.length === 0) {
+		const message = `No skills found in ${skillDir}.`
 		return {
 			error: {
-				field: "skillPath",
+				field: "skills",
 				message,
 				origin,
 				path: skillDir,
@@ -295,67 +283,7 @@ async function loadSkillFromDir(
 		}
 	}
 
-	let contents: string
-	try {
-		contents = await readFile(skillPath, "utf8")
-	} catch (error) {
-		return {
-			error: {
-				message: `Unable to read ${skillPath}.`,
-				operation: "readFile",
-				origin,
-				path: skillPath,
-				rawError: error instanceof Error ? error : undefined,
-				type: "io",
-			},
-			ok: false,
-		}
-	}
-
-	const parsed = parseFrontmatter(contents)
-	if (!parsed.ok) {
-		const message = "Skill frontmatter validation failed."
-		const zodError =
-			parsed.error.type === "validation" && parsed.error.source === "zod"
-				? parsed.error.zodError
-				: undefined
-		if (zodError) {
-			return {
-				error: {
-					cause: parsed.error,
-					field: "frontmatter",
-					message,
-					origin,
-					path: skillPath,
-					source: "zod",
-					type: "validation",
-					zodError,
-				},
-				ok: false,
-			}
-		}
-		return {
-			error: {
-				cause: parsed.error,
-				field: "frontmatter",
-				message,
-				origin,
-				path: skillPath,
-				source: "manual",
-				type: "validation",
-			},
-			ok: false,
-		}
-	}
-
-	return {
-		ok: true,
-		value: {
-			name: parsed.value.name,
-			origin,
-			sourcePath: skillDir,
-		},
-	}
+	return buildSkillList(extracted.value.skills, origin)
 }
 
 function mapCoreError(

@@ -1,4 +1,4 @@
-import type { AgentId, Alias, NonEmptyString } from "@/types/branded"
+import type { AbsolutePath, AgentId, Alias, NonEmptyString } from "@/types/branded"
 import type { ValidatedDeclaration } from "@/types/declaration"
 
 export type MarketplaceSource =
@@ -59,6 +59,14 @@ export type ManifestPackageMetadata = NonNullable<ManifestInfo["package"]>
 export type SkillInfo = {
 	name: NonEmptyString
 	description?: NonEmptyString
+}
+
+export type SkillEntry = SkillInfo & {
+	relativePath: NonEmptyString
+}
+
+export type ExtractedSkill = SkillEntry & {
+	sourcePath: AbsolutePath
 }
 
 export type MarketplacePluginMetadata = {

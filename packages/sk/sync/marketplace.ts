@@ -12,6 +12,7 @@ import {
 	PLUGIN_DIR,
 	parseMarketplace,
 	resolvePluginSource,
+	type ValidatedDeclaration,
 } from "@skills-supply/core"
 import type { ResolvedAgent } from "@/agents/types"
 import { readTextFile, safeStat } from "@/io/fs"
@@ -20,7 +21,6 @@ import {
 	fetchGitRepository,
 	parseGithubSlug,
 } from "@/packages/fetch"
-import { resolveValidatedDependency } from "@/packages/resolve"
 import type { CanonicalPackage, ClaudePluginPackage } from "@/packages/types"
 import { failSync } from "@/sync/errors"
 import { buildRepoDir, buildRepoKey } from "@/sync/repo"
@@ -50,19 +50,35 @@ type MarketplaceSource =
 	| { type: "git"; url: string }
 	| { type: "url"; url: string }
 
+type PluginSource = Extract<ValidatedDeclaration, { type: "github" | "git" | "local" }>
+
+export type ResolvedClaudePlugin = {
+	readonly canonical: ClaudePluginPackage
+	readonly source: PluginSource
+}
+
 export async function resolveAgentPackages(options: {
 	agent: ResolvedAgent
 	packages: CanonicalPackage[]
 	tempRoot: AbsolutePath
 	dryRun: boolean
-}): Promise<SyncResult<{ packages: CanonicalPackage[]; warnings: string[] }>> {
+}): Promise<
+	SyncResult<{
+		packages: CanonicalPackage[]
+		plugins: ResolvedClaudePlugin[]
+		warnings: string[]
+	}>
+> {
 	const pluginPackages = options.packages.filter(isClaudePluginPackage)
 	const standardPackages = options.packages.filter(
 		(pkg) => pkg.type !== "claude-plugin",
 	)
 
 	if (pluginPackages.length === 0) {
-		return { ok: true, value: { packages: standardPackages, warnings: [] } }
+		return {
+			ok: true,
+			value: { packages: standardPackages, plugins: [], warnings: [] },
+		}
 	}
 
 	const marketplaceCache = new Map<string, MarketplaceResolved>()
@@ -83,6 +99,7 @@ export async function resolveAgentPackages(options: {
 				ok: true,
 				value: {
 					packages: standardPackages,
+					plugins: [],
 					warnings: [
 						`Would install Claude plugins for ${options.agent.displayName}: ${names}.`,
 					],
@@ -99,7 +116,10 @@ export async function resolveAgentPackages(options: {
 			return installPlugins
 		}
 
-		return { ok: true, value: { packages: standardPackages, warnings: [] } }
+		return {
+			ok: true,
+			value: { packages: standardPackages, plugins: [], warnings: [] },
+		}
 	}
 
 	const resolved = await resolveClaudePluginDependencies(
@@ -114,7 +134,8 @@ export async function resolveAgentPackages(options: {
 	return {
 		ok: true,
 		value: {
-			packages: [...standardPackages, ...resolved.value],
+			packages: standardPackages,
+			plugins: resolved.value,
 			warnings: [],
 		},
 	}
@@ -216,8 +237,8 @@ async function resolveClaudePluginDependencies(
 	plugins: ClaudePluginPackage[],
 	tempRoot: AbsolutePath,
 	cache: Map<string, MarketplaceResolved>,
-): Promise<SyncResult<CanonicalPackage[]>> {
-	const resolved: CanonicalPackage[] = []
+): Promise<SyncResult<ResolvedClaudePlugin[]>> {
+	const resolved: ResolvedClaudePlugin[] = []
 
 	for (const plugin of plugins) {
 		const marketplaceResult = await loadMarketplaceInfo(
@@ -249,8 +270,10 @@ async function resolveClaudePluginDependencies(
 			})
 		}
 
-		const canonical = resolveValidatedDependency(sourceResult.value, plugin.origin)
-		resolved.push(canonical)
+		resolved.push({
+			canonical: plugin,
+			source: sourceResult.value,
+		})
 	}
 
 	return { ok: true, value: resolved }

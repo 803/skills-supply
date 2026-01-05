@@ -127,3 +127,105 @@ describe("extractSkills (plugin)", () => {
 		})
 	})
 })
+
+describe("extractSkills (manifest)", () => {
+	it("extracts skills from the default ./skills path", async () => {
+		await withTempDir(async (dir) => {
+			await writeFile(
+				path.join(dir, "agents.toml"),
+				'[package]\nname = "pkg"\nversion = "1.0.0"\n',
+			)
+			const skillsDir = path.join(dir, "skills", "alpha")
+			await mkdir(skillsDir, { recursive: true })
+			await writeFile(
+				path.join(skillsDir, "SKILL.md"),
+				"---\nname: alpha\n---\n\n# Alpha",
+			)
+
+			const detection: DetectedStructure = {
+				manifestPath: mustAbsolute(path.join(dir, "agents.toml")),
+				method: "manifest",
+			}
+
+			const result = await extractSkills(makeDetected(dir, detection))
+			expect(result.ok).toBe(true)
+			if (result.ok) {
+				expect(result.value).toHaveLength(1)
+				expect(result.value[0]?.name).toBe("alpha")
+			}
+		})
+	})
+
+	it("extracts skills from a custom auto_discover path", async () => {
+		await withTempDir(async (dir) => {
+			await writeFile(
+				path.join(dir, "agents.toml"),
+				`[package]\nname = "pkg"\nversion = "1.0.0"\n\n[exports.auto_discover]\nskills = "custom-skills"\n`,
+			)
+			const skillsDir = path.join(dir, "custom-skills", "alpha")
+			await mkdir(skillsDir, { recursive: true })
+			await writeFile(
+				path.join(skillsDir, "SKILL.md"),
+				"---\nname: alpha\n---\n\n# Alpha",
+			)
+
+			const detection: DetectedStructure = {
+				manifestPath: mustAbsolute(path.join(dir, "agents.toml")),
+				method: "manifest",
+			}
+
+			const result = await extractSkills(makeDetected(dir, detection))
+			expect(result.ok).toBe(true)
+			if (result.ok) {
+				expect(result.value).toHaveLength(1)
+				expect(result.value[0]?.name).toBe("alpha")
+			}
+		})
+	})
+})
+
+describe("extractSkills (subdir)", () => {
+	it("extracts skills from subdirectories", async () => {
+		await withTempDir(async (dir) => {
+			const skillDir = path.join(dir, "alpha")
+			await mkdir(skillDir, { recursive: true })
+			await writeFile(
+				path.join(skillDir, "SKILL.md"),
+				"---\nname: alpha\n---\n\n# Alpha",
+			)
+
+			const detection: DetectedStructure = {
+				method: "subdir",
+				rootDir: mustAbsolute(dir),
+			}
+
+			const result = await extractSkills(makeDetected(dir, detection))
+			expect(result.ok).toBe(true)
+			if (result.ok) {
+				expect(result.value).toHaveLength(1)
+				expect(result.value[0]?.name).toBe("alpha")
+			}
+		})
+	})
+})
+
+describe("extractSkills (single)", () => {
+	it("extracts a single skill from root", async () => {
+		await withTempDir(async (dir) => {
+			const skillPath = path.join(dir, "SKILL.md")
+			await writeFile(skillPath, "---\nname: root-skill\n---\n\n# Root")
+
+			const detection: DetectedStructure = {
+				method: "single",
+				skillPath: mustAbsolute(dir),
+			}
+
+			const result = await extractSkills(makeDetected(dir, detection))
+			expect(result.ok).toBe(true)
+			if (result.ok) {
+				expect(result.value).toHaveLength(1)
+				expect(result.value[0]?.name).toBe("root-skill")
+			}
+		})
+	})
+})

@@ -1,6 +1,7 @@
 import type {
 	ManifestPackageMetadata,
 	MarketplacePluginMetadata,
+	SkillEntry,
 	SkillInfo,
 	ValidatedDeclaration,
 } from "@skills-supply/core"
@@ -12,3 +13,5 @@ export type IndexedMetadata =
 	| MarketplacePluginMetadata
 	| ManifestPackageMetadata
 	| null
+
+export type IndexedSkill = SkillEntry

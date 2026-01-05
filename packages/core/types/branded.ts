@@ -19,7 +19,3 @@ export type GithubRef = Brand<string, typeof GithubRefBrand>
 export type RemoteMarketplaceUrl = Brand<string, typeof RemoteMarketplaceUrlBrand>
 
 export type AgentId = "claude-code" | "codex" | "opencode" | "factory"
-
-export function unwrap<T extends string>(branded: T): string {
-	return branded
-}

@@ -36,6 +36,24 @@ describe("scanRepo", () => {
 	it("indexes marketplace plugins at repo root", async () => {
 		const pluginDir = path.join(tempDir, ".claude-plugin")
 		await mkdir(pluginDir, { recursive: true })
+		const alphaSkillDir = path.join(
+			tempDir,
+			"plugins",
+			"alpha",
+			"skills",
+			"alpha-skill",
+		)
+		const betaSkillDir = path.join(tempDir, "plugins", "beta", "skills", "beta-skill")
+		await mkdir(alphaSkillDir, { recursive: true })
+		await mkdir(betaSkillDir, { recursive: true })
+		await writeFile(
+			path.join(alphaSkillDir, "SKILL.md"),
+			"---\nname: alpha-skill\n---\n\n# Alpha",
+		)
+		await writeFile(
+			path.join(betaSkillDir, "SKILL.md"),
+			"---\nname: beta-skill\n---\n\n# Beta",
+		)
 		await writeFile(
 			path.join(pluginDir, "marketplace.json"),
 			JSON.stringify({
@@ -48,7 +66,7 @@ describe("scanRepo", () => {
 					},
 					{
 						name: "beta",
-						source: { repo: "acme/beta", source: "github" },
+						source: "plugins/beta",
 					},
 				],
 			}),
@@ -65,12 +83,22 @@ describe("scanRepo", () => {
 			expect(result.value.units).toHaveLength(2)
 			const names = result.value.units.map((unit: ScanUnit) => unit.metadata?.name)
 			expect(names).toEqual(["alpha", "beta"])
+			const expectedPaths: Record<string, string> = {
+				alpha: "skills/alpha-skill/SKILL.md",
+				beta: "skills/beta-skill/SKILL.md",
+			}
 			for (const unit of result.value.units) {
 				expect(unit.kind).toBe("marketplace")
 				expect(unit.declaration.type).toBe("claude-plugin")
 				if (unit.declaration.type === "claude-plugin") {
 					expect(unit.declaration.marketplace).toBe("owner/repo")
 				}
+				if (unit.metadata && typeof unit.metadata === "object") {
+					expect("source" in unit.metadata).toBe(false)
+				}
+				expect(unit.skills).toHaveLength(1)
+				const expectedPath = expectedPaths[String(unit.metadata?.name)]
+				expect(unit.skills[0]?.relativePath).toBe(expectedPath)
 			}
 		}
 	})
@@ -78,6 +106,24 @@ describe("scanRepo", () => {
 	it("indexes marketplace and manifest packages together at repo root", async () => {
 		const pluginDir = path.join(tempDir, ".claude-plugin")
 		await mkdir(pluginDir, { recursive: true })
+		const pluginSkillDir = path.join(
+			tempDir,
+			"plugins",
+			"alpha",
+			"skills",
+			"alpha-skill",
+		)
+		await mkdir(pluginSkillDir, { recursive: true })
+		await writeFile(
+			path.join(pluginSkillDir, "SKILL.md"),
+			"---\nname: alpha-skill\n---\n\n# Alpha",
+		)
+		const manifestSkillDir = path.join(tempDir, "skills", "one")
+		await mkdir(manifestSkillDir, { recursive: true })
+		await writeFile(
+			path.join(manifestSkillDir, "SKILL.md"),
+			"---\nname: manifest-skill\n---\n\n# Manifest",
+		)
 		await writeFile(
 			path.join(pluginDir, "marketplace.json"),
 			JSON.stringify({
@@ -97,6 +143,9 @@ describe("scanRepo", () => {
 			expect(result.value.units).toHaveLength(2)
 			const kinds = result.value.units.map((unit: ScanUnit) => unit.kind).sort()
 			expect(kinds).toEqual(["manifest", "marketplace"])
+			for (const unit of result.value.units) {
+				expect(unit.skills.length).toBeGreaterThan(0)
+			}
 		}
 	})
 
@@ -133,6 +182,9 @@ describe("scanRepo", () => {
 	})
 
 	it("indexes manifest packages only when [package] exists", async () => {
+		const skillDir = path.join(tempDir, "skills", "one")
+		await mkdir(skillDir, { recursive: true })
+		await writeFile(path.join(skillDir, "SKILL.md"), "---\nname: one\n---\n\n# One")
 		await writeFile(
 			path.join(tempDir, "agents.toml"),
 			`[package]\nname = "pkg"\nversion = "1.0.0"\n`,
@@ -150,6 +202,21 @@ describe("scanRepo", () => {
 			expect(unit.kind).toBe("manifest")
 			expect(unit.metadata?.name).toBe("pkg")
 			expect(unit.declaration.type).toBe("github")
+			expect(unit.skills).toHaveLength(1)
+			expect(unit.skills[0]?.relativePath).toBe("skills/one/SKILL.md")
+		}
+	})
+
+	it("skips manifest packages with no skills", async () => {
+		await writeFile(
+			path.join(tempDir, "agents.toml"),
+			`[package]\nname = "pkg"\nversion = "1.0.0"\n`,
+		)
+
+		const result = await scanRepo(tempDir, "owner/repo")
+		expect(result.ok).toBe(true)
+		if (result.ok) {
+			expect(result.value.units).toEqual([])
 		}
 	})
 
@@ -186,6 +253,8 @@ describe("scanRepo", () => {
 			expect(unit.kind).toBe("subdir")
 			expect(unit.metadata?.name).toBe("skills")
 			expect(unit.path).toBe("skills")
+			expect(unit.skills).toHaveLength(1)
+			expect(unit.skills[0]?.relativePath).toBe("one/SKILL.md")
 		}
 	})
 
@@ -207,6 +276,8 @@ describe("scanRepo", () => {
 			expect(unit.kind).toBe("single")
 			expect(unit.metadata?.name).toBe("root-skill")
 			expect(unit.path).toBeNull()
+			expect(unit.skills).toHaveLength(1)
+			expect(unit.skills[0]?.relativePath).toBe("SKILL.md")
 		}
 	})
 
@@ -228,12 +299,25 @@ describe("scanRepo", () => {
 		if (result.ok) {
 			expect(result.value.units).toHaveLength(1)
 			expect(result.value.units[0]?.kind).toBe("manifest")
+			expect(result.value.units[0]?.skills.length).toBeGreaterThan(0)
 		}
 	})
 
 	it("stops after root marketplace and ignores nested skills", async () => {
 		const pluginDir = path.join(tempDir, ".claude-plugin")
 		await mkdir(pluginDir, { recursive: true })
+		const pluginSkillDir = path.join(
+			tempDir,
+			"plugins",
+			"alpha",
+			"skills",
+			"alpha-skill",
+		)
+		await mkdir(pluginSkillDir, { recursive: true })
+		await writeFile(
+			path.join(pluginSkillDir, "SKILL.md"),
+			"---\nname: alpha-skill\n---\n\n# Alpha",
+		)
 		await writeFile(
 			path.join(pluginDir, "marketplace.json"),
 			JSON.stringify({
@@ -254,6 +338,7 @@ describe("scanRepo", () => {
 		if (result.ok) {
 			expect(result.value.units).toHaveLength(1)
 			expect(result.value.units[0]?.kind).toBe("marketplace")
+			expect(result.value.units[0]?.skills.length).toBeGreaterThan(0)
 		}
 	})
 
@@ -276,6 +361,8 @@ describe("scanRepo", () => {
 			const unit = result.value.units[0]
 			expect(unit?.kind).toBe("subdir")
 			expect(unit?.path).toBe("skills")
+			expect(unit?.skills).toHaveLength(1)
+			expect(unit?.skills[0]?.relativePath).toBe("one/SKILL.md")
 		}
 	})
 })

@@ -42,29 +42,45 @@ async function main(): Promise<void> {
 		.description("Process queued discovery jobs")
 		.option("--concurrency <count>", "Jobs per worker", "5")
 		.option("--limit <count>", "Stop after processing N repos")
-		.action(async (options: { concurrency: string; limit?: string }) => {
-			const count = Number.parseInt(options.concurrency, 10)
-			if (!Number.isFinite(count) || count <= 0) {
-				printError({
-					field: "concurrency",
-					message: "--concurrency must be a positive integer.",
-					source: "manual",
-					type: "validation",
+		.option("--dry-run", "Process jobs without completing or indexing")
+		.action(
+			async (options: {
+				concurrency: string
+				limit?: string
+				dryRun?: boolean
+			}) => {
+				const count = Number.parseInt(options.concurrency, 10)
+				if (!Number.isFinite(count) || count <= 0) {
+					printError({
+						field: "concurrency",
+						message: "--concurrency must be a positive integer.",
+						source: "manual",
+						type: "validation",
+					})
+					return
+				}
+				const limit = options.limit
+					? Number.parseInt(options.limit, 10)
+					: undefined
+				if (
+					typeof limit === "number" &&
+					(!Number.isFinite(limit) || limit <= 0)
+				) {
+					printError({
+						field: "limit",
+						message: "--limit must be a positive integer.",
+						source: "manual",
+						type: "validation",
+					})
+					return
+				}
+				await workerCommand({
+					concurrency: count,
+					dryRun: Boolean(options.dryRun),
+					limit,
 				})
-				return
-			}
-			const limit = options.limit ? Number.parseInt(options.limit, 10) : undefined
-			if (typeof limit === "number" && (!Number.isFinite(limit) || limit <= 0)) {
-				printError({
-					field: "limit",
-					message: "--limit must be a positive integer.",
-					source: "manual",
-					type: "validation",
-				})
-				return
-			}
-			await workerCommand({ concurrency: count, limit })
-		})
+			},
+		)
 
 	program
 		.command("list")

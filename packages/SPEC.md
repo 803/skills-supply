@@ -203,11 +203,16 @@ Detection follows this **strict priority order**:
 
 | Priority | Condition | Action | Indexed as |
 |----------|-----------|--------|------------|
-| 1 | marketplace in list | Index each plugin listed | N × `claude-plugin` |
+| 1 | marketplace in list | Resolve each plugin, extract skills, index only if ≥1 skill | N × `claude-plugin` |
 | 2 | plugin only (no marketplace) | **SKIP** - exists in a marketplace somewhere | — |
-| 3 | manifest with `[package]` | Index the package | `github` |
-| 4 | subdir | Index the parent directory as one package | 1 × `github` |
-| 5 | single | Index the skill | 1 × `github` |
+| 3 | manifest with `[package]` | Extract skills, index only if ≥1 skill | `github` |
+| 4 | subdir | Extract skills, index only if ≥1 skill | 1 × `github` |
+| 5 | single | Extract skill, index only if ≥1 skill | 1 × `github` |
+
+**Discovery validation (declaration storage)**  
+During discovery, declarations are validated **before** insertion. The discovery pipeline must attempt to coerce the raw declaration into a `ValidatedDeclaration`.
+- **On success**: store the validated declaration (JSON-serialized) as the package’s canonical declaration.
+- **On failure**: do **not** insert that package; record a warning.
 
 #### Why These Priorities? (sk add)
 
@@ -257,7 +262,7 @@ Before describing each declaration type, we define two reusable extraction proce
 
 **claude-plugin-skills-extraction-process:**
 Given a fetched plugin directory (containing `.claude-plugin/plugin.json`):
-1. Parse the plugin manifest
+1. Parse the plugin manifest, validate its presence
 2. Discover skills from the `./skills` subdirectory (convention-based, not configurable)
 3. Extract skills from paths
 
@@ -403,19 +408,30 @@ PHASE 1: Check repo root for primary package types (apply BOTH rules together)
     → if .claude-plugin/marketplace.json exists at repo root:
         → parse marketplace.json to get list of plugins
         → for EACH plugin in the list:
-            → create an IndexedPackage record with:
+            → resolve plugin source via core marketplace resolution
+            → fetch the plugin source (github/git/local)
+            → extract skills from plugin's ./skills subdirectory
+            → if a skill fails frontmatter validation: SKIP that skill and record warning
+            → if zero valid skills remain: SKIP that plugin and record warning
+            → if plugin resolution or fetch fails: SKIP that plugin and record warning
+            → otherwise create an IndexedPackage record with:
                 - declaration type: `claude-plugin`
                 - marketplace: GithubRef
                 - plugin: the plugin name from marketplace.json
                 - metadata: from marketplace.json entry (name, description, keywords, etc.)
+                - skills: list of { name, description, relativePath }
         → add all to results list
 
   Rule B: Manifest with [package] at root
     → if agents.toml exists at repo root AND contains [package] section:
-        → create an IndexedPackage record :
+        → resolve auto_discover.skills path and extract skills
+        → if a skill fails frontmatter validation: SKIP that skill and record warning
+        → if zero valid skills remain: SKIP the package and record warning
+        → otherwise create an IndexedPackage record :
             - declaration type of: `github`
             - gh: the repo reference (owner/repo) (GithubRef)
             - metadata: from [package] section (name, version, description, license, org)
+            - skills: list of { name, description, relativePath }
         → add to results list
 
   IMPORTANT: Apply BOTH rules. A repo can have both a marketplace AND a manifest package.
@@ -434,11 +450,15 @@ PHASE 2: Recursive scan for skills (only if Phase 1 found nothing)
         (one or more direct subdirectories contain SKILL.md with valid frontmatter)
 
       → if YES:
-          → create an IndexedPackage record with:
+          → extract skills from SKILL.md files
+          → if a skill fails frontmatter validation: SKIP that skill and record warning
+          → if zero valid skills remain: SKIP the package and record warning
+          → otherwise create an IndexedPackage record with:
               - declaration type: `github`
               - gh: the repo reference (GithubRef)
               - path: relative path to this directory
               - metadata: aggregated from SKILL.md frontmatters or directory name
+              - skills: list of { name, description, relativePath }
           → add to results list
           → DO NOT recurse into this directory's children (subdir pattern "claims" this directory)
           → return
@@ -447,11 +467,15 @@ PHASE 2: Recursive scan for skills (only if Phase 1 found nothing)
           → check if dir contains a single SKILL.md at its root:
 
             → if YES:
-                → create an IndexedPackage record with:
+                → extract skills from SKILL.md files
+                → if a skill fails frontmatter validation: SKIP that skill and record warning
+                → if zero valid skills remain: SKIP the package and record warning
+                → otherwise create an IndexedPackage record with:
                     - declaration type: `github`
                     - gh: the repo reference (GithubRef)
                     - path: relative path to this directory
                     - metadata: from SKILL.md frontmatter (name, description)
+                    - skills: list of { name, description, relativePath }
                 → add to results list
                 → return
 
@@ -467,10 +491,10 @@ PHASE 2: Recursive scan for skills (only if Phase 1 found nothing)
 
 | Detection | Location | Records created | Declaration type |
 |-----------|----------|-----------------|------------------|
-| marketplace.json | repo root only | N (one per plugin) | `claude-plugin` |
-| agents.toml + [package] | repo root only | 1 | `github` |
-| subdir pattern | anywhere (Phase 2) | 1 per matching dir | `github` with path |
-| single SKILL.md | anywhere (Phase 2) | 1 per matching dir | `github` with path |
+| marketplace.json | repo root only | N (one per plugin, only if ≥1 skill) | `claude-plugin` |
+| agents.toml + [package] | repo root only | 1 (only if ≥1 skill) | `github` |
+| subdir pattern | anywhere (Phase 2) | 1 per matching dir (only if ≥1 skill) | `github` with path |
+| single SKILL.md | anywhere (Phase 2) | 1 per matching dir (only if ≥1 skill) | `github` with path |
 
 ---
 
@@ -492,24 +516,34 @@ PHASE 2: Recursive scan for skills (only if Phase 1 found nothing)
 - **Action**: **SKIP — do not index**
 - **Rationale**: This is a private project config, not a publishable package. The manifest's `[dependencies]` are NOT indexed — those repos get indexed when discovery scans *them* directly.
 
+**no valid skills:**
+- **Detection**: A candidate package yields zero valid skills after extraction
+- **Action**: **SKIP — do not index**
+- **Rationale**: Discovery only indexes installable packages that actually contain skills.
+
+**marketplace plugin resolution/fetch/extraction failure:**
+- **Detection**: A marketplace plugin fails to resolve, fetch, or extract skills
+- **Action**: **SKIP that plugin — do not index it; continue with other plugins**
+- **Rationale**: One bad plugin should not block a marketplace with other valid plugins.
+
 ---
 
 #### Metadata Sources
 
 | Detection | Source |
 |-----------|--------|
-| marketplace.json | marketplace.json entry (name, description, keywords, version, author, etc.). Plugin `source` is not recorded during discovery indexing. |
+| marketplace.json | marketplace.json entry (name, description, keywords, version, author, etc.). Plugin `source` is not recorded as metadata. |
 | agents.toml + [package] | [package] section (name, version, description, license, org) |
 | subdir pattern | Aggregated from SKILL.md frontmatters or directory name |
 | single SKILL.md | SKILL.md frontmatter (name, description) |
+| skills list (all cases) | SKILL.md frontmatter (name, description) + relative path to SKILL.md |
 
 **Uniform marketplace handling:**
-- Discovery reads ONLY marketplace.json, never plugin.json for individual plugins
-- Metadata comes from the marketplace.json entry only
-- Plugin sources are treated as opaque and are NOT stored in discovery metadata
-- Discovery does not clone or resolve plugin sources (remote or local); install-time flows handle resolution
-- This is uniform: discovery behavior is the same regardless of local vs remote marketplaces
-- At install time, sk reads the real plugin.json anyway
+- Discovery reads marketplace.json to enumerate plugins and uses core resolution to resolve each plugin source.
+- Metadata comes from marketplace.json entries; plugin.json is not used as a metadata source.
+- Plugin sources are NOT stored as discovery metadata; discovery uses them only to fetch and extract skills.
+- Discovery resolves and fetches plugin sources for both local and remote marketplaces to extract skills.
+- At install time, sk still reads the real plugin.json for plugin installs; discovery only cares about skills.
 
 ---
 
@@ -561,8 +595,17 @@ The `claude-plugin` type is an indirection layer requiring two fetches:
 
 **Important notes**:
 
-- **No type conversion**: A `claude-plugin` declaration remains `claude-plugin` throughout the resolution process. We do not "unwrap" or convert it to `github`/`git`/`local` declarations.
+- **Canonical package stays `claude-plugin`**: The declared dependency remains `claude-plugin` end-to-end. We resolve a *separate* plugin source in order to fetch the plugin contents, but we do not replace or convert the declaration type in the manifest.
 
-- **Plugin sources are opaque**: The source references in marketplace.json follow their own schema defined by Claude plugins. They do not need to conform to our `GithubRef`, `GitUrl`, or other branded types — marketplace.json data structures are their own.
+- **Plugin source definitions must be normalized into branded fetch types**: Marketplace `source` entries are *not* passed through verbatim. They must be converted into one of our fetchable, branded shapes so the rest of the system can download and extract the plugin. Today the supported mappings are:
+  - String path → local path relative to the marketplace root → `{ type: "local", path: AbsolutePath }`
+  - `{ source: "github", repo: "owner/repo" }` → `{ type: "github", gh: GithubRef }`
+  - `{ source: "url", url: "https://host/repo.git" }` → `{ type: "git", url: GitUrl }`
+
+  This conversion belongs in **packages/core** (see the core marketplace resolution logic). It should be deterministic, validated, and covered by unit tests. The core layer is the single place that knows how to interpret a plugin `source` and produce a branded fetch target.
+
+- **URL marketplaces cannot use local plugin sources**: If the marketplace itself is a RemoteMarketplaceUrl, string-path sources are invalid because there is no local filesystem root to resolve against.
+
+- **Orthogonality is the design goal**: Adding new Claude plugin source *types* should only require changes in core (parsing + normalization + tests). It should *not* require changing `sk` CLI declaration types or user‑facing dependency semantics. The CLI keeps dealing in `claude-plugin` declarations; core expands marketplace source types as needed to keep fetching robust.
 
 - **Skills extraction is predictable**: Regardless of how the plugin source is defined in marketplace.json, the skills extraction always follows the same pattern: discover skills from the `./skills` subdirectory using SUBDIR detection logic.

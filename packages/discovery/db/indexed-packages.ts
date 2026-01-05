@@ -9,6 +9,18 @@ export type IndexedPackageInsert = Omit<
 	"id" | "discovered_at" | "updated_at" | "github_repo"
 >
 
+export type IndexedPackageSkillRow = Selectable<Database["indexed_package_skills"]>
+
+export type IndexedPackageSkillInsert = Omit<
+	Insertable<Database["indexed_package_skills"]>,
+	"id" | "indexed_package_id"
+>
+
+export type IndexedPackageInsertWithSkills = {
+	package: IndexedPackageInsert
+	skills: IndexedPackageSkillInsert[]
+}
+
 export function coerceIndexedPackageId(value: number): IndexedPackageId | null {
 	if (!Number.isInteger(value) || value <= 0) {
 		return null
@@ -20,7 +32,7 @@ export function coerceIndexedPackageId(value: number): IndexedPackageId | null {
 export async function upsertRepoPackages(
 	db: Kysely<Database>,
 	githubRepo: string,
-	packages: IndexedPackageInsert[],
+	packages: IndexedPackageInsertWithSkills[],
 ): Promise<void> {
 	await db.transaction().execute(async (trx) => {
 		await trx
@@ -32,15 +44,39 @@ export async function upsertRepoPackages(
 			return
 		}
 
-		await trx
+		const inserted = await trx
 			.insertInto("indexed_packages")
 			.values(
 				packages.map((pkg) => ({
-					...pkg,
+					...pkg.package,
 					github_repo: githubRepo,
 				})),
 			)
+			.returning(["id", "declaration"])
 			.execute()
+
+		const skillMap = new Map<string, IndexedPackageSkillInsert[]>()
+		for (const pkg of packages) {
+			skillMap.set(pkg.package.declaration, pkg.skills)
+		}
+
+		const skillRows: Insertable<Database["indexed_package_skills"]>[] = []
+		for (const row of inserted) {
+			const skills = skillMap.get(row.declaration)
+			if (!skills) {
+				continue
+			}
+			for (const skill of skills) {
+				skillRows.push({
+					...skill,
+					indexed_package_id: row.id,
+				})
+			}
+		}
+
+		if (skillRows.length > 0) {
+			await trx.insertInto("indexed_package_skills").values(skillRows).execute()
+		}
 	})
 }
 

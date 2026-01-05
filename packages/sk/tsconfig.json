@@ -8,7 +8,7 @@
 		"rootDir": "./",
 		"types": ["node"]
 	},
-	"exclude": ["dist", "node_modules"],
+	"exclude": ["bin", "dist", "node_modules"],
 	"extends": "../../tsconfig.base.json",
 	"include": ["**/*.ts", "**/*.tsx"],
 	"references": [{ "path": "../core" }]

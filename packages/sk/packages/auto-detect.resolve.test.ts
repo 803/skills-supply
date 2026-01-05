@@ -78,6 +78,27 @@ describe("resolveDetection", () => {
 		})
 	})
 
+	it("ignores manifests without [package]", async () => {
+		await withTempDir(async (dir) => {
+			const manifestPath = path.join(dir, "agents.toml")
+			await writeFile(manifestPath, '[dependencies]\nfoo = "superpowers@1.0.0"\n')
+
+			const structures: DetectedStructure[] = [
+				{
+					manifestPath: mustAbsolute(manifestPath),
+					method: "manifest",
+				},
+				{ method: "subdir", rootDir: mustAbsolute(dir) },
+			]
+
+			const result = await resolveDetection(structures, { hasSubpath: false })
+			expect(result.ok).toBe(true)
+			if (result.ok) {
+				expect(result.value).toEqual({ method: "subdir" })
+			}
+		})
+	})
+
 	it("returns claude-plugin when plugin belongs to marketplace", async () => {
 		await withTempDir(async (dir) => {
 			const pluginPath = await setupPlugin(dir, "alpha")
@@ -154,11 +175,75 @@ describe("resolveDetection", () => {
 		})
 	})
 
+	it("returns plugin when only plugin is present", async () => {
+		await withTempDir(async (dir) => {
+			const pluginPath = await setupPlugin(dir, "alpha")
+
+			const structures: DetectedStructure[] = [
+				{
+					method: "plugin",
+					pluginJsonPath: mustAbsolute(pluginPath),
+					skillsDir: null,
+				},
+			]
+
+			const result = await resolveDetection(structures, { hasSubpath: false })
+			expect(result.ok).toBe(true)
+			if (result.ok) {
+				expect(result.value).toEqual({ method: "plugin", pluginName: "alpha" })
+			}
+		})
+	})
+
+	it("prefers subdir over single when both are present", async () => {
+		const structures: DetectedStructure[] = [
+			{ method: "single", skillPath: mustAbsolute("/tmp/skill") },
+			{ method: "subdir", rootDir: mustAbsolute("/tmp/skills") },
+		]
+
+		const result = await resolveDetection(structures, { hasSubpath: false })
+		expect(result.ok).toBe(true)
+		if (result.ok) {
+			expect(result.value).toEqual({ method: "subdir" })
+		}
+	})
+
 	it("fails when marketplace is detected under a subpath for remote packages", async () => {
 		await withTempDir(async (dir) => {
 			const marketplacePath = await setupMarketplace(dir, ["alpha"])
 
 			const structures: DetectedStructure[] = [
+				{
+					marketplaceJsonPath: mustAbsolute(marketplacePath),
+					method: "marketplace",
+				},
+			]
+
+			const result = await resolveDetection(structures, { hasSubpath: true })
+			expect(result.ok).toBe(false)
+			if (!result.ok) {
+				expect(result.error.type).toBe("validation")
+				if (result.error.type === "validation") {
+					expect(result.error.field).toBe("path")
+					expect(result.error.message).toContain(
+						"Marketplaces must live at repo root",
+					)
+				}
+			}
+		})
+	})
+
+	it("fails when plugin and marketplace are detected under a subpath for remote packages", async () => {
+		await withTempDir(async (dir) => {
+			const pluginPath = await setupPlugin(dir, "alpha")
+			const marketplacePath = await setupMarketplace(dir, ["alpha"])
+
+			const structures: DetectedStructure[] = [
+				{
+					method: "plugin",
+					pluginJsonPath: mustAbsolute(pluginPath),
+					skillsDir: null,
+				},
 				{
 					marketplaceJsonPath: mustAbsolute(marketplacePath),
 					method: "marketplace",

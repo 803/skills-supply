@@ -15,14 +15,12 @@
 	"name": "@skills-supply/discovery",
 	"private": true,
 	"scripts": {
-		"build": "tsc --build",
-		"clean": "rm -rf dist",
-		"draft": "npx tsx --tsconfig tsconfig.json cli.ts draft",
-		"enqueue": "npx tsx --tsconfig tsconfig.json cli.ts enqueue",
-		"list": "npx tsx --tsconfig tsconfig.json cli.ts list",
-		"tsc": "tsc --build",
-		"tsx": "npx tsx --tsconfig tsconfig.json cli.ts",
-		"worker": "npx tsx --tsconfig tsconfig.json cli.ts worker"
+		"build": "bun run build:binary && bun run build:node",
+		"build:binary": "bun build ./cli.ts --compile --outfile ./bin/discovery",
+		"build:node": "bun build ./cli.ts --outdir ./dist --target node",
+		"clean": "rm -rf dist bin",
+		"cli": "npm run build && node ./dist/cli.js",
+		"tsc": "tsc --build"
 	},
 	"type": "module",
 	"version": "0.1.0"

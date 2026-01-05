@@ -1,5 +1,5 @@
 import path from "node:path"
-import { isCancel, select, text } from "@clack/prompts"
+import { isCancel, multiselect, select, text } from "@clack/prompts"
 import {
 	type AbsolutePath,
 	coerceAbsolutePath,
@@ -60,14 +60,14 @@ export async function pkgAdd(
 						normalizedOptions.value,
 					)
 					return built.ok
-						? CommandResult.completed(built.value)
+						? CommandResult.completed([built.value])
 						: CommandResult.failed(built.error)
 				})()
 	if (pkgSpecResult.status !== "completed") {
 		printOutcome(pkgSpecResult)
 		return
 	}
-	const pkgSpec = pkgSpecResult.value
+	const pkgSpecs = pkgSpecResult.value
 
 	const selectionResult = options.global
 		? await resolveGlobalManifest({
@@ -100,41 +100,77 @@ export async function pkgAdd(
 
 	consola.start("Updating dependencies...")
 
-	const alias = coerceAlias(pkgSpec.alias)
-	if (!alias) {
-		const message = `Invalid alias: ${pkgSpec.alias}`
-		printOutcome(
-			CommandResult.failed({
-				field: "alias",
-				message,
-				source: "manual",
-				type: "validation",
-			}),
+	const pending: Array<{
+		alias: ReturnType<typeof coerceAlias>
+		declaration: ValidatedDeclaration
+	}> = []
+	const seenAliases = new Set<string>()
+
+	for (const draft of pkgSpecs) {
+		const alias = coerceAlias(draft.alias)
+		if (!alias) {
+			const message = `Invalid alias: ${draft.alias}`
+			printOutcome(
+				CommandResult.failed({
+					field: "alias",
+					message,
+					source: "manual",
+					type: "validation",
+				}),
+			)
+			return
+		}
+
+		if (seenAliases.has(alias)) {
+			const message = `Duplicate alias in selection: ${alias}`
+			printOutcome(
+				CommandResult.failed({
+					field: "alias",
+					message,
+					source: "manual",
+					type: "validation",
+				}),
+			)
+			return
+		}
+		seenAliases.add(alias)
+
+		const resolvedDeclaration = resolveDeclarationPath(
+			draft.declaration,
+			selection.manifestPath,
 		)
-		return
+		if (resolvedDeclaration.status !== "completed") {
+			printOutcome(resolvedDeclaration)
+			return
+		}
+
+		const validated = validateDeclaration(resolvedDeclaration.value)
+		if (!validated.ok) {
+			printOutcome(CommandResult.failed(validated.error))
+			return
+		}
+
+		pending.push({ alias, declaration: validated.value })
 	}
 
-	const resolvedDeclaration = resolveDeclarationPath(
-		pkgSpec.declaration,
-		selection.manifestPath,
-	)
-	if (resolvedDeclaration.status !== "completed") {
-		printOutcome(resolvedDeclaration)
-		return
+	let updated = selection.manifest
+	const changedAliases: string[] = []
+	const unchangedAliases: string[] = []
+
+	for (const item of pending) {
+		const current = getDependency(updated, item.alias)
+		if (!areDependenciesEqual(current, item.declaration)) {
+			updated = addDependency(updated, item.alias, item.declaration)
+			changedAliases.push(String(item.alias))
+		} else {
+			unchangedAliases.push(String(item.alias))
+		}
 	}
 
-	const validated = validateDeclaration(resolvedDeclaration.value)
-	if (!validated.ok) {
-		printOutcome(CommandResult.failed(validated.error))
-		return
-	}
-
-	const current = getDependency(selection.manifest, alias)
-	const changed = !areDependenciesEqual(current, validated.value)
+	const changed = changedAliases.length > 0
 	let manifestForSync = selection.manifest
 
 	if (changed) {
-		const updated = addDependency(selection.manifest, alias, validated.value)
 		const saved = await saveManifest(
 			updated,
 			selection.manifestPath,
@@ -147,7 +183,11 @@ export async function pkgAdd(
 		manifestForSync = updated
 	}
 
-	const noChangeReason = `Dependency already present: ${pkgSpec.alias}. Manifest: ${selection.manifestPath} (no changes).`
+	const aliasList = pending.map((item) => String(item.alias)).join(", ")
+	const noChangeReason =
+		pending.length === 1
+			? `Dependency already present: ${aliasList}. Manifest: ${selection.manifestPath} (no changes).`
+			: `Dependencies already present: ${aliasList}. Manifest: ${selection.manifestPath} (no changes).`
 	let outcome = CommandResult.completed(undefined)
 
 	if (!changed && !options.sync) {
@@ -159,10 +199,16 @@ export async function pkgAdd(
 		if (selection.created) {
 			consola.info(`Created ${selection.manifestPath}.`)
 		}
-		consola.success(`Added dependency: ${pkgSpec.alias}.`)
+		const addedLabel =
+			changedAliases.length === 1 ? "Added dependency" : "Added dependencies"
+		consola.success(`${addedLabel}: ${changedAliases.join(", ")}.`)
 		consola.info(`Manifest: ${selection.manifestPath} (updated).`)
 	} else if (options.sync) {
-		consola.info(`Dependency already present: ${pkgSpec.alias}.`)
+		const unchangedLabel =
+			pending.length === 1
+				? "Dependency already present"
+				: "Dependencies already present"
+		consola.info(`${unchangedLabel}: ${aliasList}.`)
 		consola.info(`Manifest: ${selection.manifestPath} (no changes).`)
 	}
 
@@ -185,11 +231,11 @@ export async function pkgAdd(
 	printOutcome(outcome)
 }
 
-async function resolveAutoDetectSpec(
+export async function resolveAutoDetectSpec(
 	input: string,
 	options: NormalizedAddOptions,
 	commandOptions: PkgAddCommandOptions,
-): Promise<CommandResult<DependencyDraft>> {
+): Promise<CommandResult<DependencyDraft[]>> {
 	const trimmed = input.trim()
 	if (!trimmed) {
 		const message = "Package type or URL is required."
@@ -279,16 +325,26 @@ async function resolveAutoDetectSpec(
 		const pluginOptions: NormalizedAddOptions = {
 			aliasOverride: options.aliasOverride,
 		}
-		const pluginResult = await selectMarketplacePlugin(
+		const pluginResult = await selectMarketplacePlugins(
 			detection.marketplace,
 			commandOptions.nonInteractive,
 		)
 		if (pluginResult.status !== "completed") {
 			return pluginResult
 		}
+		if (pluginOptions.aliasOverride && pluginResult.value.length > 1) {
+			const message =
+				"Alias override cannot be used when selecting multiple plugins."
+			return CommandResult.failed({
+				field: "alias",
+				message,
+				source: "manual",
+				type: "validation",
+			})
+		}
 		const marketplaceSpec = formatMarketplaceSpec(detected.value.source)
-		const spec = `${pluginResult.value}@${marketplaceSpec}`
-		return buildSpecResult("claude-plugin", spec, pluginOptions)
+		const specs = pluginResult.value.map((plugin) => `${plugin}@${marketplaceSpec}`)
+		return buildSpecResults("claude-plugin", specs, pluginOptions)
 	}
 
 	if (detection.method === "plugin-mismatch") {
@@ -336,16 +392,28 @@ async function resolveAutoDetectSpec(
 			const pluginOptions: NormalizedAddOptions = {
 				aliasOverride: options.aliasOverride,
 			}
-			const pluginResult = await selectMarketplacePlugin(
+			const pluginResult = await selectMarketplacePlugins(
 				detection.marketplace,
 				commandOptions.nonInteractive,
 			)
 			if (pluginResult.status !== "completed") {
 				return pluginResult
 			}
+			if (pluginOptions.aliasOverride && pluginResult.value.length > 1) {
+				const message =
+					"Alias override cannot be used when selecting multiple plugins."
+				return CommandResult.failed({
+					field: "alias",
+					message,
+					source: "manual",
+					type: "validation",
+				})
+			}
 			const marketplaceSpec = formatMarketplaceSpec(detected.value.source)
-			const spec = `${pluginResult.value}@${marketplaceSpec}`
-			return buildSpecResult("claude-plugin", spec, pluginOptions)
+			const specs = pluginResult.value.map(
+				(plugin) => `${plugin}@${marketplaceSpec}`,
+			)
+			return buildSpecResults("claude-plugin", specs, pluginOptions)
 		}
 
 		if (action === "package") {
@@ -496,7 +564,7 @@ export async function resolveRemoteMarketplaceSpec(
 	marketplaceUrl: string,
 	options: NormalizedAddOptions,
 	commandOptions: PkgAddCommandOptions,
-): Promise<CommandResult<DependencyDraft>> {
+): Promise<CommandResult<DependencyDraft[]>> {
 	if (options.ref) {
 		const message = "--tag/--branch/--rev are not valid for marketplace plugins."
 		return CommandResult.failed({
@@ -532,16 +600,25 @@ export async function resolveRemoteMarketplaceSpec(
 		name: parsed.value.name,
 		plugins: parsed.value.plugins.map((plugin) => plugin.name),
 	}
-	const pluginResult = await selectMarketplacePlugin(
+	const pluginResult = await selectMarketplacePlugins(
 		marketplaceInfo,
 		commandOptions.nonInteractive,
 	)
 	if (pluginResult.status !== "completed") {
 		return pluginResult
 	}
+	if (pluginOptions.aliasOverride && pluginResult.value.length > 1) {
+		const message = "Alias override cannot be used when selecting multiple plugins."
+		return CommandResult.failed({
+			field: "alias",
+			message,
+			source: "manual",
+			type: "validation",
+		})
+	}
 
-	const spec = `${pluginResult.value}@${marketplaceUrl}`
-	return buildSpecResult("claude-plugin", spec, pluginOptions)
+	const specs = pluginResult.value.map((plugin) => `${plugin}@${marketplaceUrl}`)
+	return buildSpecResults("claude-plugin", specs, pluginOptions)
 }
 
 async function fetchMarketplaceContents(
@@ -577,13 +654,13 @@ async function fetchMarketplaceContents(
 	return { ok: true, value: await response.text() }
 }
 
-async function selectMarketplacePlugin(
+async function selectMarketplacePlugins(
 	marketplace: {
 		name: string
 		plugins: string[]
 	},
 	nonInteractive: boolean,
-): Promise<CommandResult<string>> {
+): Promise<CommandResult<string[]>> {
 	if (marketplace.plugins.length === 0) {
 		const message = `Marketplace "${marketplace.name}" has no plugins.`
 		return CommandResult.failed({
@@ -607,7 +684,7 @@ async function selectMarketplacePlugin(
 		}
 		consola.info(`Detected marketplace with 1 plugin: "${plugin}".`)
 		consola.info(`Auto-selecting plugin: ${plugin}`)
-		return CommandResult.completed(plugin)
+		return CommandResult.completed([plugin])
 	}
 
 	consola.info(`Detected marketplace with ${marketplace.plugins.length} plugins.`)
@@ -623,19 +700,20 @@ async function selectMarketplacePlugin(
 		})
 	}
 
-	const selection = await select({
-		message: "Select a plugin to add",
+	const selection = await multiselect({
+		message: "Select plugin(s) to add",
 		options: marketplace.plugins.map((plugin) => ({
 			label: plugin,
 			value: plugin,
 		})),
+		required: true,
 	})
 
 	if (isCancel(selection)) {
 		return CommandResult.cancelled()
 	}
 
-	if (typeof selection !== "string") {
+	if (!Array.isArray(selection) || selection.length === 0) {
 		const message = "Invalid plugin selection."
 		return CommandResult.failed({
 			field: "plugin",
@@ -645,7 +723,20 @@ async function selectMarketplacePlugin(
 		})
 	}
 
-	return CommandResult.completed(selection)
+	const plugins = selection.filter(
+		(value): value is string => typeof value === "string",
+	)
+	if (plugins.length === 0) {
+		const message = "Invalid plugin selection."
+		return CommandResult.failed({
+			field: "plugin",
+			message,
+			source: "manual",
+			type: "validation",
+		})
+	}
+
+	return CommandResult.completed(plugins)
 }
 
 function areDependenciesEqual(
@@ -668,12 +759,24 @@ function buildSpecResult(
 	type: string,
 	spec: string,
 	options: NormalizedAddOptions,
-): CommandResult<DependencyDraft> {
-	const built = buildPackageSpec(type, spec, options)
-	if (!built.ok) {
-		return CommandResult.failed(built.error)
+): CommandResult<DependencyDraft[]> {
+	return buildSpecResults(type, [spec], options)
+}
+
+function buildSpecResults(
+	type: string,
+	specs: string[],
+	options: NormalizedAddOptions,
+): CommandResult<DependencyDraft[]> {
+	const drafts: DependencyDraft[] = []
+	for (const spec of specs) {
+		const built = buildPackageSpec(type, spec, options)
+		if (!built.ok) {
+			return CommandResult.failed(built.error)
+		}
+		drafts.push(built.value)
 	}
-	return CommandResult.completed(built.value)
+	return CommandResult.completed(drafts)
 }
 
 function formatMarketplaceSpec(source: AutoDetectSource): string {

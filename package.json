@@ -5,6 +5,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.3.11",
+		"babel-plugin-react-compiler": "1.0.0",
 		"cheerio": "^1.1.2",
 		"consola": "^3.4.2",
 		"jsdom": "^27.4.0",

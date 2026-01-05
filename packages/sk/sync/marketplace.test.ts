@@ -61,17 +61,22 @@ function makeGithubPackage(): CanonicalPackage {
 	}
 }
 
-async function setupMarketplace(dir: string): Promise<string> {
+async function setupMarketplace(
+	dir: string,
+	plugins: string[] = ["alpha"],
+): Promise<string> {
 	const pluginDir = path.join(dir, ".claude-plugin")
 	await mkdir(pluginDir, { recursive: true })
 	await writeFile(
 		path.join(pluginDir, "marketplace.json"),
 		JSON.stringify({
 			name: "Test Market",
-			plugins: [{ name: "alpha", source: "plugins/alpha" }],
+			plugins: plugins.map((name) => ({ name, source: `plugins/${name}` })),
 		}),
 	)
-	await mkdir(path.join(dir, "plugins", "alpha"), { recursive: true })
+	for (const name of plugins) {
+		await mkdir(path.join(dir, "plugins", name), { recursive: true })
+	}
 	return dir
 }
 
@@ -91,11 +96,12 @@ describe("resolveAgentPackages", () => {
 				return
 			}
 			expect(result.value.warnings).toEqual([])
-			expect(result.value.packages).toHaveLength(1)
-			const resolved = result.value.packages[0]
-			expect(resolved?.type).toBe("local")
-			if (resolved && resolved.type === "local") {
-				expect(String(resolved.absolutePath)).toContain("plugins/alpha")
+			expect(result.value.packages).toHaveLength(0)
+			expect(result.value.plugins).toHaveLength(1)
+			const resolved = result.value.plugins[0]
+			expect(resolved?.canonical.type).toBe("claude-plugin")
+			if (resolved?.source.type === "local") {
+				expect(String(resolved.source.path)).toContain("plugins/alpha")
 			}
 		})
 	})
@@ -115,6 +121,7 @@ describe("resolveAgentPackages", () => {
 				return
 			}
 			expect(result.value.packages).toHaveLength(1)
+			expect(result.value.plugins).toHaveLength(0)
 			expect(result.value.packages[0]?.type).toBe("github")
 			expect(result.value.warnings.join(" ")).toContain("alpha")
 		})
@@ -150,5 +157,26 @@ describe("resolveAgentPackages", () => {
 		} finally {
 			globalThis.fetch = originalFetch
 		}
+	})
+
+	it("fails when the requested plugin is missing from the marketplace", async () => {
+		await withTempDir(async (dir) => {
+			const marketplacePath = await setupMarketplace(dir, ["beta"])
+
+			const result = await resolveAgentPackages({
+				agent: makeAgent("codex"),
+				dryRun: false,
+				packages: [makePluginPackage(marketplacePath)],
+				tempRoot: abs(dir),
+			})
+
+			expect(result.ok).toBe(false)
+			if (!result.ok) {
+				expect(result.error.type).toBe("not_found")
+				if (result.error.cause) {
+					expect(result.error.cause.message).toContain("alpha")
+				}
+			}
+		})
 	})
 })

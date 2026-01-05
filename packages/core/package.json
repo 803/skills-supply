@@ -8,7 +8,8 @@
 		"@types/node": "^25"
 	},
 	"exports": {
-		".": "./index.ts"
+		".": "./index.ts",
+		"./standalone": "./standalone.ts"
 	},
 	"name": "@skills-supply/core",
 	"private": true,

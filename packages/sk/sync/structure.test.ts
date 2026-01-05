@@ -6,7 +6,7 @@ import { coerceAbsolutePathDirect } from "@skills-supply/core"
 import { describe, expect, it } from "vitest"
 import type { CanonicalPackage } from "@/packages/types"
 import { selectDetectedStructure } from "@/sync/sync"
-import { abs, alias, ghRef } from "@/tests/helpers/branded"
+import { abs, alias, ghRef, nes } from "@/tests/helpers/branded"
 
 async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
 	const dir = path.join(tmpdir(), `sk-sync-${Date.now()}`)
@@ -26,6 +26,16 @@ function makeCanonical(): CanonicalPackage {
 		path: undefined,
 		ref: undefined,
 		type: "github",
+	}
+}
+
+function makeClaudePlugin(): CanonicalPackage {
+	return {
+		fetchStrategy: { mode: "clone", sparse: false },
+		marketplace: ghRef("org/marketplace"),
+		origin: { alias: alias("plugin"), manifestPath: abs("/test/agents.toml") },
+		plugin: nes("alpha"),
+		type: "claude-plugin",
 	}
 }
 
@@ -104,6 +114,54 @@ describe("selectDetectedStructure", () => {
 		]
 
 		const result = await selectDetectedStructure(makeCanonical(), structures)
+		expect(result.ok).toBe(true)
+		if (result.ok) {
+			expect(result.value.method).toBe("plugin")
+		}
+	})
+
+	it("prefers subdir over single when both are present", async () => {
+		const structures: DetectedStructure[] = [
+			{ method: "single", skillPath: abs("/tmp/root/SKILL.md") },
+			{ method: "subdir", rootDir: abs("/tmp/root") },
+		]
+
+		const result = await selectDetectedStructure(makeCanonical(), structures)
+		expect(result.ok).toBe(true)
+		if (result.ok) {
+			expect(result.value.method).toBe("subdir")
+		}
+	})
+
+	it("requires plugin structure for claude-plugin packages", async () => {
+		const structures: DetectedStructure[] = [
+			{ method: "subdir", rootDir: abs("/tmp/root") },
+		]
+
+		const result = await selectDetectedStructure(makeClaudePlugin(), structures)
+		expect(result.ok).toBe(false)
+		if (!result.ok) {
+			expect(result.error.type).toBe("validation")
+			if (result.error.type === "validation") {
+				expect(result.error.field).toBe("structure")
+			}
+		}
+	})
+
+	it("uses plugin structure for claude-plugin packages", async () => {
+		const structures: DetectedStructure[] = [
+			{
+				method: "plugin",
+				pluginJsonPath: abs("/tmp/plugin.json"),
+				skillsDir: null,
+			},
+			{
+				manifestPath: abs("/tmp/agents.toml"),
+				method: "manifest",
+			},
+		]
+
+		const result = await selectDetectedStructure(makeClaudePlugin(), structures)
 		expect(result.ok).toBe(true)
 		if (result.ok) {
 			expect(result.value.method).toBe("plugin")
