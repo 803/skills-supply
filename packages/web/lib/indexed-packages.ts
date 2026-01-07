@@ -7,6 +7,12 @@ import { db } from "@skills-supply/database"
 import type { Selectable } from "kysely"
 
 export type IndexedPackage = Selectable<Database["indexed_packages"]>
+export type IndexedPackageSkill = Selectable<Database["indexed_package_skills"]>
+
+export type IndexedPackageWithSkills = {
+	package: IndexedPackage
+	skills: IndexedPackageSkill[]
+}
 
 export async function listIndexedPackages(): Promise<IndexedPackage[]> {
 	return db
@@ -24,6 +30,66 @@ export async function fetchIndexedPackageById(
 		.selectAll()
 		.where("id", "=", id)
 		.executeTakeFirst()
+}
+
+type IndexedPackageSkillJoinRow = IndexedPackage & {
+	skill_id: IndexedPackageSkill["id"] | null
+	skill_name: IndexedPackageSkill["name"] | null
+	skill_description: IndexedPackageSkill["description"] | null
+	skill_relative_path: IndexedPackageSkill["relative_path"] | null
+}
+
+export async function fetchIndexedPackageWithSkills(
+	id: number,
+): Promise<IndexedPackageWithSkills | undefined> {
+	const rows = await db
+		.selectFrom("indexed_packages")
+		.leftJoin(
+			"indexed_package_skills",
+			"indexed_packages.id",
+			"indexed_package_skills.indexed_package_id",
+		)
+		.selectAll("indexed_packages")
+		.select([
+			"indexed_package_skills.id as skill_id",
+			"indexed_package_skills.name as skill_name",
+			"indexed_package_skills.description as skill_description",
+			"indexed_package_skills.relative_path as skill_relative_path",
+		])
+		.where("indexed_packages.id", "=", id)
+		.orderBy("indexed_package_skills.name", "asc")
+		.execute()
+
+	if (rows.length === 0) {
+		return undefined
+	}
+
+	const {
+		skill_id: _skillId,
+		skill_name: _skillName,
+		skill_description: _skillDesc,
+		skill_relative_path: _skillPath,
+		...pkg
+	} = rows[0] as IndexedPackageSkillJoinRow
+
+	const skills: IndexedPackageSkill[] = []
+	for (const row of rows as IndexedPackageSkillJoinRow[]) {
+		if (row.skill_id === null) {
+			continue
+		}
+		if (row.skill_name === null || row.skill_relative_path === null) {
+			continue
+		}
+		skills.push({
+			description: row.skill_description ?? null,
+			id: row.skill_id,
+			indexed_package_id: pkg.id,
+			name: row.skill_name,
+			relative_path: row.skill_relative_path,
+		})
+	}
+
+	return { package: pkg, skills }
 }
 
 export function buildSkInstallCommand(declaration: string): string {

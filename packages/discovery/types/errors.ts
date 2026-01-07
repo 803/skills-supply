@@ -45,6 +45,7 @@ export interface NetworkError extends BaseError {
 export interface NotFoundError extends BaseError {
 	type: "not_found"
 	target: string
+	path?: string
 }
 
 export interface UnexpectedError extends BaseError {

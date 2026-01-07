@@ -34,6 +34,37 @@ function formatNumber(value: number | null | undefined): string {
 	return numberFormatter.format(value)
 }
 
+function formatText(value: string | null | undefined): string {
+	if (!value) {
+		return "n/a"
+	}
+
+	const trimmed = value.trim()
+	return trimmed.length > 0 ? trimmed : "n/a"
+}
+
+function formatRepo(value: string | null | undefined): string {
+	if (!value) {
+		return "n/a"
+	}
+
+	const trimmed = value.trim()
+	if (!trimmed) {
+		return "n/a"
+	}
+
+	if (trimmed.startsWith("git@github.com:")) {
+		return trimmed.replace("git@github.com:", "").replace(/\.git$/, "")
+	}
+
+	const normalized = trimmed.replace(/^https?:\/\//, "")
+	if (normalized.startsWith("github.com/")) {
+		return normalized.replace("github.com/", "").replace(/\.git$/, "")
+	}
+
+	return normalized.replace(/\.git$/, "")
+}
+
 interface StatCardProps {
 	label: string
 	value: string
@@ -139,13 +170,31 @@ export default async function Home() {
 									}}
 								>
 									<div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-amber-200/50 blur-2xl transition duration-500 group-hover:scale-110" />
-									<div className="relative">
-										<p className="text-xs uppercase tracking-[0.3em] text-stone-500">
-											{pkg.github_repo}
-										</p>
-										<h2 className="mt-3 text-2xl font-heading text-stone-900 sm:text-3xl">
-											{pkg.name}
-										</h2>
+									<div className="relative flex flex-nowrap gap-6">
+										<div className="min-w-0">
+											<p className="text-[10px] uppercase tracking-[0.32em] text-stone-500">
+												GitHub owner/repo
+											</p>
+											<p className="mt-2 text-lg font-heading text-stone-900 sm:text-xl">
+												{formatRepo(pkg.github_repo)}
+											</p>
+										</div>
+										<div className="min-w-0">
+											<p className="text-[10px] uppercase tracking-[0.32em] text-stone-500">
+												Package name
+											</p>
+											<p className="mt-2 text-lg font-heading text-stone-900 sm:text-xl">
+												{formatText(pkg.name)}
+											</p>
+										</div>
+										<div className="min-w-0">
+											<p className="text-[10px] uppercase tracking-[0.32em] text-stone-500">
+												Package path
+											</p>
+											<p className="mt-2 text-lg font-heading text-stone-900 sm:text-xl">
+												{formatText(pkg.path)}
+											</p>
+										</div>
 									</div>
 								</Link>
 							))}

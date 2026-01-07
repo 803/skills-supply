@@ -561,7 +561,8 @@ async function buildSingleSkillUnit(options: {
 
 	pushWarnings(options.warnings, extracted.value.warnings)
 
-	if (extracted.value.skills.length === 0) {
+	const [skillMetadata] = extracted.value.skills
+	if (!skillMetadata) {
 		options.warnings.push({
 			field: "skills",
 			message: `No valid skills found in ${options.skillDir}.`,
@@ -571,8 +572,6 @@ async function buildSingleSkillUnit(options: {
 		})
 		return null
 	}
-
-	const skillMetadata = extracted.value.skills[0]
 	const relative = toOptionalRepoPath(options.repoRoot, options.skillDir)
 	const pathValue = relative ? (coerceNonEmpty(relative) ?? undefined) : undefined
 	const declaration: ValidatedDeclaration = pathValue

@@ -13,7 +13,11 @@ vi.mock("@/packages/auto-detect", () => ({
 
 import { multiselect, select, text } from "@clack/prompts"
 import { resolveAutoDetectSpec, resolveRemoteMarketplaceSpec } from "@/commands/pkg/add"
-import { autoDetectPackage } from "@/packages/auto-detect"
+import {
+	type AutoDetectDetection,
+	type AutoDetectSource,
+	autoDetectPackage,
+} from "@/packages/auto-detect"
 
 const multiselectMock = vi.mocked(multiselect)
 const selectMock = vi.mocked(select)
@@ -39,17 +43,8 @@ function mockAutoDetect({
 	detection,
 	source = { slug: "owner/repo", type: "github" },
 }: {
-	detection: {
-		method: string
-		pluginName?: string
-		marketplace?: { name: string; plugins: string[] }
-	}
-	source?: {
-		type: "github" | "git" | "local"
-		slug?: string
-		url?: string
-		path?: string
-	}
+	detection: AutoDetectDetection
+	source?: AutoDetectSource
 }) {
 	autoDetectPackageMock.mockResolvedValue({
 		ok: true,

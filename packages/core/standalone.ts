@@ -20,7 +20,10 @@ type ParsedDeclaration =
 	| { type: "local"; path: string }
 	| { type: "claude-plugin"; plugin: string; marketplace: string }
 
-type ParsedRef = { type: "tag" | "branch" | "rev"; value: string }
+type ParsedRef =
+	| { type: "tag"; value: string }
+	| { type: "branch"; value: string }
+	| { type: "rev"; value: string }
 
 type ParseError =
 	| { type: "parse"; message: string }

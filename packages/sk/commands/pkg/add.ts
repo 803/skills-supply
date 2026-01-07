@@ -2,6 +2,7 @@ import path from "node:path"
 import { isCancel, multiselect, select, text } from "@clack/prompts"
 import {
 	type AbsolutePath,
+	type Alias,
 	coerceAbsolutePath,
 	coerceAlias,
 	coerceGitRef,
@@ -101,7 +102,7 @@ export async function pkgAdd(
 	consola.start("Updating dependencies...")
 
 	const pending: Array<{
-		alias: ReturnType<typeof coerceAlias>
+		alias: Alias
 		declaration: ValidatedDeclaration
 	}> = []
 	const seenAliases = new Set<string>()

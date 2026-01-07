@@ -5,11 +5,13 @@ import type { MarketplaceInfo } from "@/types/content"
 import type { ValidatedDeclaration } from "@/types/declaration"
 import type { Result } from "@/types/error"
 
+type PluginSource = Extract<ValidatedDeclaration, { type: "github" | "git" | "local" }>
+
 export function resolvePluginSource(
 	marketplace: MarketplaceInfo,
 	plugin: string,
 	basePath: AbsolutePath,
-): Result<ValidatedDeclaration> {
+): Result<PluginSource> {
 	const targetName = plugin.trim()
 	if (!targetName) {
 		const message = "Plugin name must be non-empty."
@@ -149,7 +151,7 @@ function resolveStringSource(
 	value: string,
 	basePath: AbsolutePath,
 	pluginRoot: NonEmptyString | undefined,
-): Result<ValidatedDeclaration> {
+): Result<PluginSource> {
 	const trimmed = value.trim()
 	if (!trimmed) {
 		const message = "Plugin source must not be empty."
