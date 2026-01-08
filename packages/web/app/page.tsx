@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { listIndexedPackages } from "@/lib/indexed-packages"
+import { getIndexedPackagesStats, listIndexedPackages } from "@/lib/indexed-packages"
 
 export const dynamic = "force-dynamic"
 
@@ -84,25 +84,10 @@ function StatCard({ label, value, hint }: StatCardProps) {
 }
 
 export default async function Home() {
-	const packages = await listIndexedPackages()
-	const repoCount = new Set(packages.map((pkg) => pkg.gh_repo)).size
-	const topicCount = new Set(packages.flatMap((pkg) => pkg.gh_topics ?? [])).size
-	const latestUpdate = packages.reduce<Date | null>((latest, pkg) => {
-		const candidate =
-			toDate(pkg.updated_at) ??
-			toDate(pkg.gh_updated_at) ??
-			toDate(pkg.discovered_at)
-
-		if (!candidate) {
-			return latest
-		}
-
-		if (!latest || candidate > latest) {
-			return candidate
-		}
-
-		return latest
-	}, null)
+	const [packages, stats] = await Promise.all([
+		listIndexedPackages({ limit: 50 }),
+		getIndexedPackagesStats(),
+	])
 
 	return (
 		<main className="relative min-h-screen overflow-hidden bg-stone-50 text-stone-900">
@@ -127,22 +112,26 @@ export default async function Home() {
 					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 						<StatCard
 							label="Total packages"
-							value={formatNumber(packages.length)}
+							value={formatNumber(stats.totalPackages)}
 							hint="Indexed records"
 						/>
 						<StatCard
 							label="GitHub repos"
-							value={formatNumber(repoCount)}
+							value={formatNumber(stats.uniqueRepos)}
 							hint="Unique repositories"
 						/>
 						<StatCard
 							label="Topics"
-							value={formatNumber(topicCount)}
+							value={formatNumber(stats.uniqueTopics)}
 							hint="Distinct tags"
 						/>
 						<StatCard
 							label="Last sync"
-							value={latestUpdate ? formatDate(latestUpdate) : "n/a"}
+							value={
+								stats.latestUpdate
+									? formatDate(stats.latestUpdate)
+									: "n/a"
+							}
 							hint="Latest recorded update"
 						/>
 					</div>

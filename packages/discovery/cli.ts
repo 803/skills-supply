@@ -5,6 +5,7 @@ import { draftCommand } from "@/commands/draft"
 import { enqueueCommand } from "@/commands/enqueue"
 import { listCommand } from "@/commands/list"
 import { printError } from "@/commands/outcome"
+import { randomCommand } from "@/commands/random"
 import { workerCommand } from "@/commands/worker"
 
 async function main(): Promise<void> {
@@ -110,6 +111,16 @@ async function main(): Promise<void> {
 				return
 			}
 			const result = await draftCommand(parsed)
+			if (!result.ok) {
+				printError(result.error)
+			}
+		})
+
+	program
+		.command("random")
+		.description("Output sk install command for a random package")
+		.action(async () => {
+			const result = await randomCommand()
 			if (!result.ok) {
 				printError(result.error)
 			}

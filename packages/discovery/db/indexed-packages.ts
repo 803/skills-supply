@@ -113,3 +113,43 @@ export async function listIndexedRepos(db: Kysely<Database>): Promise<string[]> 
 
 	return rows.map((row) => row.gh_repo)
 }
+
+/**
+ * Path segments that indicate installed/configured skills rather than source packages.
+ * Packages with paths containing any of these segments should be excluded from listings.
+ */
+const EXCLUDED_PATH_SEGMENTS = [
+	".claude",
+	".codex",
+	".agent",
+	".agents",
+	".ai",
+	".aider-desk",
+	".config",
+	".codebuddy",
+	".opencode",
+	".skills",
+	".github",
+	"backups",
+] as const
+
+export async function getRandomIndexedPackage(
+	db: Kysely<Database>,
+): Promise<IndexedPackageRow | undefined> {
+	return db
+		.selectFrom("indexed_packages")
+		.selectAll()
+		.where((eb) =>
+			eb.or([
+				eb("path", "is", null),
+				eb.and(
+					EXCLUDED_PATH_SEGMENTS.map((segment) =>
+						eb("path", "not like", `%${segment}%`),
+					),
+				),
+			]),
+		)
+		.orderBy((eb) => eb.fn("random"))
+		.limit(1)
+		.executeTakeFirst()
+}

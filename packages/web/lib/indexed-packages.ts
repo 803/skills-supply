@@ -4,7 +4,13 @@ import {
 } from "@skills-supply/core"
 import type { Database, IndexedPackagesId } from "@skills-supply/database"
 import { db } from "@skills-supply/database"
-import type { Expression, ExpressionBuilder, Selectable, SqlBool } from "kysely"
+import {
+	type Expression,
+	type ExpressionBuilder,
+	type Selectable,
+	type SqlBool,
+	sql,
+} from "kysely"
 
 export type { IndexedPackagesId }
 
@@ -32,6 +38,7 @@ export const EXCLUDED_PATH_SEGMENTS = [
 	".opencode",
 	".skills",
 	".github",
+	"backups",
 ] as const
 
 /**
@@ -52,13 +59,61 @@ export function excludeInstalledPaths(
 	])
 }
 
-export async function listIndexedPackages(): Promise<IndexedPackage[]> {
-	return db
+export interface IndexedPackagesStats {
+	totalPackages: number
+	uniqueRepos: number
+	uniqueTopics: number
+	latestUpdate: Date | null
+}
+
+export async function getIndexedPackagesStats(): Promise<IndexedPackagesStats> {
+	// Single query using CTE to scan the table once for all stats
+	const pathConditions = EXCLUDED_PATH_SEGMENTS.map(
+		(seg) => sql`path NOT LIKE ${`%${seg}%`}`,
+	)
+	const whereClause = sql`path IS NULL OR (${sql.join(pathConditions, sql` AND `)})`
+
+	const result = await sql<{
+		total_packages: number
+		unique_repos: number
+		unique_topics: number
+		latest_update: Date | null
+	}>`
+		WITH filtered_packages AS (
+			SELECT gh_repo, gh_topics, updated_at
+			FROM indexed_packages
+			WHERE ${whereClause}
+		)
+		SELECT
+			(SELECT COUNT(*) FROM filtered_packages) as total_packages,
+			(SELECT COUNT(DISTINCT gh_repo) FROM filtered_packages) as unique_repos,
+			(SELECT COUNT(DISTINCT topic) FROM filtered_packages, unnest(gh_topics) as topic) as unique_topics,
+			(SELECT MAX(updated_at) FROM filtered_packages) as latest_update
+	`.execute(db)
+
+	const row = result.rows[0]
+	return {
+		latestUpdate: row?.latest_update ? new Date(row.latest_update) : null,
+		totalPackages: Number(row?.total_packages ?? 0),
+		uniqueRepos: Number(row?.unique_repos ?? 0),
+		uniqueTopics: Number(row?.unique_topics ?? 0),
+	}
+}
+
+export async function listIndexedPackages(
+	options: { limit?: number } = {},
+): Promise<IndexedPackage[]> {
+	let query = db
 		.selectFrom("indexed_packages")
 		.selectAll()
 		.where(excludeInstalledPaths)
 		.orderBy("gh_stars", "desc")
-		.execute()
+
+	if (options.limit) {
+		query = query.limit(options.limit)
+	}
+
+	return query.execute()
 }
 
 export async function fetchIndexedPackageById(
