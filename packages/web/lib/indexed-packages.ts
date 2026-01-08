@@ -1,7 +1,7 @@
 import {
 	formatSkPackageAddCommand,
 	parseSerializedDeclaration,
-} from "@skills-supply/core/standalone"
+} from "@skills-supply/core"
 import type { Database, IndexedPackagesId } from "@skills-supply/database"
 import { db } from "@skills-supply/database"
 import type { Expression, ExpressionBuilder, Selectable, SqlBool } from "kysely"

@@ -11,5 +11,5 @@
 	"exclude": ["bin", "dist", "node_modules"],
 	"extends": "../../tsconfig.base.json",
 	"include": ["**/*.ts", "**/*.tsx"],
-	"references": [{ "path": "../core" }, { "path": "../database" }]
+	"references": [{ "path": "../database" }]
 }

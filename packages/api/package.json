@@ -17,11 +17,7 @@
 	"main": "./dist/index.js",
 	"name": "@skills-supply/api",
 	"private": true,
-	"scripts": {
-		"build": "tsc --build",
-		"clean": "rm -rf dist",
-		"dev": "node --watch ./dist/index.js"
-	},
+	"scripts": {},
 	"type": "module",
 	"types": "./dist/index.d.ts",
 	"version": "0.1.0"

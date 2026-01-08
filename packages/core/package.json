@@ -5,18 +5,26 @@
 		"zod": "^4.3.5"
 	},
 	"devDependencies": {
-		"@types/node": "^25"
+		"@types/node": "^25",
+		"tsdown": "^0.19.0-beta.5"
 	},
 	"exports": {
-		".": "./index.ts",
-		"./standalone": "./standalone.ts"
+		".": {
+			"import": "./dist/index.mjs",
+			"types": "./dist/index.d.mts"
+		}
 	},
+	"files": [
+		"dist"
+	],
+	"main": "./dist/index.mjs",
 	"name": "@skills-supply/core",
 	"private": true,
 	"scripts": {
-		"tsc": "tsc --build"
+		"build": "tsdown",
+		"tsc": "tsc"
 	},
 	"type": "module",
-	"types": "./index.ts",
+	"types": "./dist/index.d.mts",
 	"version": "0.1.0"
 }

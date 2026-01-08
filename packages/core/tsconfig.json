@@ -2,8 +2,6 @@
 	"compilerOptions": {
 		"baseUrl": "./",
 		"composite": true,
-		"noEmit": false,
-		"outDir": "./dist",
 		"paths": {
 			"@/*": ["./*"]
 		},
