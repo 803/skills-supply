@@ -160,11 +160,21 @@ export async function pkgAdd(
 
 	for (const item of pending) {
 		const current = getDependency(updated, item.alias)
-		if (!areDependenciesEqual(current, item.declaration)) {
+		if (current === undefined) {
 			updated = addDependency(updated, item.alias, item.declaration)
 			changedAliases.push(String(item.alias))
-		} else {
+		} else if (areDependenciesEqual(current, item.declaration)) {
 			unchangedAliases.push(String(item.alias))
+		} else {
+			const message = `Dependency "${item.alias}" already exists with different settings. Use \`--as <alias>\` to add both, or run interactively to overwrite.`
+			printOutcome(
+				CommandResult.failed({
+					message,
+					target: "dependency",
+					type: "conflict",
+				}),
+			)
+			return
 		}
 	}
 
