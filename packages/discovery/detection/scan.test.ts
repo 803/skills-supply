@@ -251,7 +251,7 @@ describe("scanRepo", () => {
 				return
 			}
 			expect(unit.kind).toBe("subdir")
-			expect(unit.metadata?.name).toBe("skills")
+			expect(unit.metadata).toBeNull()
 			expect(unit.path).toBe("skills")
 			expect(unit.skills).toHaveLength(1)
 			expect(unit.skills[0]?.relativePath).toBe("one/SKILL.md")
@@ -274,7 +274,7 @@ describe("scanRepo", () => {
 				return
 			}
 			expect(unit.kind).toBe("single")
-			expect(unit.metadata?.name).toBe("root-skill")
+			expect(unit.metadata).toBeNull()
 			expect(unit.path).toBeNull()
 			expect(unit.skills).toHaveLength(1)
 			expect(unit.skills[0]?.relativePath).toBe("SKILL.md")

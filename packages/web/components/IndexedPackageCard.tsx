@@ -103,7 +103,7 @@ export function IndexedPackageCard({
 	index = 0,
 	installCommand,
 }: IndexedPackageCardProps) {
-	const repoLink = repoHref(pkg.github_repo)
+	const repoLink = repoHref(pkg.gh_repo)
 
 	return (
 		<article
@@ -170,7 +170,7 @@ export function IndexedPackageCard({
 								rel="noreferrer"
 								className="font-medium text-stone-900 underline decoration-amber-300 underline-offset-4 transition hover:text-amber-700"
 							>
-								{pkg.github_repo}
+								{pkg.gh_repo}
 							</a>
 						}
 					/>

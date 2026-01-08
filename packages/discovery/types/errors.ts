@@ -48,10 +48,6 @@ export interface NotFoundError extends BaseError {
 	path?: string
 }
 
-export interface UnexpectedError extends BaseError {
-	type: "unexpected"
-}
-
 export type DiscoveryError =
 	| ValidationError
 	| ParseError
@@ -59,4 +55,3 @@ export type DiscoveryError =
 	| IoError
 	| NetworkError
 	| NotFoundError
-	| UnexpectedError

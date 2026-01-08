@@ -42,6 +42,7 @@ const dotenvResult = envPath ? dotenv.config({ path: envPath }) : { parsed: {} }
 const str = () => z.string().trim().min(1)
 
 export const schema = z.object({
+	BROWSERLESS_TOKEN: str().optional(),
 	DATABASE_POOL_SIZE: z.coerce.number().int().positive().max(50).optional().default(2),
 	DATABASE_URL: str().default(
 		"postgres://postgres:postgres@localhost:5877/skillssupply_dev",
@@ -49,6 +50,14 @@ export const schema = z.object({
 	GITHUB_TOKEN: str().optional(),
 	NODE_ENV: z.enum(["development", "production", "preview"]).default("development"),
 	SKILLSMP_API_KEY: str().optional(),
+	SKILLSMP_API_LIMIT: z.coerce.number().int().positive().optional().default(48),
+	SKILLSMP_BQL_LIMIT: z.coerce.number().int().positive().optional().default(48),
+	SKILLSMP_BQL_TIMEOUT_MS: z.coerce
+		.number()
+		.int()
+		.positive()
+		.optional()
+		.default(30_000),
 })
 
 const mergedEnv = {

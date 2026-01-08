@@ -6,20 +6,15 @@ import { Command } from "commander"
 import { FileMigrationProvider, type Kysely, Migrator } from "kysely"
 import type { ZodError } from "zod"
 import { env } from "./env"
-import { db as database } from "./index"
+import { initDb } from "./index"
 import { debug } from "./log"
 import type Database from "./models/Database"
 
 interface Config {
-	db: Kysely<Database>
+	initDb: () => Kysely<Database>
 	dbUrl: string
 	codegen: "kanel-kysely" | "kysely-codegen"
-	drop: "schema" | "file"
-}
-
-interface ExtendedConfig extends Config {
-	folder: string
-	migrator: Migrator
+	drop: "schema" | "file" | "database"
 }
 
 interface BaseError {
@@ -79,20 +74,25 @@ const PROGRAM = new Command()
 	.argument("<string>")
 
 const ACTIONS = {
-	biome: async ({ folder }): Promise<Result<void>> => {
-		return runCommand(`${biomeBin()} check --write ${folder}`, { stdio: "inherit" })
+	biome: async (_config): Promise<Result<void>> => {
+		return runCommand(`${biomeBin()} check --write ${CURRENT_DIR}`, {
+			stdio: "inherit",
+		})
 	},
-	codegen: async ({ codegen, dbUrl, folder }): Promise<Result<void>> => {
+	codegen: async ({ codegen, dbUrl }): Promise<Result<void>> => {
 		if (codegen === "kanel-kysely") {
 			return runCommand(
-				`${kanelBin()} -d ${dbUrl} -o ${path.join(folder, "models")}`,
-				{ cwd: folder, stdio: "inherit" },
+				`${kanelBin()} -d ${dbUrl} -o ${path.join(CURRENT_DIR, "models")}`,
+				{ cwd: CURRENT_DIR, stdio: "inherit" },
 			)
 		}
 		if (codegen === "kysely-codegen") {
 			return runCommand(
-				`${kyselyCodegenBin()} --url ${dbUrl} --out-file=${path.join(folder, "models/index.d.ts")}`,
-				{ cwd: folder, stdio: "inherit" },
+				`${kyselyCodegenBin()} --url ${dbUrl} --out-file=${path.join(
+					CURRENT_DIR,
+					"models/index.d.ts",
+				)}`,
+				{ cwd: CURRENT_DIR, stdio: "inherit" },
 			)
 		}
 		return {
@@ -105,34 +105,82 @@ const ACTIONS = {
 			ok: false,
 		}
 	},
-	down: async ({ migrator }): Promise<Result<void>> => {
-		return runMigration("down", async () => migrator.migrateDown())
+	down: async (config): Promise<Result<void>> => {
+		return withDb(config, "migrate-down", async (db) => {
+			const migrator = newMigrator(db)
+			return runMigration("down", async () => migrator.migrateDown())
+		})
 	},
-	downup: async ({ migrator }): Promise<Result<void>> => {
-		const down = await runMigration("down", async () => migrator.migrateDown())
-		if (!down.ok) {
-			return down
-		}
-		return runMigration("up", async () => migrator.migrateUp())
+	downup: async (config): Promise<Result<void>> => {
+		return withDb(config, "migrate-downup", async (db) => {
+			const migrator = newMigrator(db)
+			const down = await runMigration("down", async () => migrator.migrateDown())
+			if (!down.ok) {
+				return down
+			}
+			return runMigration("up", async () => migrator.migrateUp())
+		})
 	},
-	drop: async ({ drop, db, dbUrl }): Promise<Result<void>> => {
+	drop: async (config): Promise<Result<void>> => {
+		const { drop, dbUrl } = config
 		if (drop === "schema") {
+			return withDb(config, "drop-schema", async (db) => {
+				try {
+					await db.schema.dropSchema("public").ifExists().cascade().execute()
+					await db.schema.createSchema("public").execute()
+					return { ok: true, value: undefined }
+				} catch (error) {
+					return {
+						error: {
+							message: "Schema drop failed.",
+							operation: "dropSchema",
+							path: "db",
+							rawError: error instanceof Error ? error : undefined,
+							type: "io",
+						},
+						ok: false,
+					}
+				}
+			})
+		}
+		if (drop === "database") {
+			let dbName: string
 			try {
-				await db.schema.dropSchema("public").ifExists().cascade().execute()
-				await db.schema.createSchema("public").execute()
-				return { ok: true, value: undefined }
+				dbName = extractDbName(dbUrl)
 			} catch (error) {
 				return {
 					error: {
-						message: "Schema drop failed.",
-						operation: "dropSchema",
-						path: "db",
+						field: "dbUrl",
+						message: "Invalid database URL.",
 						rawError: error instanceof Error ? error : undefined,
-						type: "io",
+						source: "manual",
+						type: "validation",
 					},
 					ok: false,
 				}
 			}
+			if (!dbName) {
+				return {
+					error: {
+						field: "dbUrl",
+						message: "Database URL is missing a database name.",
+						source: "manual",
+						type: "validation",
+					},
+					ok: false,
+				}
+			}
+			const dropResult = runCommand(
+				`docker compose exec postgres dropdb -U postgres --force ${dbName}`,
+				{ stdio: "inherit" },
+			)
+			if (!dropResult.ok) {
+				return dropResult
+			}
+			return runCommand(
+				`docker compose exec postgres createdb -U postgres ${dbName}`,
+				{ stdio: "inherit" },
+			)
 		}
 		if (drop === "file") {
 			try {
@@ -161,8 +209,11 @@ const ACTIONS = {
 			ok: false,
 		}
 	},
-	latest: async ({ migrator }): Promise<Result<void>> => {
-		return runMigration("latest", async () => migrator.migrateToLatest())
+	latest: async (config): Promise<Result<void>> => {
+		return withDb(config, "migrate-latest", async (db) => {
+			const migrator = newMigrator(db)
+			return runMigration("latest", async () => migrator.migrateToLatest())
+		})
 	},
 	reset: async (config): Promise<Result<void>> => {
 		const dropped = await ACTIONS.drop(config)
@@ -171,10 +222,13 @@ const ACTIONS = {
 		}
 		return ACTIONS.latest(config)
 	},
-	up: async ({ migrator }): Promise<Result<void>> => {
-		return runMigration("up", async () => migrator.migrateUp())
+	up: async (config): Promise<Result<void>> => {
+		return withDb(config, "migrate-up", async (db) => {
+			const migrator = newMigrator(db)
+			return runMigration("up", async () => migrator.migrateUp())
+		})
 	},
-} satisfies Record<string, (config: ExtendedConfig) => Promise<Result<void>>>
+} satisfies Record<string, (config: Config) => Promise<Result<void>>>
 
 const __filename = fileURLToPath(import.meta.url)
 const CURRENT_DIR = path.dirname(__filename)
@@ -236,6 +290,71 @@ async function runMigration(
 		}
 	}
 	return { ok: true, value: undefined }
+}
+
+function extractDbName(url: string): string {
+	const parsed = new URL(url)
+	return parsed.pathname.slice(1)
+}
+
+function newMigrator(db: Kysely<Database>): Migrator {
+	return new Migrator({
+		db,
+		provider: new FileMigrationProvider({
+			fs,
+			migrationFolder: path.join(CURRENT_DIR, "migrations"),
+			path,
+		}),
+	})
+}
+
+async function destroyDb(db: Kysely<Database>): Promise<Result<void>> {
+	try {
+		await db.destroy()
+		return { ok: true, value: undefined }
+	} catch (error) {
+		return {
+			error: {
+				message: "Failed to close database connection.",
+				operation: "destroy",
+				path: "db",
+				rawError: error instanceof Error ? error : undefined,
+				type: "io",
+			},
+			ok: false,
+		}
+	}
+}
+
+async function withDb<T>(
+	config: Config,
+	operation: string,
+	action: (db: Kysely<Database>) => Promise<Result<T>>,
+): Promise<Result<T>> {
+	const db = config.initDb()
+	let result: Result<T>
+	try {
+		result = await action(db)
+	} catch (error) {
+		result = {
+			error: {
+				message: `Database action failed: ${operation}.`,
+				operation,
+				path: "db",
+				rawError: error instanceof Error ? error : undefined,
+				type: "io",
+			},
+			ok: false,
+		}
+	}
+	const destroyed = await destroyDb(db)
+	if (!result.ok) {
+		return result
+	}
+	if (!destroyed.ok) {
+		return destroyed
+	}
+	return result
 }
 
 function printError(error: PrintableError): void {
@@ -330,24 +449,11 @@ async function run(): Promise<Result<void>> {
 		}
 	}
 	const typedAction = action as keyof typeof ACTIONS
-	const folder = CURRENT_DIR
 	const config: Config = {
 		codegen: "kanel-kysely",
-		db: database,
 		dbUrl: env.DATABASE_URL,
-		drop: "schema",
-	}
-	const extendedConfig = {
-		folder,
-		migrator: new Migrator({
-			db: config.db,
-			provider: new FileMigrationProvider({
-				fs,
-				migrationFolder: path.join(folder, "migrations"),
-				path,
-			}),
-		}),
-		...config,
+		drop: "database",
+		initDb,
 	}
 	const actions: (keyof typeof ACTIONS)[] = [typedAction]
 	if (!ci) {
@@ -361,23 +467,9 @@ async function run(): Promise<Result<void>> {
 	const uniquedActions = [...new Set(actions.reverse())].reverse()
 	for (const a of uniquedActions) {
 		const actionFn = ACTIONS[a]
-		const result = await actionFn(extendedConfig)
+		const result = await actionFn(config)
 		if (!result.ok) {
 			return result
-		}
-	}
-	try {
-		await config.db.destroy()
-	} catch (error) {
-		return {
-			error: {
-				message: "Failed to close database connection.",
-				operation: "destroy",
-				path: "db",
-				rawError: error instanceof Error ? error : undefined,
-				type: "io",
-			},
-			ok: false,
 		}
 	}
 	return { ok: true, value: undefined }

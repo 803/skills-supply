@@ -2,9 +2,11 @@ import {
 	formatSkPackageAddCommand,
 	parseSerializedDeclaration,
 } from "@skills-supply/core/standalone"
-import type { Database } from "@skills-supply/database"
+import type { Database, IndexedPackagesId } from "@skills-supply/database"
 import { db } from "@skills-supply/database"
-import type { Selectable } from "kysely"
+import type { Expression, ExpressionBuilder, Selectable, SqlBool } from "kysely"
+
+export type { IndexedPackagesId }
 
 export type IndexedPackage = Selectable<Database["indexed_packages"]>
 export type IndexedPackageSkill = Selectable<Database["indexed_package_skills"]>
@@ -14,16 +16,53 @@ export type IndexedPackageWithSkills = {
 	skills: IndexedPackageSkill[]
 }
 
+/**
+ * Path segments that indicate installed/configured skills rather than source packages.
+ * Packages with paths containing any of these segments should be excluded from listings.
+ */
+export const EXCLUDED_PATH_SEGMENTS = [
+	".claude",
+	".codex",
+	".agent",
+	".agents",
+	".ai",
+	".aider-desk",
+	".config",
+	".codebuddy",
+	".opencode",
+	".skills",
+	".github",
+] as const
+
+/**
+ * Builds a WHERE condition that excludes packages with paths containing
+ * segments that indicate installed/configured skills (e.g., .claude, .codex).
+ * Use this for any listing/browsing queries to filter out non-source packages.
+ */
+export function excludeInstalledPaths(
+	eb: ExpressionBuilder<Database, "indexed_packages">,
+): Expression<SqlBool> {
+	return eb.or([
+		eb("path", "is", null),
+		eb.and(
+			EXCLUDED_PATH_SEGMENTS.map((segment) =>
+				eb("path", "not like", `%${segment}%`),
+			),
+		),
+	])
+}
+
 export async function listIndexedPackages(): Promise<IndexedPackage[]> {
 	return db
 		.selectFrom("indexed_packages")
 		.selectAll()
+		.where(excludeInstalledPaths)
 		.orderBy("gh_stars", "desc")
 		.execute()
 }
 
 export async function fetchIndexedPackageById(
-	id: number,
+	id: IndexedPackagesId,
 ): Promise<IndexedPackage | undefined> {
 	return db
 		.selectFrom("indexed_packages")
@@ -40,7 +79,7 @@ type IndexedPackageSkillJoinRow = IndexedPackage & {
 }
 
 export async function fetchIndexedPackageWithSkills(
-	id: number,
+	id: IndexedPackagesId,
 ): Promise<IndexedPackageWithSkills | undefined> {
 	const rows = await db
 		.selectFrom("indexed_packages")

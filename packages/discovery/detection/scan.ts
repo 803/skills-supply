@@ -28,7 +28,6 @@ import {
 	resolvePluginSource,
 	type SkillEntry,
 	type SkillExtractionWarning,
-	type SkillInfo,
 	type ValidatedDeclaration,
 	validateManifest,
 } from "@skills-supply/core"
@@ -581,10 +580,7 @@ async function buildSingleSkillUnit(options: {
 	return {
 		declaration,
 		kind: "single",
-		metadata: {
-			description: skillMetadata.description,
-			name: skillMetadata.name,
-		},
+		metadata: null,
 		path: relative,
 		skills: toSkillEntries(extracted.value.skills),
 	}
@@ -619,7 +615,6 @@ async function buildSubdirUnit(options: {
 		return null
 	}
 
-	const metadata = aggregateSubdirMetadata(options.rootDir)
 	const relative = toOptionalRepoPath(options.repoRoot, options.rootDir)
 	const pathValue = relative ? (coerceNonEmpty(relative) ?? undefined) : undefined
 	const declaration: ValidatedDeclaration = pathValue
@@ -629,16 +624,10 @@ async function buildSubdirUnit(options: {
 	return {
 		declaration,
 		kind: "subdir",
-		metadata,
+		metadata: null,
 		path: relative,
 		skills: toSkillEntries(extracted.value.skills),
 	}
-}
-
-function aggregateSubdirMetadata(rootDir: AbsolutePath): SkillInfo {
-	const dirName = path.basename(rootDir)
-	const name = coerceNonEmpty(dirName) ?? (dirName as SkillInfo["name"])
-	return { name }
 }
 
 function toSkillEntries(skills: ExtractedSkill[]): SkillEntry[] {

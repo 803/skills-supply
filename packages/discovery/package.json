@@ -7,6 +7,7 @@
 		"dotenv": "^17.2.3",
 		"kysely": "^0.28.9",
 		"pg-boss": "^12.5.4",
+		"playwright-core": "^1.57.0",
 		"zod": "^4.3.5"
 	},
 	"devDependencies": {
@@ -16,10 +17,10 @@
 	"private": true,
 	"scripts": {
 		"build": "bun run build:binary && bun run build:node",
-		"build:binary": "bun build ./cli.ts --compile --outfile ./bin/discovery",
-		"build:node": "bun build ./cli.ts --outdir ./dist --target node",
+		"build:binary": "bun build ./cli.ts --compile --outfile ./bin/discovery --external playwright-core",
+		"build:node": "bun build ./cli.ts --outdir ./dist --target node --external playwright-core",
 		"clean": "rm -rf dist bin",
-		"cli": "npm run build && node ./dist/cli.js",
+		"cli": "npm run build:node && node ./dist/cli.js",
 		"tsc": "tsc --build"
 	},
 	"type": "module",

@@ -13,13 +13,11 @@ export async function cloneRemoteRepo(options: {
 }): Promise<Result<{ repoPath: string }, IoError>> {
 	try {
 		await mkdir(path.dirname(options.destination), { recursive: true })
-		await execFileAsync("git", [
-			"clone",
-			"--depth",
-			"1",
-			options.remoteUrl,
-			options.destination,
-		])
+		await execFileAsync(
+			"git",
+			["clone", "--depth", "1", options.remoteUrl, options.destination],
+			{ env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } },
+		)
 		return { ok: true, value: { repoPath: options.destination } }
 	} catch (error) {
 		return {

@@ -85,7 +85,7 @@ function StatCard({ label, value, hint }: StatCardProps) {
 
 export default async function Home() {
 	const packages = await listIndexedPackages()
-	const repoCount = new Set(packages.map((pkg) => pkg.github_repo)).size
+	const repoCount = new Set(packages.map((pkg) => pkg.gh_repo)).size
 	const topicCount = new Set(packages.flatMap((pkg) => pkg.gh_topics ?? [])).size
 	const latestUpdate = packages.reduce<Date | null>((latest, pkg) => {
 		const candidate =
@@ -176,7 +176,7 @@ export default async function Home() {
 												GitHub owner/repo
 											</p>
 											<p className="mt-2 text-lg font-heading text-stone-900 sm:text-xl">
-												{formatRepo(pkg.github_repo)}
+												{formatRepo(pkg.gh_repo)}
 											</p>
 										</div>
 										<div className="min-w-0">

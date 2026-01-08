@@ -6,7 +6,7 @@ export type IndexedPackageId = IndexedPackageRow["id"]
 
 export type IndexedPackageInsert = Omit<
 	Insertable<Database["indexed_packages"]>,
-	"id" | "discovered_at" | "updated_at" | "github_repo"
+	"id" | "discovered_at" | "updated_at" | "gh_repo"
 >
 
 export type IndexedPackageSkillRow = Selectable<Database["indexed_package_skills"]>
@@ -37,7 +37,7 @@ export async function upsertRepoPackages(
 	await db.transaction().execute(async (trx) => {
 		await trx
 			.deleteFrom("indexed_packages")
-			.where("github_repo", "=", githubRepo)
+			.where("gh_repo", "=", githubRepo)
 			.execute()
 
 		if (packages.length === 0) {
@@ -49,7 +49,7 @@ export async function upsertRepoPackages(
 			.values(
 				packages.map((pkg) => ({
 					...pkg.package,
-					github_repo: githubRepo,
+					gh_repo: githubRepo,
 				})),
 			)
 			.returning(["id", "declaration"])
@@ -107,9 +107,9 @@ export async function getIndexedPackageById(
 export async function listIndexedRepos(db: Kysely<Database>): Promise<string[]> {
 	const rows = await db
 		.selectFrom("indexed_packages")
-		.select("github_repo")
+		.select("gh_repo")
 		.distinct()
 		.execute()
 
-	return rows.map((row) => row.github_repo)
+	return rows.map((row) => row.gh_repo)
 }

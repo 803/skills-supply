@@ -10,13 +10,13 @@ export type IndexedPackagesId = number & { __brand: "public.indexed_packages" }
 export default interface IndexedPackagesTable {
 	id: ColumnType<IndexedPackagesId, IndexedPackagesId | undefined, IndexedPackagesId>
 
-	github_repo: ColumnType<string, string, string>
+	gh_repo: ColumnType<string, string, string>
 
 	declaration: ColumnType<string, string, string>
 
 	path: ColumnType<string | null, string | null, string | null>
 
-	name: ColumnType<string, string, string>
+	name: ColumnType<string | null, string | null, string | null>
 
 	description: ColumnType<string | null, string | null, string | null>
 

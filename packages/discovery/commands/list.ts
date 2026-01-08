@@ -12,19 +12,10 @@ export async function listCommand(options: {
 		for (const row of rows) {
 			const pathValue = row.path ?? ""
 			console.log(
-				[row.id, row.name, row.github_repo, pathValue, row.gh_stars].join("\t"),
+				[row.id, row.name, row.gh_repo, pathValue, row.gh_stars].join("\t"),
 			)
 		}
 		return { ok: true, value: undefined }
-	} catch (error) {
-		return {
-			error: {
-				message: "Failed to list packages.",
-				rawError: error instanceof Error ? error : undefined,
-				type: "unexpected",
-			},
-			ok: false,
-		}
 	} finally {
 		await db.destroy()
 	}
