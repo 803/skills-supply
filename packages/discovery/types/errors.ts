@@ -1,4 +1,4 @@
-import type { BaseError } from "@skills-supply/core"
+import type { AbsolutePath, BaseError } from "@skills-supply/core"
 import type { ZodError } from "zod"
 
 export type ValidationError =
@@ -6,30 +6,30 @@ export type ValidationError =
 			type: "validation"
 			source: "zod"
 			field: string
-			path?: string
+			path?: AbsolutePath
 			zodError: ZodError
 	  })
 	| (BaseError & {
 			type: "validation"
 			source: "manual"
 			field: string
-			path?: string
+			path?: AbsolutePath
 	  })
 
 export interface ParseError extends BaseError {
 	type: "parse"
 	source: string
-	path?: string
+	path?: AbsolutePath
 }
 
 export interface DetectionError extends BaseError {
 	type: "detection"
-	path: string
+	path: AbsolutePath
 }
 
 export interface IoError extends BaseError {
 	type: "io"
-	path: string
+	path: AbsolutePath
 	operation: string
 }
 
@@ -46,6 +46,7 @@ export interface NotFoundError extends BaseError {
 	type: "not_found"
 	target: string
 	path?: string
+	status?: number
 }
 
 export type DiscoveryError =

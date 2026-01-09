@@ -66,6 +66,14 @@ export function coerceAbsolutePathDirect(value: string): AbsolutePath | null {
 	return path.normalize(trimmed) as AbsolutePath
 }
 
+export function assertAbsolutePathDirect(value: string): AbsolutePath {
+	const result = coerceAbsolutePathDirect(value)
+	if (!result) {
+		throw new Error(`Expected absolute path, got: ${value}`)
+	}
+	return result
+}
+
 const SSH_GIT_PATTERN = /^git@([^:]+):(.+?)(?:\.git)?$/
 const HTTP_GIT_PATTERN = /^(https?):\/\/([^/]+)\/(.+?)(?:\.git)?$/
 

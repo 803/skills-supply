@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import {
 	type AbsolutePath,
+	assertAbsolutePathDirect,
 	buildClaudePluginDeclaration,
 	type CoreError,
 	coerceAbsolutePath,
@@ -43,7 +44,7 @@ export interface ScanUnit {
 	skills: IndexedSkill[]
 }
 
-export type ScanWarning = DiscoveryError & { path: string }
+export type ScanWarning = DiscoveryError & { path: AbsolutePath; github_ref?: GithubRef }
 
 export type ScanResult = Result<
 	{ units: ScanUnit[]; warnings: ScanWarning[] },
@@ -69,7 +70,6 @@ export async function scanRepo(
 			error: {
 				field: "path",
 				message: `Repo path is not absolute: ${repoPath}`,
-				path: repoPath,
 				source: "manual",
 				type: "validation",
 			},
@@ -87,7 +87,7 @@ export async function scanRepo(
 			error: {
 				field: "path",
 				message: `Repo path is not a directory: ${repoPath}`,
-				path: repoPath,
+				path: rootPath,
 				source: "manual",
 				type: "validation",
 			},
@@ -101,7 +101,7 @@ export async function scanRepo(
 			error: {
 				field: "githubRepo",
 				message: `Invalid GitHub repo: ${githubRepo}`,
-				path: repoPath,
+				path: rootPath,
 				source: "manual",
 				type: "validation",
 			},
@@ -117,7 +117,6 @@ export async function scanRepo(
 			error: {
 				field: "pluginTempRoot",
 				message: `Plugin temp root is not absolute: ${options.pluginTempRoot}`,
-				path: options.pluginTempRoot,
 				source: "manual",
 				type: "validation",
 			},
@@ -158,7 +157,7 @@ export async function scanRepo(
 				error: {
 					message: "Unable to create plugin temp directory.",
 					operation: "mkdtemp",
-					path: tmpdir(),
+					path: assertAbsolutePathDirect(tmpdir()),
 					rawError: error instanceof Error ? error : undefined,
 					type: "io",
 				},
@@ -172,7 +171,6 @@ export async function scanRepo(
 				error: {
 					field: "pluginTempRoot",
 					message: `Plugin temp root is not absolute: ${created}`,
-					path: created,
 					source: "manual",
 					type: "validation",
 				},
@@ -729,7 +727,6 @@ async function resolvePluginRoot(options: {
 			error: {
 				field: "path",
 				message: `Plugin repo path is not absolute: ${cloneResult.value.repoPath}`,
-				path: cloneResult.value.repoPath,
 				source: "manual",
 				type: "validation",
 			},
@@ -805,7 +802,7 @@ async function readFileText(
 		warnings.push({
 			message: `Unable to read ${filePath}.`,
 			operation: "readFile",
-			path: filePath,
+			path: assertAbsolutePathDirect(filePath),
 			rawError: error instanceof Error ? error : undefined,
 			type: "io",
 		})
@@ -865,7 +862,7 @@ async function safeStat(
 			error: {
 				message: `Unable to access ${targetPath}.`,
 				operation: "stat",
-				path: targetPath,
+				path: assertAbsolutePathDirect(targetPath),
 				rawError: error instanceof Error ? error : undefined,
 				type: "io",
 			},

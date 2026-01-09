@@ -97,20 +97,29 @@ async function main(): Promise<void> {
 
 	program
 		.command("draft")
-		.description("Generate README install text for a package")
-		.argument("<id>", "Package id")
-		.action(async (id: string) => {
-			const parsed = Number.parseInt(id, 10)
-			if (!Number.isFinite(parsed)) {
-				printError({
-					field: "id",
-					message: "Package id must be a number.",
-					source: "manual",
-					type: "validation",
-				})
-				return
+		.description("Create a PR to add sk installation instructions")
+		.argument("[id]", "Package id (optional)")
+		.option("--dry-run", "Show diff without creating PR")
+		.action(async (id: string | undefined, options: { dryRun?: boolean }) => {
+			let parsedId: number | undefined
+			if (id !== undefined) {
+				const parsed = Number.parseInt(id, 10)
+				if (!Number.isFinite(parsed)) {
+					printError({
+						field: "id",
+						message: "Package id must be a number.",
+						source: "manual",
+						type: "validation",
+					})
+					return
+				}
+				parsedId = parsed
 			}
-			const result = await draftCommand(parsed)
+
+			const result = await draftCommand({
+				dryRun: Boolean(options.dryRun),
+				id: parsedId,
+			})
 			if (!result.ok) {
 				printError(result.error)
 			}

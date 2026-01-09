@@ -1,6 +1,6 @@
 import { readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
-import type { Result } from "@skills-supply/core"
+import { assertAbsolutePathDirect, type Result } from "@skills-supply/core"
 import { consola } from "consola"
 import { type Browser, chromium, type Page } from "playwright-core"
 import { env } from "@/env"
@@ -603,7 +603,7 @@ async function readState(): Promise<SkillsmpStateResult<SkillsmpState | null>> {
 			error: {
 				message: `Unable to read ${statePath}.`,
 				operation: "readFile",
-				path: statePath,
+				path: assertAbsolutePathDirect(statePath),
 				rawError: error instanceof Error ? error : undefined,
 				type: "io",
 			},
@@ -618,7 +618,7 @@ async function readState(): Promise<SkillsmpStateResult<SkillsmpState | null>> {
 		return {
 			error: {
 				message: `Invalid JSON in ${statePath}.`,
-				path: statePath,
+				path: assertAbsolutePathDirect(statePath),
 				rawError: error instanceof Error ? error : undefined,
 				source: "skillsmp_bql_state",
 				type: "parse",
@@ -642,7 +642,7 @@ async function writeState(state: SkillsmpState): Promise<SkillsmpStateResult<voi
 			error: {
 				message: `Unable to write ${statePath}.`,
 				operation: "writeFile",
-				path: statePath,
+				path: assertAbsolutePathDirect(statePath),
 				rawError: error instanceof Error ? error : undefined,
 				type: "io",
 			},
@@ -664,7 +664,7 @@ async function clearState(): Promise<SkillsmpStateResult<void>> {
 			error: {
 				message: `Unable to remove ${statePath}.`,
 				operation: "rm",
-				path: statePath,
+				path: assertAbsolutePathDirect(statePath),
 				rawError: error instanceof Error ? error : undefined,
 				type: "io",
 			},
@@ -679,7 +679,7 @@ function parseState(raw: unknown, statePath: string): SkillsmpStateResult<Skills
 			error: {
 				field: "state",
 				message: "SkillsMP BQL state must be a JSON object.",
-				path: statePath,
+				path: assertAbsolutePathDirect(statePath),
 				source: "manual",
 				type: "validation",
 			},
@@ -693,7 +693,7 @@ function parseState(raw: unknown, statePath: string): SkillsmpStateResult<Skills
 			error: {
 				field: "resumeFromPage",
 				message: "SkillsMP BQL state resumeFromPage must be a positive integer.",
-				path: statePath,
+				path: assertAbsolutePathDirect(statePath),
 				source: "manual",
 				type: "validation",
 			},
@@ -707,7 +707,7 @@ function parseState(raw: unknown, statePath: string): SkillsmpStateResult<Skills
 			error: {
 				field: "totalPages",
 				message: "SkillsMP BQL state totalPages must be a positive integer.",
-				path: statePath,
+				path: assertAbsolutePathDirect(statePath),
 				source: "manual",
 				type: "validation",
 			},
@@ -721,7 +721,7 @@ function parseState(raw: unknown, statePath: string): SkillsmpStateResult<Skills
 			error: {
 				field: "startedAt",
 				message: "SkillsMP BQL state startedAt must be a non-empty string.",
-				path: statePath,
+				path: assertAbsolutePathDirect(statePath),
 				source: "manual",
 				type: "validation",
 			},

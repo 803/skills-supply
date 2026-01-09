@@ -1,147 +1,174 @@
-import type { Result } from "@skills-supply/core"
+import { execFile } from "node:child_process"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+import { promisify } from "node:util"
 import {
-	coerceAbsolutePathDirect,
-	coerceGithubRef,
-	coerceGitUrl,
-	coerceNonEmpty,
-	coerceRemoteMarketplaceUrl,
+	assertAbsolutePathDirect,
+	formatSkPackageAddCommand,
+	normalizeDeclarationToKey,
+	parseSerializedDeclaration,
+	type Result,
 } from "@skills-supply/core"
+import { z } from "zod"
 import { db } from "@/db"
-import { coerceIndexedPackageId, getIndexedPackageById } from "@/db/indexed-packages"
+import {
+	coerceIndexedPackageId,
+	getIndexedPackageById,
+	listPackagesByStars,
+} from "@/db/indexed-packages"
+import {
+	cloneRemoteRepo,
+	gitAddAll,
+	gitCheckoutNewBranch,
+	gitCommit,
+	gitDiffStaged,
+	gitPush,
+} from "@/sources/git"
+import {
+	checkRepoExists,
+	createFork,
+	createPullRequestViaCli,
+	deleteRepo,
+	waitForForkReady,
+} from "@/sources/github"
 import type { IndexedDeclaration } from "@/types"
 import type { DiscoveryError } from "@/types/errors"
 
-export async function draftCommand(id: number): Promise<Result<void, DiscoveryError>> {
+interface TargetPackage {
+	id: number
+	name: string | null
+	description: string | null
+	gh_repo: string
+	gh_stars: number
+	declaration: IndexedDeclaration
+	declarationKey: string
+	installCommand: string
+}
+
+interface ForkInfo {
+	forkUrl: string
+	forkOwner: string
+	forkRepo: string
+}
+
+interface WorkingDir {
+	path: string
+	root: string
+}
+
+type DraftState = Record<string, { pr_url: string }>
+
+type DraftOptions = {
+	id?: number
+	dryRun: boolean
+}
+
+const execFileAsync = promisify(execFile)
+
+const BRANCH_NAME = "sk-install-instructions"
+const COMMIT_MESSAGE = "docs: add sk installation instructions"
+const PR_TITLE = "docs: add sk installation instructions"
+const PR_BODY =
+	"Adds installation instructions for the sk tool.\n\n" +
+	"sk is a cross-agent skill installer that works with Claude Code, Codex, OpenCode, Factory, and other compatible agents.\n\n" +
+	"Learn more: https://skills.supply"
+const FORK_OWNER = "803"
+
+const COMMAND_DIR = path.dirname(fileURLToPath(import.meta.url))
+const DISCOVERY_DIR = path.resolve(COMMAND_DIR, "..")
+const STATE_FILE_PATH = path.join(DISCOVERY_DIR, "drafted-prs.json")
+const PROMPT_FILE_PATH = path.join(DISCOVERY_DIR, "draft-prompt.md")
+
+export async function draftCommand(
+	options: DraftOptions,
+): Promise<Result<void, DiscoveryError>> {
+	let tempRoot: string | undefined
+
 	try {
-		const packageId = coerceIndexedPackageId(id)
-		if (!packageId) {
-			return {
-				error: {
-					field: "id",
-					message: "Package id must be a positive integer.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
+		const target = await resolveTargetPackage(options)
+		if (!target.ok) {
+			return target
 		}
 
-		const row = await getIndexedPackageById(db, packageId)
-		if (!row) {
-			return {
-				error: {
-					message: `Package not found: ${id}`,
-					target: "package",
-					type: "not_found",
-				},
-				ok: false,
-			}
+		const declarationLabel = JSON.stringify(target.value.declaration)
+		console.log(
+			`[info] Target package: ${declarationLabel} (id: ${target.value.id}, stars: ${target.value.gh_stars})`,
+		)
+		console.log(`[info] Target repo: ${target.value.gh_repo}`)
+
+		const fork = await prepareFork(target.value.gh_repo)
+		if (!fork.ok) {
+			return fork
+		}
+		console.log(`[info] Fork created: ${fork.value.forkOwner}/${fork.value.forkRepo}`)
+
+		const workdir = await cloneToWorkingDir(fork.value)
+		if (!workdir.ok) {
+			return workdir
+		}
+		tempRoot = workdir.value.root
+
+		const generated = await invokeClaudeForGeneration(workdir.value, target.value)
+		if (!generated.ok) {
+			return generated
+		}
+		console.log("[info] Claude completed content generation")
+
+		const diff = await detectChanges(workdir.value)
+		if (!diff.ok) {
+			return diff
+		}
+		console.log("[diff]")
+		console.log(diff.value)
+
+		if (options.dryRun) {
+			console.log("[info] Dry run complete. No PR created.")
+			return { ok: true, value: undefined }
 		}
 
-		const declaration = parseDeclaration(row.declaration)
-		if (!declaration.ok) {
-			return declaration
+		if (diff.value.trim().length === 0) {
+			console.log("[info] No changes detected. Exiting.")
+			return { ok: true, value: undefined }
 		}
-		const markdown = renderDraft(declaration.value)
-		console.log(markdown)
+
+		const pr = await submitPR(workdir.value, target.value, fork.value)
+		if (!pr.ok) {
+			return pr
+		}
+		console.log("[info] Changes committed and pushed")
+		console.log(`[success] PR created: ${pr.value.prUrl}`)
+		console.log("[info] State file updated")
+
 		return { ok: true, value: undefined }
 	} finally {
+		if (tempRoot) {
+			await rm(tempRoot, { force: true, recursive: true })
+		}
 		await db.destroy()
 	}
 }
 
-function renderDraft(declaration: IndexedDeclaration): string {
-	const lines: string[] = []
-	lines.push("## Installation", "")
-
-	if (isClaudePlugin(declaration)) {
-		lines.push("### Claude Code (CLI)", "", "```bash")
-		lines.push(
-			`claude plugin marketplace add ${declaration.marketplace}`,
-			`claude plugin install ${declaration.plugin}@${declaration.marketplace}`,
-		)
-		lines.push("```", "", "### Claude Code (Slash Commands)", "", "```")
-		lines.push(
-			`/plugin marketplace add ${declaration.marketplace}`,
-			`/plugin install ${declaration.plugin}@${declaration.marketplace}`,
-		)
-		lines.push("```", "")
+async function resolveTargetPackage(
+	options: DraftOptions,
+): Promise<Result<TargetPackage, DiscoveryError>> {
+	if (options.id !== undefined) {
+		return resolvePackageById(options.id)
 	}
 
-	lines.push(
-		"### Cross-Agent Install (sk)",
-		"",
-		"Works with Claude Code, Codex, OpenCode, Factory, and other compatible agents:",
-		"",
-		"```bash",
-	)
-	lines.push(buildSkInstallLine(declaration), "sk sync", "```", "")
-	lines.push(
-		"> **Why sk?** One manifest, all agents. [Learn more](https://skills.supply)",
-	)
-
-	return lines.join("\n")
+	return selectNextUnprocessedPackage()
 }
 
-function buildSkInstallLine(declaration: IndexedDeclaration): string {
-	switch (declaration.type) {
-		case "registry": {
-			const name = declaration.org
-				? `@${declaration.org}/${declaration.name}`
-				: declaration.name
-			return `sk pkg add registry ${name}@${declaration.version}`
-		}
-		case "git":
-			return buildPathCommand(`sk pkg add git ${declaration.url}`, declaration.path)
-		case "github":
-			return buildPathCommand(
-				`sk pkg add github ${declaration.gh}`,
-				declaration.path,
-			)
-		case "local":
-			return `sk pkg add local ${declaration.path}`
-		case "claude-plugin":
-			return `sk pkg add claude-plugin ${declaration.plugin}@${declaration.marketplace}`
-		default: {
-			const exhaustive: never = declaration
-			throw new Error(
-				`Unsupported declaration type: ${String(
-					(exhaustive as { type?: string }).type ?? "unknown",
-				)}`,
-			)
-		}
-	}
-}
-
-function buildPathCommand(base: string, pathValue?: string): string {
-	if (!pathValue) {
-		return base
-	}
-
-	return `${base} --path ${pathValue}`
-}
-
-function parseDeclaration(raw: string): Result<IndexedDeclaration, DiscoveryError> {
-	let parsed: unknown
-	try {
-		parsed = JSON.parse(raw)
-	} catch (error) {
+async function resolvePackageById(
+	id: number,
+): Promise<Result<TargetPackage, DiscoveryError>> {
+	const packageId = coerceIndexedPackageId(id)
+	if (!packageId) {
 		return {
 			error: {
-				message: "Invalid declaration JSON.",
-				rawError: error instanceof Error ? error : undefined,
-				source: "declaration",
-				type: "parse",
-			},
-			ok: false,
-		}
-	}
-
-	if (!parsed || typeof parsed !== "object") {
-		return {
-			error: {
-				field: "declaration",
-				message: "Invalid declaration format.",
+				field: "id",
+				message: "Package id must be a positive integer.",
 				source: "manual",
 				type: "validation",
 			},
@@ -149,227 +176,387 @@ function parseDeclaration(raw: string): Result<IndexedDeclaration, DiscoveryErro
 		}
 	}
 
-	const record = parsed as Record<string, unknown>
-
-	if (record.type === "registry") {
-		if (typeof record.name !== "string" || typeof record.version !== "string") {
-			return {
-				error: {
-					field: "declaration",
-					message: "Registry declaration is missing name or version.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
-		}
-
-		const name = coerceNonEmpty(record.name)
-		const version = coerceNonEmpty(record.version)
-		const org =
-			typeof record.org === "string"
-				? (coerceNonEmpty(record.org) ?? undefined)
-				: undefined
-		if (!name || !version || (record.org && !org)) {
-			return {
-				error: {
-					field: "declaration",
-					message: "Registry declaration has invalid fields.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
-		}
+	const row = await getIndexedPackageById(db, packageId)
+	if (!row) {
 		return {
-			ok: true,
-			value: {
-				name,
-				org,
-				type: "registry",
-				version,
+			error: {
+				message: `Package not found: ${id}`,
+				target: "package",
+				type: "not_found",
 			},
+			ok: false,
 		}
 	}
 
-	if (record.type === "github") {
-		if (typeof record.gh !== "string") {
-			return {
-				error: {
-					field: "declaration",
-					message: "GitHub declaration is missing gh.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
-		}
-		const gh = coerceGithubRef(record.gh)
-		if (!gh) {
-			return {
-				error: {
-					field: "declaration",
-					message: "GitHub declaration has invalid gh.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
-		}
-		const pathValue =
-			typeof record.path === "string"
-				? (coerceNonEmpty(record.path) ?? undefined)
-				: undefined
-		if (record.path && !pathValue) {
-			return {
-				error: {
-					field: "declaration",
-					message: "GitHub declaration has invalid path.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
-		}
-		return {
-			ok: true,
-			value: {
-				gh,
-				path: pathValue,
-				type: "github",
-			},
-		}
+	return buildTargetPackage(row)
+}
+
+async function selectNextUnprocessedPackage(): Promise<
+	Result<TargetPackage, DiscoveryError>
+> {
+	const state = await loadStateFile()
+	if (!state.ok) {
+		return state
 	}
 
-	if (record.type === "git") {
-		if (typeof record.url !== "string") {
-			return {
-				error: {
-					field: "declaration",
-					message: "Git declaration is missing url.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
+	const rows = await listPackagesByStars(db)
+	for (const row of rows) {
+		const candidate = buildTargetPackage(row)
+		if (!candidate.ok) {
+			return candidate
 		}
-		const url = coerceGitUrl(record.url)
-		if (!url) {
-			return {
-				error: {
-					field: "declaration",
-					message: "Git declaration has invalid url.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
-		}
-		const pathValue =
-			typeof record.path === "string"
-				? (coerceNonEmpty(record.path) ?? undefined)
-				: undefined
-		if (record.path && !pathValue) {
-			return {
-				error: {
-					field: "declaration",
-					message: "Git declaration has invalid path.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
-		}
-		return {
-			ok: true,
-			value: {
-				path: pathValue,
-				type: "git",
-				url,
-			},
-		}
-	}
-
-	if (record.type === "local") {
-		if (typeof record.path !== "string") {
-			return {
-				error: {
-					field: "declaration",
-					message: "Local declaration is missing path.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
-		}
-		const pathValue = coerceAbsolutePathDirect(record.path)
-		if (!pathValue) {
-			return {
-				error: {
-					field: "declaration",
-					message: "Local declaration has invalid path.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
-		}
-		return { ok: true, value: { path: pathValue, type: "local" } }
-	}
-
-	if (record.type === "claude-plugin") {
-		if (typeof record.plugin !== "string" || typeof record.marketplace !== "string") {
-			return {
-				error: {
-					field: "declaration",
-					message:
-						"Claude plugin declaration is missing plugin or marketplace.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
-		}
-		const plugin = coerceNonEmpty(record.plugin)
-		const marketplace =
-			coerceRemoteMarketplaceUrl(record.marketplace) ??
-			coerceAbsolutePathDirect(record.marketplace) ??
-			coerceGitUrl(record.marketplace) ??
-			coerceGithubRef(record.marketplace)
-		if (!plugin || !marketplace) {
-			return {
-				error: {
-					field: "declaration",
-					message: "Claude plugin declaration has invalid fields.",
-					source: "manual",
-					type: "validation",
-				},
-				ok: false,
-			}
-		}
-		return {
-			ok: true,
-			value: {
-				marketplace,
-				plugin,
-				type: "claude-plugin",
-			},
+		if (!state.value[candidate.value.declarationKey]) {
+			return candidate
 		}
 	}
 
 	return {
 		error: {
-			field: "declaration",
-			message: "Declaration did not match any known type.",
-			source: "manual",
-			type: "validation",
+			message: "No unprocessed packages found.",
+			target: "package",
+			type: "not_found",
 		},
 		ok: false,
 	}
 }
 
-function isClaudePlugin(
-	declaration: IndexedDeclaration,
-): declaration is Extract<IndexedDeclaration, { type: "claude-plugin" }> {
-	return "type" in declaration && declaration.type === "claude-plugin"
+function buildTargetPackage(row: {
+	id: number
+	name: string | null
+	description: string | null
+	gh_repo: string
+	gh_stars: number
+	declaration: string
+}): Result<TargetPackage, DiscoveryError> {
+	const parsed = parseSerializedDeclaration(row.declaration)
+	if (!parsed.ok) {
+		return {
+			error: {
+				field: "declaration",
+				message: `Invalid declaration for package ${row.id}: ${parsed.error.message}`,
+				source: "manual",
+				type: "validation",
+			},
+			ok: false,
+		}
+	}
+
+	const declaration = parsed.value
+	return {
+		ok: true,
+		value: {
+			declaration,
+			declarationKey: normalizeDeclarationToKey(declaration),
+			description: row.description,
+			gh_repo: row.gh_repo,
+			gh_stars: row.gh_stars,
+			id: row.id,
+			installCommand: formatSkPackageAddCommand(declaration),
+			name: row.name,
+		},
+	}
+}
+
+async function loadStateFile(): Promise<Result<DraftState, DiscoveryError>> {
+	let contents: string
+	try {
+		contents = await readFile(STATE_FILE_PATH, "utf8")
+	} catch (error) {
+		if (isNotFound(error)) {
+			return { ok: true, value: {} }
+		}
+		return {
+			error: {
+				message: `Unable to read ${STATE_FILE_PATH}.`,
+				operation: "readFile",
+				path: assertAbsolutePathDirect(STATE_FILE_PATH),
+				rawError: error instanceof Error ? error : undefined,
+				type: "io",
+			},
+			ok: false,
+		}
+	}
+
+	let parsed: unknown
+	try {
+		parsed = JSON.parse(contents)
+	} catch (error) {
+		return {
+			error: {
+				message: `Invalid JSON in ${STATE_FILE_PATH}.`,
+				path: assertAbsolutePathDirect(STATE_FILE_PATH),
+				rawError: error instanceof Error ? error : undefined,
+				source: "draft_pr_state",
+				type: "parse",
+			},
+			ok: false,
+		}
+	}
+
+	return parseDraftState(parsed, STATE_FILE_PATH)
+}
+
+async function saveStateFile(state: DraftState): Promise<Result<void, DiscoveryError>> {
+	const output = JSON.stringify(state, null, 2)
+
+	try {
+		await writeFile(STATE_FILE_PATH, `${output}\n`)
+		return { ok: true, value: undefined }
+	} catch (error) {
+		return {
+			error: {
+				message: `Unable to write ${STATE_FILE_PATH}.`,
+				operation: "writeFile",
+				path: assertAbsolutePathDirect(STATE_FILE_PATH),
+				rawError: error instanceof Error ? error : undefined,
+				type: "io",
+			},
+			ok: false,
+		}
+	}
+}
+
+const DraftStateSchema = z.record(
+	z.string(),
+	z.object({
+		pr_url: z.string().min(1, "pr_url cannot be empty"),
+	}),
+)
+
+function parseDraftState(
+	raw: unknown,
+	statePath: string,
+): Result<DraftState, DiscoveryError> {
+	const result = DraftStateSchema.safeParse(raw)
+	if (!result.success) {
+		return {
+			error: {
+				field: "state",
+				message: result.error.message,
+				path: assertAbsolutePathDirect(statePath),
+				source: "zod",
+				type: "validation",
+				zodError: result.error,
+			},
+			ok: false,
+		}
+	}
+	return { ok: true, value: result.data }
+}
+
+async function prepareFork(ghRepo: string): Promise<Result<ForkInfo, DiscoveryError>> {
+	const parsed = parseGithubRepo(ghRepo)
+	if (!parsed.ok) {
+		return parsed
+	}
+	const [owner, repo] = parsed.value
+
+	const exists = await checkRepoExists(FORK_OWNER, repo)
+	if (!exists.ok) {
+		return exists
+	}
+
+	if (exists.value) {
+		const deleted = await deleteRepo(FORK_OWNER, repo)
+		if (!deleted.ok) {
+			return deleted
+		}
+	}
+
+	const fork = await createFork(owner, repo)
+	if (!fork.ok) {
+		return fork
+	}
+
+	const ready = await waitForForkReady(FORK_OWNER, repo)
+	if (!ready.ok) {
+		return ready
+	}
+
+	return {
+		ok: true,
+		value: {
+			forkOwner: FORK_OWNER,
+			forkRepo: repo,
+			forkUrl: fork.value.clone_url,
+		},
+	}
+}
+
+async function cloneToWorkingDir(
+	fork: ForkInfo,
+): Promise<Result<WorkingDir, DiscoveryError>> {
+	let tempRoot: string
+	try {
+		tempRoot = await mkdtemp(path.join(os.tmpdir(), "sk-draft-"))
+	} catch (error) {
+		return {
+			error: {
+				message: "Unable to create temporary working directory.",
+				operation: "mkdtemp",
+				path: assertAbsolutePathDirect(os.tmpdir()),
+				rawError: error instanceof Error ? error : undefined,
+				type: "io",
+			},
+			ok: false,
+		}
+	}
+
+	const repoPath = path.join(tempRoot, "repo")
+	const cloned = await cloneRemoteRepo({
+		destination: repoPath,
+		remoteUrl: fork.forkUrl,
+	})
+	if (!cloned.ok) {
+		return cloned
+	}
+
+	const branched = await gitCheckoutNewBranch(repoPath, BRANCH_NAME)
+	if (!branched.ok) {
+		return branched
+	}
+
+	return { ok: true, value: { path: repoPath, root: tempRoot } }
+}
+
+async function invokeClaudeForGeneration(
+	workdir: WorkingDir,
+	pkg: TargetPackage,
+): Promise<Result<void, DiscoveryError>> {
+	const promptResult = await buildPrompt(pkg)
+	if (!promptResult.ok) {
+		return promptResult
+	}
+
+	try {
+		await execFileAsync("claude", ["--print", "-p", promptResult.value], {
+			cwd: workdir.path,
+			env: process.env,
+			timeout: 300000,
+		})
+		return { ok: true, value: undefined }
+	} catch (error) {
+		return {
+			error: {
+				message: "Claude CLI failed.",
+				operation: "execFile",
+				path: assertAbsolutePathDirect(workdir.path),
+				rawError: error instanceof Error ? error : undefined,
+				type: "io",
+			},
+			ok: false,
+		}
+	}
+}
+
+async function buildPrompt(pkg: TargetPackage): Promise<Result<string, DiscoveryError>> {
+	let template: string
+	try {
+		template = await readFile(PROMPT_FILE_PATH, "utf8")
+	} catch (error) {
+		return {
+			error: {
+				message: `Unable to read ${PROMPT_FILE_PATH}.`,
+				operation: "readFile",
+				path: assertAbsolutePathDirect(PROMPT_FILE_PATH),
+				rawError: error instanceof Error ? error : undefined,
+				type: "io",
+			},
+			ok: false,
+		}
+	}
+
+	const installCommands = `${pkg.installCommand}\nsk sync`
+	const prompt = template
+		.replaceAll("{{PACKAGE_NAME}}", pkg.name ?? "unknown")
+		.replaceAll("{{PACKAGE_DESCRIPTION}}", pkg.description ?? "")
+		.replaceAll("{{INSTALL_COMMAND}}", installCommands)
+		.replaceAll("{{DECLARATION}}", JSON.stringify(pkg.declaration, null, 2))
+
+	return { ok: true, value: prompt }
+}
+
+async function detectChanges(
+	workdir: WorkingDir,
+): Promise<Result<string, DiscoveryError>> {
+	const added = await gitAddAll(workdir.path)
+	if (!added.ok) {
+		return added
+	}
+
+	return gitDiffStaged(workdir.path)
+}
+
+async function submitPR(
+	workdir: WorkingDir,
+	pkg: TargetPackage,
+	fork: ForkInfo,
+): Promise<Result<{ prUrl: string }, DiscoveryError>> {
+	// Load state file FIRST, before any irreversible actions
+	const state = await loadStateFile()
+	if (!state.ok) {
+		return state
+	}
+
+	const committed = await gitCommit(workdir.path, COMMIT_MESSAGE)
+	if (!committed.ok) {
+		return committed
+	}
+
+	const pushed = await gitPush(workdir.path, "origin", BRANCH_NAME)
+	if (!pushed.ok) {
+		return pushed
+	}
+
+	const head = `${fork.forkOwner}:${BRANCH_NAME}`
+	const pr = await createPullRequestViaCli(
+		workdir.path,
+		pkg.gh_repo,
+		head,
+		PR_TITLE,
+		PR_BODY,
+	)
+	if (!pr.ok) {
+		return pr
+	}
+
+	// Log before writing so manual recovery is possible if write fails
+	const stateKey = pkg.declarationKey
+	const stateValue = { pr_url: pr.value.url }
+	console.log(`[state] Adding to state file:`)
+	console.log(`[state]   key: ${JSON.stringify(stateKey)}`)
+	console.log(`[state]   value: ${JSON.stringify(stateValue)}`)
+
+	state.value[stateKey] = stateValue
+	const saved = await saveStateFile(state.value)
+	if (!saved.ok) {
+		return saved
+	}
+
+	return { ok: true, value: { prUrl: pr.value.url } }
+}
+
+function parseGithubRepo(ghRepo: string): Result<[string, string], DiscoveryError> {
+	const parts = ghRepo.split("/").map((part) => part.trim())
+	if (parts.length !== 2 || !parts[0] || !parts[1]) {
+		return {
+			error: {
+				field: "gh_repo",
+				message: `Invalid GitHub repo: ${ghRepo}`,
+				source: "manual",
+				type: "validation",
+			},
+			ok: false,
+		}
+	}
+
+	return { ok: true, value: [parts[0], parts[1]] }
+}
+
+function isNotFound(error: unknown): boolean {
+	return (
+		error instanceof Error &&
+		"code" in error &&
+		(error as NodeJS.ErrnoException).code === "ENOENT"
+	)
 }

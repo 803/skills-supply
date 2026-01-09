@@ -1,7 +1,12 @@
 import { mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { coerceValidatedDeclaration } from "@skills-supply/core"
+import {
+	assertAbsolutePathDirect,
+	coerceGithubRef,
+	coerceValidatedDeclaration,
+	type GithubRef,
+} from "@skills-supply/core"
 import { consola } from "consola"
 import type { Job } from "pg-boss"
 import { formatErrorChain, printRawErrorChain } from "@/commands/outcome"
@@ -70,13 +75,18 @@ export async function workerCommand(options: WorkerOptions): Promise<void> {
 			return
 		}
 
-		const githubRepo = job.data.github_repo
-		if (!githubRepo || typeof githubRepo !== "string") {
-			consola.warn("Discovery job missing github_repo. Skipping.")
-			return
+		const rawGithubRepo = job.data.github_repo
+		if (!rawGithubRepo) {
+			throw new Error("Discovery job missing github_repo")
+		}
+		const githubRef = coerceGithubRef(rawGithubRepo)
+		if (!githubRef) {
+			throw new Error(
+				`Discovery job has invalid github_repo: ${JSON.stringify(rawGithubRepo)}`,
+			)
 		}
 
-		const result = await processRepo(githubRepo)
+		const result = await processRepo(githubRef)
 		processed += 1
 		if (typeof maxJobs === "number" && processed >= maxJobs) {
 			void requestStop()
@@ -88,13 +98,8 @@ export async function workerCommand(options: WorkerOptions): Promise<void> {
 			throw new Error(message)
 		}
 
-		console.log(
-			"about to persist",
-			result.packages.length,
-			"packages for",
-			githubRepo,
-		)
-		await persistRepoPackages(githubRepo, result.packages)
+		console.log("about to persist", result.packages.length, "packages for", githubRef)
+		await persistRepoPackages(githubRef, result.packages)
 	}
 
 	await Promise.all(
@@ -105,26 +110,26 @@ export async function workerCommand(options: WorkerOptions): Promise<void> {
 }
 
 async function persistRepoPackages(
-	githubRepo: string,
+	githubRef: GithubRef,
 	packages: IndexedPackageInsertWithSkills[],
 ): Promise<void> {
 	if (packages.length === 0) {
-		await upsertRepoPackages(db, githubRepo, [])
-		consola.info(`${githubRepo}: no installable packages found.`)
+		await upsertRepoPackages(db, githubRef, [])
+		consola.info(`${githubRef}: no installable packages found.`)
 		return
 	}
-	await upsertRepoPackages(db, githubRepo, packages)
-	consola.success(`${githubRepo}: indexed ${packages.length} packages.`)
+	await upsertRepoPackages(db, githubRef, packages)
+	consola.success(`${githubRef}: indexed ${packages.length} packages.`)
 }
 
-async function processRepo(githubRepo: string): Promise<RepoProcessResult> {
+async function processRepo(githubRef: GithubRef): Promise<RepoProcessResult> {
 	const tempDir = await mkdtemp(path.join(os.tmpdir(), "sk-scan-"))
 	const repoDir = path.join(tempDir, "repo")
-	consola.info(`${githubRepo}: processing`)
+	consola.info(`${githubRef}: processing`)
 	try {
 		const cloneResult = await cloneRemoteRepo({
 			destination: repoDir,
-			remoteUrl: `https://github.com/${githubRepo}.git`,
+			remoteUrl: `https://github.com/${githubRef}.git`,
 		})
 		if (!cloneResult.ok) {
 			return {
@@ -134,7 +139,7 @@ async function processRepo(githubRepo: string): Promise<RepoProcessResult> {
 			}
 		}
 
-		const scanResult = await scanRepo(repoDir, githubRepo, {
+		const scanResult = await scanRepo(repoDir, githubRef, {
 			pluginTempRoot: path.join(tempDir, "plugins"),
 		})
 		if (!scanResult.ok) {
@@ -154,7 +159,7 @@ async function processRepo(githubRepo: string): Promise<RepoProcessResult> {
 			return { ok: true, packages: [], retryable: false, warnings }
 		}
 
-		const ghResult = await fetchGithubRepoMetadata(githubRepo)
+		const ghResult = await fetchGithubRepoMetadata(githubRef)
 		if (!ghResult.ok) {
 			// @ts-expect-error
 			throw new Error(ghResult.error)
@@ -167,9 +172,15 @@ async function processRepo(githubRepo: string): Promise<RepoProcessResult> {
 
 			const validated = coerceValidatedDeclaration(unit.declaration)
 			if (!validated.ok) {
+				if (!unit.path) {
+					throw new Error(
+						`Unexpected validation error for pathless unit: ${JSON.stringify(validated.error)}`,
+					)
+				}
 				warnings.push({
 					...validated.error,
-					path: unit.path ?? githubRepo,
+					github_ref: githubRef,
+					path: assertAbsolutePathDirect(unit.path),
 				})
 				return []
 			}

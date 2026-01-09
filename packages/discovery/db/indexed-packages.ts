@@ -93,6 +93,16 @@ export async function listIndexedPackages(
 	return query.orderBy("gh_stars", "desc").execute()
 }
 
+export async function listPackagesByStars(
+	db: Kysely<Database>,
+): Promise<IndexedPackageRow[]> {
+	return db
+		.selectFrom("indexed_packages")
+		.selectAll()
+		.orderBy("gh_stars", "desc")
+		.execute()
+}
+
 export async function getIndexedPackageById(
 	db: Kysely<Database>,
 	id: IndexedPackageId,

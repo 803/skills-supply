@@ -15,6 +15,7 @@ export {
 	SKILL_FILENAME,
 } from "@/constants"
 export { formatSkPackageAddCommand } from "@/declaration/format"
+export { normalizeDeclarationToKey } from "@/declaration/normalize"
 export {
 	coerceValidatedDeclaration,
 	parseSerializedDeclaration,
@@ -52,6 +53,7 @@ export type {
 	RemoteMarketplaceUrl,
 } from "@/types/branded"
 export {
+	assertAbsolutePathDirect,
 	coerceAbsolutePath,
 	coerceAbsolutePathDirect,
 	coerceAgentId,
