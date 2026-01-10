@@ -227,7 +227,7 @@ async function promptForRepoConfirmation(
 	repo: TargetRepo,
 ): Promise<"confirmed" | "skip" | "cancelled"> {
 	console.log("")
-	console.log(`[repo] ${repo.gh_repo}`)
+	console.log(`[repo] https://github.com/${repo.gh_repo}`)
 	console.log("")
 
 	for (const pkg of repo.packages) {
