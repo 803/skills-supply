@@ -212,6 +212,16 @@ export async function listPackagesByRepo(
 		.selectFrom("indexed_packages")
 		.select(["id", "name", "description", "gh_repo", "gh_stars", "declaration"])
 		.where("gh_repo", "=", ghRepo)
+		.where((eb) =>
+			eb.or([
+				eb("path", "is", null),
+				eb.and(
+					EXCLUDED_PATH_SEGMENTS.map((segment) =>
+						eb("path", "not like", `%${segment}%`),
+					),
+				),
+			]),
+		)
 		.execute()
 }
 

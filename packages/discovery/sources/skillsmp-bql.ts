@@ -2,8 +2,9 @@ import { readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { assertAbsolutePathDirect, type Result } from "@skills-supply/core"
 import { consola } from "consola"
-import { type Browser, chromium, type Page } from "playwright-core"
+import type { Page } from "playwright-core"
 import { env } from "@/env"
+import { BrowserManager } from "@/sources/browser-manager"
 import type { OnGithubRepoUrls } from "@/sources/types"
 import type { DiscoveryError, IoError, ParseError, ValidationError } from "@/types/errors"
 
@@ -14,8 +15,7 @@ const SKILLSMP_SEARCH_QUERY = "*"
 const SKILLSMP_SORT_BY = "stars"
 const SKILLSMP_DEFAULT_LIMIT = 48
 const SKILLSMP_FETCH_TIMEOUT_MS = 30_000
-const PAGE_JITTER_MAX_MS = 4_000
-const RATE_LIMIT_MAX_RETRIES = 5
+const PAGE_JITTER_MAX_MS = 0
 
 interface SkillsmpPagination {
 	page: number
@@ -62,21 +62,11 @@ export async function discover(
 		}
 	}
 
-	const sessionResult = await startBrowserlessSession()
-	if (!sessionResult.ok) {
-		return sessionResult
-	}
-
-	const browserResult = await connectToBrowserless(sessionResult.value)
-	if (!browserResult.ok) {
-		return browserResult
-	}
-
-	const { browser, page } = browserResult.value
+	const browserManager = new BrowserManager(startBrowserlessSession)
 
 	const stateResult = await readState()
 	if (!stateResult.ok) {
-		await browser.close()
+		await browserManager.close()
 		return { error: stateResult.error, ok: false }
 	}
 
@@ -96,37 +86,32 @@ export async function discover(
 		}
 
 		let hasNext = true
-		let retryCount = 0
 		while (hasNext) {
-			const pageResult = await fetchSkillsmpInternalPage(page, {
+			// Get a working page (creates or reuses browser session)
+			const pageResult = await browserManager.getPage()
+			if (!pageResult.ok) {
+				return pageResult
+			}
+
+			const fetchResult = await fetchSkillsmpInternalPage(pageResult.value, {
 				limit,
 				page: currentPage,
 				timeoutMs,
 			})
-			if (!pageResult.ok) {
-				const err = pageResult.error
+			if (!fetchResult.ok) {
+				const err = fetchResult.error
 				if (err.type === "network" && err.retryable && err.retryAfterSeconds) {
-					if (retryCount >= RATE_LIMIT_MAX_RETRIES) {
-						consola.error(
-							`[skillsmp-bql] Max retries (${RATE_LIMIT_MAX_RETRIES}) exceeded`,
-						)
-						return pageResult
-					}
-					retryCount++
 					const waitMs = (err.retryAfterSeconds + 1) * 1000 // +1s buffer
-					consola.info(
-						`[skillsmp-bql] Waiting ${waitMs}ms before retry (${retryCount}/${RATE_LIMIT_MAX_RETRIES})...`,
-					)
+					consola.info(`[skillsmp-bql] Waiting ${waitMs}ms before retry...`)
 					await sleep(waitMs)
-					continue // retry same page
+					continue // retry same page (browser may be recreated next iteration)
 				}
-				return pageResult
+				return fetchResult
 			}
-			retryCount = 0 // reset on success
 
-			totalPages = pageResult.value.pagination.totalPages
+			totalPages = fetchResult.value.pagination.totalPages
 
-			const urls = pageResult.value.skills
+			const urls = fetchResult.value.skills
 				.map((skill) => skill.githubUrl)
 				.filter((url): url is string => url !== null && url !== undefined)
 
@@ -145,7 +130,7 @@ export async function discover(
 				break
 			}
 
-			hasNext = pageResult.value.pagination.hasNext
+			hasNext = fetchResult.value.pagination.hasNext
 			currentPage += 1
 
 			await sleep(randomDelayMs())
@@ -158,7 +143,7 @@ export async function discover(
 
 		return { ok: true, value: undefined }
 	} finally {
-		await browser.close()
+		await browserManager.close()
 	}
 }
 
@@ -267,56 +252,6 @@ async function startBrowserlessSession(): Promise<Result<string, DiscoveryError>
 		ok: true,
 		value: ensureBrowserlessToken(browserWSEndpoint, env.BROWSERLESS_TOKEN ?? ""),
 	}
-}
-
-async function connectToBrowserless(
-	browserWSEndpoint: string,
-): Promise<Result<{ browser: Browser; page: Page }, DiscoveryError>> {
-	let browser: Browser
-	try {
-		browser = await chromium.connectOverCDP(browserWSEndpoint)
-	} catch (error) {
-		return {
-			error: {
-				message: "Failed to connect to Browserless via CDP.",
-				rawError: error instanceof Error ? error : undefined,
-				source: browserWSEndpoint,
-				type: "network",
-			},
-			ok: false,
-		}
-	}
-
-	const context = browser.contexts()[0]
-	if (!context) {
-		throw new Error("Browserless session returned no browser contexts.")
-	}
-
-	let page = context.pages()[0]
-	if (!page) {
-		page = await context.newPage()
-	}
-
-	if (!page.url().startsWith(SKILLSMP_ORIGIN)) {
-		try {
-			await page.goto(SKILLSMP_ORIGIN, {
-				waitUntil: "domcontentloaded",
-			})
-		} catch (error) {
-			await browser.close()
-			return {
-				error: {
-					message: "SkillsMP navigation failed in Browserless session.",
-					rawError: error instanceof Error ? error : undefined,
-					source: SKILLSMP_ORIGIN,
-					type: "network",
-				},
-				ok: false,
-			}
-		}
-	}
-
-	return { ok: true, value: { browser, page } }
 }
 
 async function fetchSkillsmpInternalPage(

@@ -1,4 +1,14 @@
 {
+	"czlonkowski/n8n-skills": {
+		"packages": [
+			"marketplace:czlonkowski/n8n-skills,plugin:n8n-mcp-skills,type:claude-plugin"
+		],
+		"pr_url": "https://github.com/czlonkowski/n8n-skills/pull/6"
+	},
+	"Dammyjay93/claude-design-skill": {
+		"packages": ["gh:Dammyjay93/claude-design-skill,type:github"],
+		"pr_url": "https://github.com/Dammyjay93/claude-design-skill/pull/3"
+	},
 	"Dimillian/Skills": {
 		"packages": ["gh:Dimillian/Skills,type:github"],
 		"pr_url": "https://github.com/Dimillian/Skills/pull/5"
