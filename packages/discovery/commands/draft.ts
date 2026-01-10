@@ -1,9 +1,10 @@
-import { execFile } from "node:child_process"
+import { execFile, spawn } from "node:child_process"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
+import { confirm, intro, isCancel } from "@clack/prompts"
 import {
 	assertAbsolutePathDirect,
 	formatSkPackageAddCommand,
@@ -16,41 +17,32 @@ import { db } from "@/db"
 import {
 	coerceIndexedPackageId,
 	getIndexedPackageById,
-	listPackagesByStars,
+	listDistinctReposByStars,
+	listPackagesByRepo,
+	listSkillsByPackageIds,
 } from "@/db/indexed-packages"
-import {
-	cloneRemoteRepo,
-	gitAddAll,
-	gitCheckoutNewBranch,
-	gitCommit,
-	gitDiffStaged,
-	gitPush,
-} from "@/sources/git"
-import {
-	checkRepoExists,
-	createFork,
-	createPullRequestViaCli,
-	deleteRepo,
-	waitForForkReady,
-} from "@/sources/github"
 import type { IndexedDeclaration } from "@/types"
 import type { DiscoveryError } from "@/types/errors"
 
-interface TargetPackage {
+interface SkillInfo {
+	name: string
+	description: string | null
+}
+
+interface PackageInfo {
 	id: number
 	name: string | null
 	description: string | null
-	gh_repo: string
-	gh_stars: number
+	path: string | null
 	declaration: IndexedDeclaration
 	declarationKey: string
 	installCommand: string
+	skills: SkillInfo[]
 }
 
-interface ForkInfo {
-	forkUrl: string
-	forkOwner: string
-	forkRepo: string
+interface TargetRepo {
+	gh_repo: string
+	packages: PackageInfo[]
 }
 
 interface WorkingDir {
@@ -58,14 +50,21 @@ interface WorkingDir {
 	root: string
 }
 
-type DraftState = Record<string, { pr_url: string }>
+type DraftState = Record<
+	string,
+	{
+		pr_url: string
+		packages: string[]
+	}
+>
+
+type DraftMode = "link" | "submit"
 
 type DraftOptions = {
 	id?: number
-	dryRun: boolean
+	maxStars?: number
+	mode: DraftMode
 }
-
-const execFileAsync = promisify(execFile)
 
 const BRANCH_NAME = "sk-install-instructions"
 const COMMIT_MESSAGE = "docs: add sk installation instructions"
@@ -81,67 +80,50 @@ const DISCOVERY_DIR = path.resolve(COMMAND_DIR, "..")
 const STATE_FILE_PATH = path.join(DISCOVERY_DIR, "drafted-prs.json")
 const PROMPT_FILE_PATH = path.join(DISCOVERY_DIR, "draft-prompt.md")
 
+const execFileAsync = promisify(execFile)
+
 export async function draftCommand(
 	options: DraftOptions,
 ): Promise<Result<void, DiscoveryError>> {
 	let tempRoot: string | undefined
 
 	try {
-		const target = await resolveTargetPackage(options)
+		if (options.mode === "submit") {
+			intro(`🚨 SUBMIT MODE — a PR will be created in the upstream repo`)
+		} else {
+			intro("🔗 LINK MODE — changes pushed to fork, you create the PR")
+		}
+
+		const target = await resolveTargetRepo(options)
 		if (!target.ok) {
 			return target
 		}
 
-		const declarationLabel = JSON.stringify(target.value.declaration)
+		const packageCount = target.value.packages.length
 		console.log(
-			`[info] Target package: ${declarationLabel} (id: ${target.value.id}, stars: ${target.value.gh_stars})`,
+			`[info] Target repo: ${target.value.gh_repo} (${packageCount} package${packageCount === 1 ? "" : "s"})`,
 		)
-		console.log(`[info] Target repo: ${target.value.gh_repo}`)
-
-		const fork = await prepareFork(target.value.gh_repo)
-		if (!fork.ok) {
-			return fork
+		for (const pkg of target.value.packages) {
+			console.log(`[info]   - ${pkg.name ?? pkg.declarationKey}`)
 		}
-		console.log(`[info] Fork created: ${fork.value.forkOwner}/${fork.value.forkRepo}`)
 
-		const workdir = await cloneToWorkingDir(fork.value)
+		const workdir = await prepareWorkingDir(target.value.gh_repo)
 		if (!workdir.ok) {
 			return workdir
 		}
 		tempRoot = workdir.value.root
+		console.log(
+			`[info] Fork and branch ready: ${FORK_OWNER}/${target.value.gh_repo.split("/")[1]}`,
+		)
 
 		const generated = await invokeClaudeForGeneration(workdir.value, target.value)
 		if (!generated.ok) {
 			return generated
 		}
-		console.log("[info] Claude completed content generation")
+		console.log("[info] Claude session ended")
 
-		const diff = await detectChanges(workdir.value)
-		if (!diff.ok) {
-			return diff
-		}
-		console.log("[diff]")
-		console.log(diff.value)
-
-		if (options.dryRun) {
-			console.log("[info] Dry run complete. No PR created.")
-			return { ok: true, value: undefined }
-		}
-
-		if (diff.value.trim().length === 0) {
-			console.log("[info] No changes detected. Exiting.")
-			return { ok: true, value: undefined }
-		}
-
-		const pr = await submitPR(workdir.value, target.value, fork.value)
-		if (!pr.ok) {
-			return pr
-		}
-		console.log("[info] Changes committed and pushed")
-		console.log(`[success] PR created: ${pr.value.prUrl}`)
-		console.log("[info] State file updated")
-
-		return { ok: true, value: undefined }
+		const result = await finalizeChanges(workdir.value, target.value, options.mode)
+		return result
 	} finally {
 		if (tempRoot) {
 			await rm(tempRoot, { force: true, recursive: true })
@@ -150,19 +132,19 @@ export async function draftCommand(
 	}
 }
 
-async function resolveTargetPackage(
+async function resolveTargetRepo(
 	options: DraftOptions,
-): Promise<Result<TargetPackage, DiscoveryError>> {
+): Promise<Result<TargetRepo, DiscoveryError>> {
 	if (options.id !== undefined) {
-		return resolvePackageById(options.id)
+		return resolveRepoByPackageId(options.id)
 	}
 
-	return selectNextUnprocessedPackage()
+	return selectNextUnprocessedRepo({ maxStars: options.maxStars })
 }
 
-async function resolvePackageById(
+async function resolveRepoByPackageId(
 	id: number,
-): Promise<Result<TargetPackage, DiscoveryError>> {
+): Promise<Result<TargetRepo, DiscoveryError>> {
 	const packageId = coerceIndexedPackageId(id)
 	if (!packageId) {
 		return {
@@ -188,71 +170,171 @@ async function resolvePackageById(
 		}
 	}
 
-	return buildTargetPackage(row)
+	const allPackages = await listPackagesByRepo(db, row.gh_repo)
+	return await buildTargetRepo(row.gh_repo, allPackages)
 }
 
-async function selectNextUnprocessedPackage(): Promise<
-	Result<TargetPackage, DiscoveryError>
-> {
+async function selectNextUnprocessedRepo(
+	options: { maxStars?: number } = {},
+): Promise<Result<TargetRepo, DiscoveryError>> {
 	const state = await loadStateFile()
 	if (!state.ok) {
 		return state
 	}
 
-	const rows = await listPackagesByStars(db)
-	for (const row of rows) {
-		const candidate = buildTargetPackage(row)
-		if (!candidate.ok) {
-			return candidate
+	const repos = await listDistinctReposByStars(db, { maxStars: options.maxStars })
+	for (const repo of repos) {
+		if (state.value[repo.gh_repo]) {
+			continue
 		}
-		if (!state.value[candidate.value.declarationKey]) {
-			return candidate
+
+		const allPackages = await listPackagesByRepo(db, repo.gh_repo)
+		const target = await buildTargetRepo(repo.gh_repo, allPackages)
+		if (!target.ok) {
+			return target
 		}
+
+		// Display repo info and prompt user
+		const confirmed = await promptForRepoConfirmation(target.value)
+		if (confirmed === "cancelled") {
+			return {
+				error: {
+					message: "Cancelled by user.",
+					target: "repo",
+					type: "not_found",
+				},
+				ok: false,
+			}
+		}
+		if (confirmed === "skip") {
+			continue
+		}
+
+		return target
 	}
 
 	return {
 		error: {
-			message: "No unprocessed packages found.",
-			target: "package",
+			message: "No unprocessed repos found.",
+			target: "repo",
 			type: "not_found",
 		},
 		ok: false,
 	}
 }
 
-function buildTargetPackage(row: {
-	id: number
-	name: string | null
-	description: string | null
-	gh_repo: string
-	gh_stars: number
-	declaration: string
-}): Result<TargetPackage, DiscoveryError> {
-	const parsed = parseSerializedDeclaration(row.declaration)
-	if (!parsed.ok) {
-		return {
-			error: {
-				field: "declaration",
-				message: `Invalid declaration for package ${row.id}: ${parsed.error.message}`,
-				source: "manual",
-				type: "validation",
-			},
-			ok: false,
+async function promptForRepoConfirmation(
+	repo: TargetRepo,
+): Promise<"confirmed" | "skip" | "cancelled"> {
+	console.log("")
+	console.log(`[repo] ${repo.gh_repo}`)
+	console.log("")
+
+	for (const pkg of repo.packages) {
+		const name = pkg.name ?? pkg.declarationKey
+		console.log(`  Package: ${name}`)
+		if (pkg.description) {
+			console.log(`    Description: ${pkg.description}`)
 		}
+		if (pkg.path) {
+			console.log(`    Path: ${pkg.path}`)
+		}
+		console.log(`    Install: ${pkg.installCommand}`)
+
+		if (pkg.skills.length > 0) {
+			console.log(`    Skills (${pkg.skills.length}):`)
+			for (const skill of pkg.skills) {
+				const desc = skill.description
+					? ` - ${truncate(skill.description, 60)}`
+					: ""
+				console.log(`      • ${skill.name}${desc}`)
+			}
+		}
+		console.log("")
 	}
 
-	const declaration = parsed.value
-	return {
-		ok: true,
-		value: {
+	const shouldProceed = await confirm({
+		initialValue: true,
+		message: `Process ${repo.gh_repo}?`,
+	})
+
+	if (isCancel(shouldProceed)) {
+		return "cancelled"
+	}
+
+	return shouldProceed ? "confirmed" : "skip"
+}
+
+function truncate(text: string, maxLength: number): string {
+	if (text.length <= maxLength) {
+		return text
+	}
+	return `${text.slice(0, maxLength - 3)}...`
+}
+
+async function buildTargetRepo(
+	ghRepo: string,
+	rows: Array<{
+		id: number
+		name: string | null
+		description: string | null
+		gh_repo: string
+		gh_stars: number
+		declaration: string
+	}>,
+): Promise<Result<TargetRepo, DiscoveryError>> {
+	// Fetch skills for all packages
+	const packageIds = rows
+		.map((row) => coerceIndexedPackageId(row.id))
+		.filter((id): id is NonNullable<typeof id> => id !== null)
+	const skillRows = await listSkillsByPackageIds(db, packageIds)
+
+	// Group skills by package id
+	const skillsByPackage = new Map<number, SkillInfo[]>()
+	for (const skill of skillRows) {
+		const pkgId = skill.indexed_package_id
+		if (pkgId === null) continue
+		const list = skillsByPackage.get(pkgId) ?? []
+		list.push({ description: skill.description, name: skill.name })
+		skillsByPackage.set(pkgId, list)
+	}
+
+	const packages: PackageInfo[] = []
+
+	for (const row of rows) {
+		const parsed = parseSerializedDeclaration(row.declaration)
+		if (!parsed.ok) {
+			return {
+				error: {
+					field: "declaration",
+					message: `Invalid declaration for package ${row.id}: ${parsed.error.message}`,
+					source: "manual",
+					type: "validation",
+				},
+				ok: false,
+			}
+		}
+
+		const declaration = parsed.value
+		const pkgPath = "path" in declaration ? (declaration.path ?? null) : null
+
+		packages.push({
 			declaration,
 			declarationKey: normalizeDeclarationToKey(declaration),
 			description: row.description,
-			gh_repo: row.gh_repo,
-			gh_stars: row.gh_stars,
 			id: row.id,
 			installCommand: formatSkPackageAddCommand(declaration),
 			name: row.name,
+			path: pkgPath,
+			skills: skillsByPackage.get(row.id) ?? [],
+		})
+	}
+
+	return {
+		ok: true,
+		value: {
+			gh_repo: ghRepo,
+			packages,
 		},
 	}
 }
@@ -319,6 +401,7 @@ async function saveStateFile(state: DraftState): Promise<Result<void, DiscoveryE
 const DraftStateSchema = z.record(
 	z.string(),
 	z.object({
+		packages: z.array(z.string()),
 		pr_url: z.string().min(1, "pr_url cannot be empty"),
 	}),
 )
@@ -344,47 +427,8 @@ function parseDraftState(
 	return { ok: true, value: result.data }
 }
 
-async function prepareFork(ghRepo: string): Promise<Result<ForkInfo, DiscoveryError>> {
-	const parsed = parseGithubRepo(ghRepo)
-	if (!parsed.ok) {
-		return parsed
-	}
-	const [owner, repo] = parsed.value
-
-	const exists = await checkRepoExists(FORK_OWNER, repo)
-	if (!exists.ok) {
-		return exists
-	}
-
-	if (exists.value) {
-		const deleted = await deleteRepo(FORK_OWNER, repo)
-		if (!deleted.ok) {
-			return deleted
-		}
-	}
-
-	const fork = await createFork(owner, repo)
-	if (!fork.ok) {
-		return fork
-	}
-
-	const ready = await waitForForkReady(FORK_OWNER, repo)
-	if (!ready.ok) {
-		return ready
-	}
-
-	return {
-		ok: true,
-		value: {
-			forkOwner: FORK_OWNER,
-			forkRepo: repo,
-			forkUrl: fork.value.clone_url,
-		},
-	}
-}
-
-async function cloneToWorkingDir(
-	fork: ForkInfo,
+async function prepareWorkingDir(
+	ghRepo: string,
 ): Promise<Result<WorkingDir, DiscoveryError>> {
 	let tempRoot: string
 	try {
@@ -402,54 +446,123 @@ async function cloneToWorkingDir(
 		}
 	}
 
-	const repoPath = path.join(tempRoot, "repo")
-	const cloned = await cloneRemoteRepo({
-		destination: repoPath,
-		remoteUrl: fork.forkUrl,
+	const repoName = ghRepo.split("/")[1]
+	if (!repoName) {
+		return {
+			error: {
+				field: "gh_repo",
+				message: `Invalid GitHub repo format: ${ghRepo}`,
+				source: "manual",
+				type: "validation",
+			},
+			ok: false,
+		}
+	}
+
+	const script = `
+set -euo pipefail
+cd "${tempRoot}"
+gh repo fork "${ghRepo}" --clone --remote --org "${FORK_OWNER}"
+cd "${repoName}"
+git push origin --delete "${BRANCH_NAME}" 2>/dev/null || true
+git fetch --depth 1 upstream HEAD
+git checkout -b "${BRANCH_NAME}" FETCH_HEAD
+`
+
+	const setupResult = await new Promise<Result<void, DiscoveryError>>((resolve) => {
+		const child = spawn("bash", ["-c", script], {
+			env: process.env,
+			stdio: "inherit", // Show fork/clone progress to user
+		})
+
+		child.on("error", (error) => {
+			resolve({
+				error: {
+					message:
+						"Fork/clone setup failed. Check gh CLI authentication and permissions.",
+					operation: "spawn",
+					path: assertAbsolutePathDirect(tempRoot),
+					rawError: error,
+					type: "io",
+				},
+				ok: false,
+			})
+		})
+
+		child.on("close", (code) => {
+			if (code === 0) {
+				resolve({ ok: true, value: undefined })
+			} else {
+				resolve({
+					error: {
+						message: `Fork/clone setup failed with exit code ${code}.`,
+						operation: "spawn",
+						path: assertAbsolutePathDirect(tempRoot),
+						type: "io",
+					},
+					ok: false,
+				})
+			}
+		})
 	})
-	if (!cloned.ok) {
-		return cloned
+
+	if (!setupResult.ok) {
+		return setupResult
 	}
 
-	const branched = await gitCheckoutNewBranch(repoPath, BRANCH_NAME)
-	if (!branched.ok) {
-		return branched
-	}
-
+	const repoPath = path.join(tempRoot, repoName)
 	return { ok: true, value: { path: repoPath, root: tempRoot } }
 }
 
 async function invokeClaudeForGeneration(
 	workdir: WorkingDir,
-	pkg: TargetPackage,
+	repo: TargetRepo,
 ): Promise<Result<void, DiscoveryError>> {
-	const promptResult = await buildPrompt(pkg)
+	const promptResult = await buildPrompt(repo)
 	if (!promptResult.ok) {
 		return promptResult
 	}
 
-	try {
-		await execFileAsync("claude", ["--print", "-p", promptResult.value], {
+	// Spawn Claude interactively - user takes control until Claude exits
+	return new Promise((resolve) => {
+		const child = spawn("claude", [promptResult.value], {
 			cwd: workdir.path,
 			env: process.env,
-			timeout: 300000,
+			stdio: "inherit", // User can interact directly with Claude
 		})
-		return { ok: true, value: undefined }
-	} catch (error) {
-		return {
-			error: {
-				message: "Claude CLI failed.",
-				operation: "execFile",
-				path: assertAbsolutePathDirect(workdir.path),
-				rawError: error instanceof Error ? error : undefined,
-				type: "io",
-			},
-			ok: false,
-		}
-	}
+
+		child.on("error", (error) => {
+			resolve({
+				error: {
+					message: "Failed to spawn Claude CLI.",
+					operation: "spawn",
+					path: assertAbsolutePathDirect(workdir.path),
+					rawError: error,
+					type: "io",
+				},
+				ok: false,
+			})
+		})
+
+		child.on("close", (code) => {
+			if (code === 0) {
+				resolve({ ok: true, value: undefined })
+			} else {
+				resolve({
+					error: {
+						message: `Claude CLI exited with code ${code}.`,
+						operation: "spawn",
+						path: assertAbsolutePathDirect(workdir.path),
+						type: "io",
+					},
+					ok: false,
+				})
+			}
+		})
+	})
 }
 
-async function buildPrompt(pkg: TargetPackage): Promise<Result<string, DiscoveryError>> {
+async function buildPrompt(repo: TargetRepo): Promise<Result<string, DiscoveryError>> {
 	let template: string
 	try {
 		template = await readFile(PROMPT_FILE_PATH, "utf8")
@@ -466,63 +579,188 @@ async function buildPrompt(pkg: TargetPackage): Promise<Result<string, Discovery
 		}
 	}
 
-	const installCommands = `${pkg.installCommand}\nsk sync`
+	const packagesData = repo.packages.map((pkg) => ({
+		description: pkg.description,
+		installCommand: pkg.installCommand,
+		name: pkg.name,
+		path: pkg.path,
+		skills: pkg.skills,
+	}))
+
 	const prompt = template
-		.replaceAll("{{PACKAGE_NAME}}", pkg.name ?? "unknown")
-		.replaceAll("{{PACKAGE_DESCRIPTION}}", pkg.description ?? "")
-		.replaceAll("{{INSTALL_COMMAND}}", installCommands)
-		.replaceAll("{{DECLARATION}}", JSON.stringify(pkg.declaration, null, 2))
+		.replaceAll("{{REPO}}", repo.gh_repo)
+		.replaceAll("{{PACKAGES_JSON}}", JSON.stringify(packagesData, null, 2))
 
 	return { ok: true, value: prompt }
 }
 
-async function detectChanges(
+async function finalizeChanges(
 	workdir: WorkingDir,
-): Promise<Result<string, DiscoveryError>> {
-	const added = await gitAddAll(workdir.path)
-	if (!added.ok) {
-		return added
+	repo: TargetRepo,
+	mode: DraftMode,
+): Promise<Result<void, DiscoveryError>> {
+	// Build script: show diff, commit, push, optionally create PR
+	let script = `
+set -euo pipefail
+cd "${workdir.path}"
+
+echo "[info] Staging changes..."
+git add .
+
+echo ""
+echo "[diff]"
+git diff --staged
+
+# Check if there are any changes (exit 2 = no changes)
+if git diff --staged --quiet; then
+  echo ""
+  echo "[info] No changes detected. Exiting."
+  exit 2
+fi
+
+echo ""
+echo "[info] Committing and pushing..."
+git commit --no-gpg-sign -m "${COMMIT_MESSAGE}"
+git push origin "${BRANCH_NAME}"
+`
+
+	if (mode === "submit") {
+		script += `
+echo ""
+echo "[info] Creating PR..."
+# gh pr create --head doesn't support org:branch syntax (cli/cli#10093)
+# Use REST API which handles org forks correctly
+DEFAULT_BRANCH=$(gh api "repos/${repo.gh_repo}" --jq '.default_branch')
+gh api "repos/${repo.gh_repo}/pulls" \\
+  --method POST \\
+  -f title="${PR_TITLE}" \\
+  -f body="${PR_BODY}" \\
+  -f head="${FORK_OWNER}:${BRANCH_NAME}" \\
+  -f base="$DEFAULT_BRANCH"
+`
 	}
 
-	return gitDiffStaged(workdir.path)
-}
+	// Run the script with inherited stdio so user sees everything
+	// Exit codes: 0 = success with changes, 2 = success with no changes
+	const scriptResult = await new Promise<
+		Result<{ noChanges: boolean }, DiscoveryError>
+	>((resolve) => {
+		const child = spawn("bash", ["-c", script], {
+			env: process.env,
+			stdio: "inherit",
+		})
 
-async function submitPR(
-	workdir: WorkingDir,
-	pkg: TargetPackage,
-	fork: ForkInfo,
-): Promise<Result<{ prUrl: string }, DiscoveryError>> {
-	// Load state file FIRST, before any irreversible actions
+		child.on("error", (error) => {
+			resolve({
+				error: {
+					message: "Finalize script failed.",
+					operation: "spawn",
+					path: assertAbsolutePathDirect(workdir.path),
+					rawError: error,
+					type: "io",
+				},
+				ok: false,
+			})
+		})
+
+		child.on("close", (code) => {
+			if (code === 0) {
+				resolve({ ok: true, value: { noChanges: false } })
+			} else if (code === 2) {
+				resolve({ ok: true, value: { noChanges: true } })
+			} else {
+				resolve({
+					error: {
+						message: `Finalize script exited with code ${code}.`,
+						operation: "spawn",
+						path: assertAbsolutePathDirect(workdir.path),
+						type: "io",
+					},
+					ok: false,
+				})
+			}
+		})
+	})
+
+	if (!scriptResult.ok) {
+		return scriptResult
+	}
+
+	// No changes detected - exit cleanly
+	if (scriptResult.value.noChanges) {
+		return { ok: true, value: undefined }
+	}
+
+	// Link mode: print the PR creation link and exit
+	if (mode === "link") {
+		const repoName = repo.gh_repo.split("/")[1]
+		// Get default branch for the link
+		let defaultBranch: string
+		try {
+			const { stdout } = await execFileAsync(
+				"gh",
+				["api", `repos/${repo.gh_repo}`, "--jq", ".default_branch"],
+				{ cwd: workdir.path },
+			)
+			defaultBranch = stdout.trim()
+		} catch {
+			defaultBranch = "main" // fallback
+		}
+
+		const prLink = `https://github.com/${repo.gh_repo}/compare/${defaultBranch}...${FORK_OWNER}:${repoName}:${BRANCH_NAME}?expand=1`
+		console.log("")
+		console.log("[link] Open this URL to create the PR:")
+		console.log(`       ${prLink}`)
+		return { ok: true, value: undefined }
+	}
+
+	// Submit mode: query the PR URL from the upstream repo (--repo needed since we're in fork dir)
+	let prUrl: string
+	try {
+		const { stdout } = await execFileAsync(
+			"gh",
+			["pr", "view", "--repo", repo.gh_repo, "--json", "url", "-q", ".url"],
+			{
+				cwd: workdir.path,
+			},
+		)
+		prUrl = stdout.trim()
+	} catch (error) {
+		return {
+			error: {
+				message: "Failed to get PR URL after creation.",
+				operation: "execFile",
+				path: assertAbsolutePathDirect(workdir.path),
+				rawError: error instanceof Error ? error : undefined,
+				type: "io",
+			},
+			ok: false,
+		}
+	}
+
+	if (!prUrl) {
+		return {
+			error: {
+				message: "PR URL is empty after creation.",
+				operation: "execFile",
+				path: assertAbsolutePathDirect(workdir.path),
+				type: "io",
+			},
+			ok: false,
+		}
+	}
+
+	// Update state file
 	const state = await loadStateFile()
 	if (!state.ok) {
 		return state
 	}
 
-	const committed = await gitCommit(workdir.path, COMMIT_MESSAGE)
-	if (!committed.ok) {
-		return committed
+	const stateKey = repo.gh_repo
+	const stateValue = {
+		packages: repo.packages.map((pkg) => pkg.declarationKey),
+		pr_url: prUrl,
 	}
-
-	const pushed = await gitPush(workdir.path, "origin", BRANCH_NAME)
-	if (!pushed.ok) {
-		return pushed
-	}
-
-	const head = `${fork.forkOwner}:${BRANCH_NAME}`
-	const pr = await createPullRequestViaCli(
-		workdir.path,
-		pkg.gh_repo,
-		head,
-		PR_TITLE,
-		PR_BODY,
-	)
-	if (!pr.ok) {
-		return pr
-	}
-
-	// Log before writing so manual recovery is possible if write fails
-	const stateKey = pkg.declarationKey
-	const stateValue = { pr_url: pr.value.url }
 	console.log(`[state] Adding to state file:`)
 	console.log(`[state]   key: ${JSON.stringify(stateKey)}`)
 	console.log(`[state]   value: ${JSON.stringify(stateValue)}`)
@@ -533,24 +771,10 @@ async function submitPR(
 		return saved
 	}
 
-	return { ok: true, value: { prUrl: pr.value.url } }
-}
+	console.log(`[success] PR created: ${prUrl}`)
+	console.log("[info] State file updated")
 
-function parseGithubRepo(ghRepo: string): Result<[string, string], DiscoveryError> {
-	const parts = ghRepo.split("/").map((part) => part.trim())
-	if (parts.length !== 2 || !parts[0] || !parts[1]) {
-		return {
-			error: {
-				field: "gh_repo",
-				message: `Invalid GitHub repo: ${ghRepo}`,
-				source: "manual",
-				type: "validation",
-			},
-			ok: false,
-		}
-	}
-
-	return { ok: true, value: [parts[0], parts[1]] }
+	return { ok: true, value: undefined }
 }
 
 function isNotFound(error: unknown): boolean {

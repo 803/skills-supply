@@ -99,8 +99,60 @@ export async function listPackagesByStars(
 	return db
 		.selectFrom("indexed_packages")
 		.selectAll()
+		.where((eb) =>
+			eb.or([
+				eb("path", "is", null),
+				eb.and(
+					EXCLUDED_PATH_SEGMENTS.map((segment) =>
+						eb("path", "not like", `%${segment}%`),
+					),
+				),
+			]),
+		)
 		.orderBy("gh_stars", "desc")
 		.execute()
+}
+
+export interface RepoWithStars {
+	gh_repo: string
+	gh_stars: number
+}
+
+/**
+ * Returns distinct repos ordered by stars (highest first).
+ * Only includes repos that have at least one non-excluded package.
+ */
+export async function listDistinctReposByStars(
+	db: Kysely<Database>,
+	options: { maxStars?: number } = {},
+): Promise<RepoWithStars[]> {
+	let query = db
+		.selectFrom("indexed_packages")
+		.select(["gh_repo", (eb) => eb.fn.max("gh_stars").as("gh_stars")])
+		.where((eb) =>
+			eb.or([
+				eb("path", "is", null),
+				eb.and(
+					EXCLUDED_PATH_SEGMENTS.map((segment) =>
+						eb("path", "not like", `%${segment}%`),
+					),
+				),
+			]),
+		)
+		.groupBy("gh_repo")
+		.orderBy("gh_stars", "desc")
+
+	if (options.maxStars !== undefined) {
+		query = query.having((eb) => eb.fn.max("gh_stars"), "<=", options.maxStars)
+	}
+
+	const rows = await query.execute()
+
+	// Kysely returns max() as number | null, coerce to number
+	return rows.map((row) => ({
+		gh_repo: row.gh_repo,
+		gh_stars: row.gh_stars ?? 0,
+	}))
 }
 
 export async function getIndexedPackageById(
@@ -143,6 +195,26 @@ const EXCLUDED_PATH_SEGMENTS = [
 	"backups",
 ] as const
 
+export async function listPackagesByRepo(
+	db: Kysely<Database>,
+	ghRepo: string,
+): Promise<
+	Array<{
+		id: number
+		name: string | null
+		description: string | null
+		gh_repo: string
+		gh_stars: number
+		declaration: string
+	}>
+> {
+	return db
+		.selectFrom("indexed_packages")
+		.select(["id", "name", "description", "gh_repo", "gh_stars", "declaration"])
+		.where("gh_repo", "=", ghRepo)
+		.execute()
+}
+
 export async function getRandomIndexedPackage(
 	db: Kysely<Database>,
 ): Promise<IndexedPackageRow | undefined> {
@@ -162,4 +234,19 @@ export async function getRandomIndexedPackage(
 		.orderBy((eb) => eb.fn("random"))
 		.limit(1)
 		.executeTakeFirst()
+}
+
+export async function listSkillsByPackageIds(
+	db: Kysely<Database>,
+	packageIds: IndexedPackageId[],
+): Promise<IndexedPackageSkillRow[]> {
+	if (packageIds.length === 0) {
+		return []
+	}
+
+	return db
+		.selectFrom("indexed_package_skills")
+		.selectAll()
+		.where("indexed_package_id", "in", packageIds)
+		.execute()
 }

@@ -1,6 +1,4 @@
-import { execFile } from "node:child_process"
-import { promisify } from "node:util"
-import { assertAbsolutePathDirect, type Result } from "@skills-supply/core"
+import type { Result } from "@skills-supply/core"
 import { env } from "@/env"
 import type { DiscoveryError } from "@/types/errors"
 
@@ -15,8 +13,6 @@ export interface GithubRepoMetadata {
 }
 
 export type GithubResult = Result<GithubRepoMetadata, DiscoveryError>
-
-const execFileAsync = promisify(execFile)
 
 export async function fetchGithubRepoMetadata(githubRepo: string): Promise<GithubResult> {
 	const url = `https://api.github.com/repos/${githubRepo}`
@@ -197,149 +193,6 @@ async function fetchGithubApi(options: {
 	return { ok: true, value: response }
 }
 
-export async function checkRepoExists(
-	owner: string,
-	repo: string,
-): Promise<Result<boolean, DiscoveryError>> {
-	const result = await fetchGithubApi({
-		handle404AsNotFound: false,
-		url: `https://api.github.com/repos/${owner}/${repo}`,
-	})
-	if (!result.ok) return result
-	return { ok: true, value: result.value.status !== 404 }
-}
-
-export async function deleteRepo(
-	owner: string,
-	repo: string,
-): Promise<Result<void, DiscoveryError>> {
-	const result = await fetchGithubApi({
-		method: "DELETE",
-		url: `https://api.github.com/repos/${owner}/${repo}`,
-	})
-	if (!result.ok) return result
-	return { ok: true, value: undefined }
-}
-
-export async function createFork(
-	owner: string,
-	repo: string,
-): Promise<Result<{ clone_url: string }, DiscoveryError>> {
-	const result = await fetchGithubApi({
-		method: "POST",
-		url: `https://api.github.com/repos/${owner}/${repo}/forks`,
-	})
-	if (!result.ok) return result
-
-	let payload: { clone_url?: string }
-	try {
-		payload = (await result.value.json()) as { clone_url?: string }
-	} catch (error) {
-		return {
-			error: {
-				message: "GitHub response parsing failed.",
-				rawError: error instanceof Error ? error : undefined,
-				source: "github",
-				type: "parse",
-			},
-			ok: false,
-		}
-	}
-
-	if (typeof payload.clone_url !== "string" || payload.clone_url.length === 0) {
-		return {
-			error: {
-				message: "GitHub response missing clone_url.",
-				source: "github",
-				type: "parse",
-			},
-			ok: false,
-		}
-	}
-
-	return { ok: true, value: { clone_url: payload.clone_url } }
-}
-
-export async function waitForForkReady(
-	owner: string,
-	repo: string,
-	maxWaitMs: number = 60_000,
-): Promise<Result<void, DiscoveryError>> {
-	const start = Date.now()
-	while (Date.now() - start < maxWaitMs) {
-		const exists = await checkRepoExists(owner, repo)
-		if (!exists.ok) {
-			return exists
-		}
-		if (exists.value) {
-			return { ok: true, value: undefined }
-		}
-		await sleep(2000)
-	}
-
-	return {
-		error: {
-			message: "Timed out waiting for fork to be ready.",
-			retryable: true,
-			source: "github",
-			type: "network",
-		},
-		ok: false,
-	}
-}
-
-export async function createPullRequestViaCli(
-	workdir: string,
-	targetRepo: string,
-	head: string,
-	title: string,
-	body: string,
-): Promise<Result<{ url: string }, DiscoveryError>> {
-	try {
-		const { stdout } = await execFileAsync(
-			"gh",
-			[
-				"pr",
-				"create",
-				"--repo",
-				targetRepo,
-				"--head",
-				head,
-				"--title",
-				title,
-				"--body",
-				body,
-			],
-			{ cwd: workdir },
-		)
-
-		const prUrl = String(stdout).trim()
-		if (!prUrl) {
-			return {
-				error: {
-					message: "gh pr create did not return a PR URL.",
-					source: "gh",
-					type: "parse",
-				},
-				ok: false,
-			}
-		}
-
-		return { ok: true, value: { url: prUrl } }
-	} catch (error) {
-		return {
-			error: {
-				message: "gh pr create failed.",
-				operation: "execFile",
-				path: assertAbsolutePathDirect(workdir),
-				rawError: error instanceof Error ? error : undefined,
-				type: "io",
-			},
-			ok: false,
-		}
-	}
-}
-
 function normalizeLicense(value: string | null | undefined): string | null {
 	if (!value || value === "NOASSERTION") {
 		return null
@@ -364,12 +217,6 @@ function buildGithubHeaders(): Record<string, string> {
 	}
 
 	return headers
-}
-
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => {
-		setTimeout(resolve, ms)
-	})
 }
 
 function isRateLimitResponse(response: Response, message: string | null): boolean {

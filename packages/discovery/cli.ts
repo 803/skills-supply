@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander"
+import { z } from "zod"
 import { draftCommand } from "@/commands/draft"
 import { enqueueCommand } from "@/commands/enqueue"
 import { listCommand } from "@/commands/list"
@@ -95,35 +96,44 @@ async function main(): Promise<void> {
 			}
 		})
 
+	const DraftOptionsSchema = z.object({
+		id: z.coerce.number().int().positive().optional(),
+		maxStars: z.coerce.number().int().nonnegative().optional(),
+		mode: z.enum(["link", "submit"]).default("link"),
+	})
+
 	program
 		.command("draft")
 		.description("Create a PR to add sk installation instructions")
 		.argument("[id]", "Package id (optional)")
-		.option("--dry-run", "Show diff without creating PR")
-		.action(async (id: string | undefined, options: { dryRun?: boolean }) => {
-			let parsedId: number | undefined
-			if (id !== undefined) {
-				const parsed = Number.parseInt(id, 10)
-				if (!Number.isFinite(parsed)) {
+		.option(
+			"--mode <mode>",
+			"link (default): print PR link | submit: create PR via API",
+		)
+		.option("--max-stars <count>", "Only consider repos with at most this many stars")
+		.action(
+			async (
+				id: string | undefined,
+				options: { mode?: string; maxStars?: string },
+			) => {
+				const parsed = DraftOptionsSchema.safeParse({ ...options, id })
+				if (!parsed.success) {
 					printError({
-						field: "id",
-						message: "Package id must be a number.",
-						source: "manual",
+						field: "options",
+						message: parsed.error.message,
+						source: "zod",
 						type: "validation",
+						zodError: parsed.error,
 					})
 					return
 				}
-				parsedId = parsed
-			}
 
-			const result = await draftCommand({
-				dryRun: Boolean(options.dryRun),
-				id: parsedId,
-			})
-			if (!result.ok) {
-				printError(result.error)
-			}
-		})
+				const result = await draftCommand(parsed.data)
+				if (!result.ok) {
+					printError(result.error)
+				}
+			},
+		)
 
 	program
 		.command("random")

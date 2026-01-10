@@ -1,5 +1,6 @@
 {
 	"dependencies": {
+		"@clack/prompts": "^0.10.0",
 		"@skills-supply/core": "*",
 		"@skills-supply/database": "*",
 		"commander": "^14.0.2",
