@@ -1,1 +1,6 @@
-{}
+{
+	"Dimillian/Skills": {
+		"packages": ["gh:Dimillian/Skills,type:github"],
+		"pr_url": "https://github.com/Dimillian/Skills/pull/5"
+	}
+}

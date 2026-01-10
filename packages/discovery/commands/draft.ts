@@ -691,7 +691,7 @@ gh api "repos/${repo.gh_repo}/pulls" \\
 		return { ok: true, value: undefined }
 	}
 
-	// Link mode: print the PR creation link and exit
+	// Link mode: print the PR creation link and state file entry
 	if (mode === "link") {
 		const repoName = repo.gh_repo.split("/")[1]
 		// Get default branch for the link
@@ -711,6 +711,18 @@ gh api "repos/${repo.gh_repo}/pulls" \\
 		console.log("")
 		console.log("[link] Open this URL to create the PR:")
 		console.log(`       ${prLink}`)
+
+		// Print what to add to state file after PR is created
+		const stateEntry = {
+			packages: repo.packages.map((pkg) => pkg.declarationKey),
+			pr_url: "<PR_URL>",
+		}
+		console.log("")
+		console.log("[state] After creating the PR, add this to drafted-prs.json:")
+		console.log(
+			`        "${repo.gh_repo}": ${JSON.stringify(stateEntry, null, 2).replace(/\n/g, "\n        ")}`,
+		)
+
 		return { ok: true, value: undefined }
 	}
 

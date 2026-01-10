@@ -87,7 +87,7 @@ When instructed to add sk installation instructions, follow this format:
 ```markdown
 ### sk
 
-Install via [sk](https://github.com/803/skills-supply), the universal package manager for AI agent skills (supports Claude, Codex, OpenCode, etc...).
+Install via [sk](https://github.com/803/skills-supply), the universal skills package manager for coding agents (supports Claude, Codex, OpenCode, etc...).
 
 ```bash
 <installCommand>
