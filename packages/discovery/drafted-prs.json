@@ -8,5 +8,13 @@
 			"marketplace:itsmostafa/aws-agent-skills,plugin:aws-agent-skills,type:claude-plugin"
 		],
 		"pr_url": "https://github.com/itsmostafa/aws-agent-skills/pull/74"
+	},
+	"Ryandonofrio3/osgrep": {
+		"packages": ["marketplace:Ryandonofrio3/osgrep,plugin:osgrep,type:claude-plugin"],
+		"pr_url": "https://github.com/Ryandonofrio3/osgrep/pull/82"
+	},
+	"SynaLinks/synalinks-skills": {
+		"packages": ["gh:SynaLinks/synalinks-skills,type:github"],
+		"pr_url": "https://github.com/SynaLinks/synalinks-skills/pull/46"
 	}
 }
