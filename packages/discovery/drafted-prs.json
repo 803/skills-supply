@@ -23,13 +23,29 @@
 		],
 		"pr_url": "https://github.com/itsmostafa/aws-agent-skills/pull/74"
 	},
+	"kepano/obsidian-skills": {
+		"packages": [
+			"marketplace:kepano/obsidian-skills,plugin:obsidian,type:claude-plugin"
+		],
+		"pr_url": "https://github.com/kepano/obsidian-skills/pull/25"
+	},
 	"mrexodia/ida-pro-mcp": {
 		"packages": ["gh:mrexodia/ida-pro-mcp,path:skills,type:github"],
 		"pr_url": "https://github.com/mrexodia/ida-pro-mcp/pull/230"
 	},
+	"PleasePrompto/notebooklm-skill": {
+		"packages": ["gh:PleasePrompto/notebooklm-skill,type:github"],
+		"pr_url": "https://github.com/PleasePrompto/notebooklm-skill/pull/12"
+	},
 	"Ryandonofrio3/osgrep": {
 		"packages": ["marketplace:Ryandonofrio3/osgrep,plugin:osgrep,type:claude-plugin"],
 		"pr_url": "https://github.com/Ryandonofrio3/osgrep/pull/82"
+	},
+	"SawyerHood/dev-browser": {
+		"packages": [
+			"marketplace:SawyerHood/dev-browser,plugin:dev-browser,type:claude-plugin"
+		],
+		"pr_url": "https://github.com/SawyerHood/dev-browser/pull/37"
 	},
 	"SynaLinks/synalinks-skills": {
 		"packages": ["gh:SynaLinks/synalinks-skills,type:github"],
@@ -38,5 +54,9 @@
 	"snarktank/ralph": {
 		"packages": ["gh:snarktank/ralph,path:skills,type:github"],
 		"pr_url": "https://github.com/snarktank/ralph/pull/8"
+	},
+	"timescale/pg-aiguide": {
+		"packages": ["marketplace:timescale/pg-aiguide,plugin:pg,type:claude-plugin"],
+		"pr_url": "https://github.com/timescale/pg-aiguide/pull/67/changes"
 	}
 }

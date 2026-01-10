@@ -69,16 +69,13 @@ type DraftOptions = {
 const BRANCH_NAME = "sk-install-instructions"
 const COMMIT_MESSAGE = "docs: add sk installation instructions"
 const PR_TITLE = "docs: add sk installation instructions"
-const PR_BODY =
-	"Adds installation instructions for the sk tool.\n\n" +
-	"sk is a cross-agent skill installer that works with Claude Code, Amp, Codex, OpenCode, Factory, and other compatible agents.\n\n" +
-	"Learn more: https://skills.supply"
 const FORK_OWNER = "803"
 
 const COMMAND_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DISCOVERY_DIR = path.resolve(COMMAND_DIR, "..")
 const STATE_FILE_PATH = path.join(DISCOVERY_DIR, "drafted-prs.json")
 const PROMPT_FILE_PATH = path.join(DISCOVERY_DIR, "draft-prompt.md")
+const PR_BODY_FILE_PATH = path.join(DISCOVERY_DIR, "PR.md")
 
 const execFileAsync = promisify(execFile)
 
@@ -609,6 +606,25 @@ async function finalizeChanges(
 	repo: TargetRepo,
 	mode: DraftMode,
 ): Promise<Result<void, DiscoveryError>> {
+	// Read PR body from file if in submit mode
+	let prBody = ""
+	if (mode === "submit") {
+		try {
+			prBody = (await readFile(PR_BODY_FILE_PATH, "utf8")).trim()
+		} catch (error) {
+			return {
+				error: {
+					message: `Unable to read ${PR_BODY_FILE_PATH}.`,
+					operation: "readFile",
+					path: assertAbsolutePathDirect(PR_BODY_FILE_PATH),
+					rawError: error instanceof Error ? error : undefined,
+					type: "io",
+				},
+				ok: false,
+			}
+		}
+	}
+
 	// Build script: show diff, commit, push, optionally create PR
 	let script = `
 set -euo pipefail
@@ -644,7 +660,7 @@ DEFAULT_BRANCH=$(gh api "repos/${repo.gh_repo}" --jq '.default_branch')
 gh api "repos/${repo.gh_repo}/pulls" \\
   --method POST \\
   -f title="${PR_TITLE}" \\
-  -f body="${PR_BODY}" \\
+  -f body="${escapeForShell(prBody)}" \\
   -f head="${FORK_OWNER}:${BRANCH_NAME}" \\
   -f base="$DEFAULT_BRANCH"
 `
@@ -843,4 +859,12 @@ function isNotFound(error: unknown): boolean {
 		"code" in error &&
 		(error as NodeJS.ErrnoException).code === "ENOENT"
 	)
+}
+
+function escapeForShell(str: string): string {
+	return str
+		.replace(/\\/g, "\\\\")
+		.replace(/"/g, '\\"')
+		.replace(/\$/g, "\\$")
+		.replace(/`/g, "\\`")
 }
