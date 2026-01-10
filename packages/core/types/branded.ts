@@ -18,4 +18,4 @@ export type GitUrl = Brand<string, typeof GitUrlBrand>
 export type GithubRef = Brand<string, typeof GithubRefBrand>
 export type RemoteMarketplaceUrl = Brand<string, typeof RemoteMarketplaceUrlBrand>
 
-export type AgentId = "claude-code" | "codex" | "opencode" | "factory"
+export type AgentId = "amp" | "claude-code" | "codex" | "opencode" | "factory"

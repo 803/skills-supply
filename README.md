@@ -1,6 +1,6 @@
 # sk
 
-Manage AI agent skills across Claude Code, Codex, OpenCode, Factory, and others.
+Manage AI agent skills across Claude Code, Amp, Codex, OpenCode, Factory, and others.
 
 ```bash
 # Install
@@ -15,7 +15,7 @@ sk sync
 ## Highlights
 
 - **One manifest, multiple agents** — Define skills once in `agents.toml`, sync to all your AI coding tools
-- **Cross-agent compatibility** — Use Claude Code plugins with Codex and OpenCode; sk extracts skills from `.claude-plugin` packages and syncs them everywhere
+- **Cross-agent compatibility** — Use Claude Code plugins with Amp, Codex, and OpenCode; sk extracts skills from `.claude-plugin` packages and syncs them everywhere
 - **Team-shareable** — Commit `agents.toml` to version control; teammates run `sk sync`
 - **Live development** — Local packages use symlinks; edit skills and changes appear instantly
 - **Smart reconciliation** — Only updates what changed; safely removes stale skills without touching manually-added ones
@@ -60,10 +60,11 @@ Creates `agents.toml` with detected agents:
 
 ```toml
 [agents]
+amp = false
 claude-code = true
 codex = true
-opencode = false
 factory = false
+opencode = false
 
 [dependencies]
 ```
@@ -113,10 +114,11 @@ The **manifest** (`agents.toml`) declares which packages you want and which agen
 
 | Agent | Global Skills | Project Skills |
 |-------|---------------|----------------|
+| Amp | `~/.config/agents/skills/` | `./.agents/skills/` |
 | Claude Code | `~/.claude/skills/` | `./.claude/skills/` |
 | Codex | `~/.codex/skills/` | `./.codex/skills/` |
-| OpenCode | `~/.config/opencode/skill/` | `./.opencode/skill/` |
 | Factory | `~/.factory/skills/` | `./.factory/skills/` |
+| OpenCode | `~/.config/opencode/skill/` | `./.opencode/skill/` |
 
 For global scope (`--global`), skills install to your home directory. For project scope (default), skills install within your project directory.
 
@@ -157,10 +159,11 @@ Project manifests are discovered by walking up from your current directory.
 
 ```toml
 [agents]
+amp = false           # Amp (disabled)
 claude-code = true    # Anthropic's Claude Code
 codex = true          # OpenAI Codex CLI
-opencode = false      # OpenCode (disabled)
 factory = true        # Factory (Droids)
+opencode = false      # OpenCode (disabled)
 
 [dependencies]
 # Claude Code plugin (from marketplace)

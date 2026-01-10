@@ -12,7 +12,8 @@ export type { AgentId }
 export interface AgentDefinition {
 	id: AgentId
 	displayName: string
-	basePath: string
+	localBasePath: string
+	globalBasePath: string
 	skillsDir: string
 	detect: () => Promise<AgentDetectionResult>
 }

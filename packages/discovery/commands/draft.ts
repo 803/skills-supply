@@ -71,7 +71,7 @@ const COMMIT_MESSAGE = "docs: add sk installation instructions"
 const PR_TITLE = "docs: add sk installation instructions"
 const PR_BODY =
 	"Adds installation instructions for the sk tool.\n\n" +
-	"sk is a cross-agent skill installer that works with Claude Code, Codex, OpenCode, Factory, and other compatible agents.\n\n" +
+	"sk is a cross-agent skill installer that works with Claude Code, Amp, Codex, OpenCode, Factory, and other compatible agents.\n\n" +
 	"Learn more: https://skills.supply"
 const FORK_OWNER = "803"
 

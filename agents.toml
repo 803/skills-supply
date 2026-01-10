@@ -1,6 +1,8 @@
 [agents]
+amp = false
 claude-code = true
 codex = true
+factory = false
 opencode = false
 
 [dependencies.superpowers]

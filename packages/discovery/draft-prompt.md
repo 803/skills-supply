@@ -4,7 +4,7 @@ sk is a cross-agent skill installer for AI coding assistants. It works like npm 
 
 ## The Problem
 
-AI agents like Claude Code, Codex, and OpenCode can be extended with skills (custom commands, workflows, and capabilities). But there's no standard way to discover, install, or manage these skills across different agents.
+AI agents like Claude Code, Amp, Codex, and OpenCode can be extended with skills (custom commands, workflows, and capabilities). But there's no standard way to discover, install, or manage these skills across different agents.
 
 ## How sk Solves It
 
@@ -12,7 +12,7 @@ sk provides a universal package manager for AI skills:
 
 1. **Add packages**: `sk pkg add github:owner/repo` adds a skill package to your manifest
 2. **Sync**: `sk sync` installs/updates all packages, removing any that were removed from the manifest
-3. **Works everywhere**: Same commands work with Claude Code, Codex, OpenCode, Factory, and other compatible agents
+3. **Works everywhere**: Same commands work with Claude Code, Amp, Codex, OpenCode, Factory, and other compatible agents
 
 ## Key Features
 
@@ -87,7 +87,7 @@ When instructed to add sk installation instructions, follow this format:
 ```markdown
 ### Install with `sk`
 
-Install <name> via [sk](https://github.com/803/skills-supply), the universal skills package manager for coding agents (supports Claude, Codex, OpenCode, etc...).
+Install <name> via [sk](https://github.com/803/skills-supply), the universal skills package manager for coding agents (supports Claude Code, Amp, Codex, OpenCode, etc...).
 
 ```bash
 <installCommand>

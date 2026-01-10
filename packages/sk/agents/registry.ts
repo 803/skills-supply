@@ -16,7 +16,8 @@ import type {
 interface AgentEntry {
 	id: AgentId
 	displayName: string
-	basePath: string
+	localBasePath: string
+	globalBasePath: string
 	skillsDir: string
 	detectPath: AbsolutePath
 }
@@ -24,40 +25,53 @@ interface AgentEntry {
 const HOME_DIR = homedir()
 const AGENT_ENTRIES: AgentEntry[] = [
 	{
-		basePath: ".claude",
+		detectPath: path.join(HOME_DIR, ".config", "agents") as AbsolutePath,
+		displayName: "Amp",
+		globalBasePath: path.join(".config", "agents"),
+		id: "amp",
+		localBasePath: ".agents",
+		skillsDir: "skills",
+	},
+	{
 		detectPath: path.join(HOME_DIR, ".claude") as AbsolutePath,
 		displayName: "Claude Code",
+		globalBasePath: ".claude",
 		id: "claude-code",
+		localBasePath: ".claude",
 		skillsDir: "skills",
 	},
 	{
-		basePath: ".codex",
 		detectPath: path.join(HOME_DIR, ".codex") as AbsolutePath,
 		displayName: "Codex",
+		globalBasePath: ".codex",
 		id: "codex",
+		localBasePath: ".codex",
 		skillsDir: "skills",
 	},
 	{
-		basePath: path.join(".config", "opencode"),
-		detectPath: path.join(HOME_DIR, ".config", "opencode") as AbsolutePath,
-		displayName: "OpenCode",
-		id: "opencode",
-		skillsDir: "skill",
-	},
-	{
-		basePath: ".factory",
 		detectPath: path.join(HOME_DIR, ".factory") as AbsolutePath,
 		displayName: "Factory",
+		globalBasePath: ".factory",
 		id: "factory",
+		localBasePath: ".factory",
 		skillsDir: "skills",
+	},
+	{
+		detectPath: path.join(HOME_DIR, ".config", "opencode") as AbsolutePath,
+		displayName: "OpenCode",
+		globalBasePath: path.join(".config", "opencode"),
+		id: "opencode",
+		localBasePath: ".opencode",
+		skillsDir: "skill",
 	},
 ]
 
 const AGENT_REGISTRY: AgentDefinition[] = AGENT_ENTRIES.map((entry) => ({
-	basePath: entry.basePath,
 	detect: () => detectAgent(entry.id, entry.detectPath),
 	displayName: entry.displayName,
+	globalBasePath: entry.globalBasePath,
 	id: entry.id,
+	localBasePath: entry.localBasePath,
 	skillsDir: entry.skillsDir,
 }))
 
@@ -104,7 +118,8 @@ export type AgentScope =
 
 export function resolveAgent(agent: AgentDefinition, scope: AgentScope): ResolvedAgent {
 	const root = scope.type === "local" ? scope.projectRoot : scope.homeDir
-	const rootPath = path.join(root, agent.basePath) as AbsolutePath
+	const basePath = scope.type === "local" ? agent.localBasePath : agent.globalBasePath
+	const rootPath = path.join(root, basePath) as AbsolutePath
 	return {
 		displayName: agent.displayName,
 		id: agent.id,

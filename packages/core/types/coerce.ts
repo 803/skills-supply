@@ -11,6 +11,7 @@ import type {
 import type { GitRef } from "@/types/declaration"
 
 export const VALID_AGENT_IDS: ReadonlyArray<AgentId> = [
+	"amp",
 	"claude-code",
 	"codex",
 	"opencode",

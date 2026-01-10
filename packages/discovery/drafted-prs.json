@@ -13,11 +13,19 @@
 		"packages": ["gh:Dimillian/Skills,type:github"],
 		"pr_url": "https://github.com/Dimillian/Skills/pull/5"
 	},
+	"dgunning/edgartools": {
+		"packages": ["gh:dgunning/edgartools,path:edgar/ai/skills,type:github"],
+		"pr_url": "https://github.com/dgunning/edgartools/pull/589"
+	},
 	"itsmostafa/aws-agent-skills": {
 		"packages": [
 			"marketplace:itsmostafa/aws-agent-skills,plugin:aws-agent-skills,type:claude-plugin"
 		],
 		"pr_url": "https://github.com/itsmostafa/aws-agent-skills/pull/74"
+	},
+	"mrexodia/ida-pro-mcp": {
+		"packages": ["gh:mrexodia/ida-pro-mcp,path:skills,type:github"],
+		"pr_url": "https://github.com/mrexodia/ida-pro-mcp/pull/230"
 	},
 	"Ryandonofrio3/osgrep": {
 		"packages": ["marketplace:Ryandonofrio3/osgrep,plugin:osgrep,type:claude-plugin"],
