@@ -45,7 +45,7 @@ export function formatSkPackageAddCommand(declaration: ValidatedDeclaration): st
 		}
 		case "github": {
 			const args = [...formatRef(declaration.ref), ...formatPath(declaration.path)]
-			return withArgs(`sk pkg add github ${declaration.gh}`, args)
+			return withArgs(`sk pkg add gh ${declaration.gh}`, args)
 		}
 		case "git": {
 			const args = [...formatRef(declaration.ref), ...formatPath(declaration.path)]
