@@ -2,5 +2,11 @@
 	"Dimillian/Skills": {
 		"packages": ["gh:Dimillian/Skills,type:github"],
 		"pr_url": "https://github.com/Dimillian/Skills/pull/5"
+	},
+	"itsmostafa/aws-agent-skills": {
+		"packages": [
+			"marketplace:itsmostafa/aws-agent-skills,plugin:aws-agent-skills,type:claude-plugin"
+		],
+		"pr_url": "https://github.com/itsmostafa/aws-agent-skills/pull/74"
 	}
 }

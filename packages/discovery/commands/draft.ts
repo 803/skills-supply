@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
-import { confirm, intro, isCancel } from "@clack/prompts"
+import { confirm, intro, isCancel, text } from "@clack/prompts"
 import {
 	assertAbsolutePathDirect,
 	formatSkPackageAddCommand,
@@ -691,7 +691,7 @@ gh api "repos/${repo.gh_repo}/pulls" \\
 		return { ok: true, value: undefined }
 	}
 
-	// Link mode: print the PR creation link and state file entry
+	// Link mode: print the PR creation link, prompt for URL, save state
 	if (mode === "link") {
 		const repoName = repo.gh_repo.split("/")[1]
 		// Get default branch for the link
@@ -712,16 +712,54 @@ gh api "repos/${repo.gh_repo}/pulls" \\
 		console.log("[link] Open this URL to create the PR:")
 		console.log(`       ${prLink}`)
 
-		// Print what to add to state file after PR is created
-		const stateEntry = {
-			packages: repo.packages.map((pkg) => pkg.declarationKey),
-			pr_url: "<PR_URL>",
-		}
+		// Show preview of state entry
+		const packageKeys = repo.packages.map((pkg) => pkg.declarationKey)
 		console.log("")
-		console.log("[state] After creating the PR, add this to drafted-prs.json:")
+		console.log("[state] Will add to drafted-prs.json:")
 		console.log(
-			`        "${repo.gh_repo}": ${JSON.stringify(stateEntry, null, 2).replace(/\n/g, "\n        ")}`,
+			`        "${repo.gh_repo}": { packages: ${JSON.stringify(packageKeys)}, pr_url: "..." }`,
 		)
+
+		// Prompt for PR URL
+		console.log("")
+		const prUrlInput = await text({
+			message: "Paste the PR URL after creating it:",
+			placeholder: `https://github.com/${repo.gh_repo}/pull/...`,
+			validate: (value) => {
+				if (!value.trim()) {
+					return "PR URL is required"
+				}
+				if (!value.startsWith(`https://github.com/${repo.gh_repo}/pull/`)) {
+					return `Expected URL starting with https://github.com/${repo.gh_repo}/pull/`
+				}
+			},
+		})
+
+		if (isCancel(prUrlInput)) {
+			console.log("[info] Cancelled. State file not updated.")
+			return { ok: true, value: undefined }
+		}
+
+		const prUrl = prUrlInput.trim()
+
+		// Update state file
+		const state = await loadStateFile()
+		if (!state.ok) {
+			return state
+		}
+
+		state.value[repo.gh_repo] = {
+			packages: packageKeys,
+			pr_url: prUrl,
+		}
+
+		const saved = await saveStateFile(state.value)
+		if (!saved.ok) {
+			return saved
+		}
+
+		console.log(`[success] PR recorded: ${prUrl}`)
+		console.log("[info] State file updated")
 
 		return { ok: true, value: undefined }
 	}
