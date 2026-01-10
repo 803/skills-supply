@@ -2,6 +2,7 @@
 
 import { Command } from "commander"
 import { z } from "zod"
+import { cleanForksCommand } from "@/commands/clean-forks"
 import { draftCommand } from "@/commands/draft"
 import { enqueueCommand } from "@/commands/enqueue"
 import { listCommand } from "@/commands/list"
@@ -140,6 +141,16 @@ async function main(): Promise<void> {
 		.description("Output sk install command for a random package")
 		.action(async () => {
 			const result = await randomCommand()
+			if (!result.ok) {
+				printError(result.error)
+			}
+		})
+
+	program
+		.command("clean-forks")
+		.description("Delete orphan forks from the 803 org")
+		.action(async () => {
+			const result = await cleanForksCommand()
 			if (!result.ok) {
 				printError(result.error)
 			}

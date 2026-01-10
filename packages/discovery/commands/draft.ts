@@ -462,8 +462,18 @@ async function prepareWorkingDir(
 	const script = `
 set -euo pipefail
 cd "${tempRoot}"
-gh repo fork "${ghRepo}" --clone --remote --org "${FORK_OWNER}"
-cd "${repoName}"
+
+# Create fork (prints URL like https://github.com/803/skills-3)
+FORK_URL=$(gh repo fork "${ghRepo}" --org "${FORK_OWNER}" --clone=false)
+FORK_NAME=$(basename "$FORK_URL")
+echo "✓ Created fork ${FORK_OWNER}/$FORK_NAME"
+
+# Clone to fixed path "repo"
+gh repo clone "${FORK_OWNER}/$FORK_NAME" repo -- --depth=1
+echo "✓ Cloned fork"
+
+# Set up branch (gh repo clone already adds upstream remote for forks)
+cd repo
 git push origin --delete "${BRANCH_NAME}" 2>/dev/null || true
 git fetch --depth 1 upstream HEAD
 git checkout -b "${BRANCH_NAME}" FETCH_HEAD
@@ -472,7 +482,7 @@ git checkout -b "${BRANCH_NAME}" FETCH_HEAD
 	const setupResult = await new Promise<Result<void, DiscoveryError>>((resolve) => {
 		const child = spawn("bash", ["-c", script], {
 			env: process.env,
-			stdio: "inherit", // Show fork/clone progress to user
+			stdio: "inherit",
 		})
 
 		child.on("error", (error) => {
@@ -510,7 +520,7 @@ git checkout -b "${BRANCH_NAME}" FETCH_HEAD
 		return setupResult
 	}
 
-	const repoPath = path.join(tempRoot, repoName)
+	const repoPath = path.join(tempRoot, "repo")
 	return { ok: true, value: { path: repoPath, root: tempRoot } }
 }
 

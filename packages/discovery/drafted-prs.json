@@ -34,5 +34,9 @@
 	"SynaLinks/synalinks-skills": {
 		"packages": ["gh:SynaLinks/synalinks-skills,type:github"],
 		"pr_url": "https://github.com/SynaLinks/synalinks-skills/pull/46"
+	},
+	"snarktank/ralph": {
+		"packages": ["gh:snarktank/ralph,path:skills,type:github"],
+		"pr_url": "https://github.com/snarktank/ralph/pull/8"
 	}
 }
