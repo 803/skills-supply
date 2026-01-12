@@ -35,9 +35,8 @@ jobs:
           install: true
           cache: true
           reshim: true
-      - run: npm install --workspace @skills-supply/sk
-      - run: npm run build:binary
-        working-directory: packages/sk
+      - run: npm install
+      - run: npm run build -- --filter=@skills-supply/sk
       - name: Package (Unix)
         if: runner.os != 'Windows'
         run: tar -czvf sk-${{ matrix.target }}.tar.gz -C packages/sk/bin sk
