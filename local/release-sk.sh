@@ -25,6 +25,9 @@ if [[ "${1:-}" == "retag" ]]; then
   TAG="sk@$PKG_VERSION"
   echo "Retagging $TAG on HEAD..."
 
+	# Make sure remote is up-to-date
+	git push
+
   # Delete local tag (ignore if doesn't exist)
   git tag -d "$TAG" 2>/dev/null || true
 
