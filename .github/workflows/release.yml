@@ -35,7 +35,10 @@ jobs:
           install: true
           cache: true
           reshim: true
+      - run: ./npmrc.sh
       - run: npm install
+        env:
+          FONTAWESOME_TOKEN: ${{ secrets.FONTAWESOME_TOKEN }}
       - run: npm run build -- --filter=@skills-supply/sk
       - name: Package (Unix)
         if: runner.os != 'Windows'
@@ -78,7 +81,10 @@ jobs:
           install: true
           cache: true
           reshim: true
+      - run: ./npmrc.sh
       - run: npm install --workspace @skills-supply/sk
+        env:
+          FONTAWESOME_TOKEN: ${{ secrets.FONTAWESOME_TOKEN }}
       - run: npm run build:node
         working-directory: packages/sk
       - run: npm publish --access public
@@ -92,7 +98,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: 803/homebrew-sk
-          token: ${{ secrets.SKILLS_SUPPLY_SK_RELEASE_PAT }}
+          token: ${{ secrets.SKILLS_SUPPLY_SK_RELEASE_WORKFLOW }}
       - uses: jdx/mise-action@v3
         with:
           install: true
@@ -111,7 +117,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: 803/scoop-sk
-          token: ${{ secrets.SKILLS_SUPPLY_SK_RELEASE_PAT }}
+          token: ${{ secrets.SKILLS_SUPPLY_SK_RELEASE_WORKFLOW }}
       - uses: jdx/mise-action@v3
         with:
           install: true
