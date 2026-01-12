@@ -227,7 +227,7 @@ echo "Cloned fork"
 # Checkout the branch
 cd repo
 git fetch origin "${BRANCH_NAME}"
-git checkout "${BRANCH_NAME}"
+git checkout -b "${BRANCH_NAME}" FETCH_HEAD
 echo "Checked out ${BRANCH_NAME}"
 `
 
