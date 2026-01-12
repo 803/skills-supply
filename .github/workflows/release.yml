@@ -10,6 +10,7 @@ permissions:
 env:
   # Extract version from tag (sk@0.1.0 -> 0.1.0)
   VERSION: ${{ github.ref_name }}
+  FONTAWESOME_TOKEN: ${{ secrets.FONTAWESOME_TOKEN }}
 
 jobs:
   build_and_npm:
@@ -28,8 +29,6 @@ jobs:
           - os: windows-latest
             target: windows-x64
     runs-on: ${{ matrix.os }}
-    env:
-      FONTAWESOME_TOKEN: ${{ secrets.FONTAWESOME_TOKEN }}
     steps:
       - uses: actions/checkout@v6
       - uses: jdx/mise-action@v3
