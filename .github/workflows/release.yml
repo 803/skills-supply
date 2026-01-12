@@ -37,6 +37,7 @@ jobs:
           cache: true
           reshim: true
       - run: ./npmrc.sh
+        shell: bash
       - run: npm install
       - run: npm run build -- --filter=@skills-supply/sk
       - name: Package (Unix)
