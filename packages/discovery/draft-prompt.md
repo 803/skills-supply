@@ -87,9 +87,10 @@ When instructed to add sk installation instructions, follow this format:
 ```markdown
 ### Install with `sk`
 
-Install <name> via [sk](https://github.com/803/skills-supply), the universal skills package manager for coding agents (supports Claude Code, Amp, Codex, OpenCode, etc...).
+Install <name> via [sk](https://github.com/803/skills-supply) (supports Codex, Amp, OpenCode, Factory, Claude Code etc...).
 
 ```bash
+# Add --global flag if you'd like to install in user-scope (defaults to project-scope)
 <installCommand>
 sk sync
 ```

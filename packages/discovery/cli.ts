@@ -8,6 +8,7 @@ import { enqueueCommand } from "@/commands/enqueue"
 import { listCommand } from "@/commands/list"
 import { printError } from "@/commands/outcome"
 import { randomCommand } from "@/commands/random"
+import { updateDraftsCommand } from "@/commands/update-drafts"
 import { workerCommand } from "@/commands/worker"
 
 async function main(): Promise<void> {
@@ -151,6 +152,16 @@ async function main(): Promise<void> {
 		.description("Delete orphan forks from the 803 org")
 		.action(async () => {
 			const result = await cleanForksCommand()
+			if (!result.ok) {
+				printError(result.error)
+			}
+		})
+
+	program
+		.command("update-drafts")
+		.description("Iterate through open PRs and refine with Claude")
+		.action(async () => {
+			const result = await updateDraftsCommand()
 			if (!result.ok) {
 				printError(result.error)
 			}

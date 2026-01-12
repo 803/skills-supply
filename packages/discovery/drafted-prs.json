@@ -29,6 +29,18 @@
 		],
 		"pr_url": "https://github.com/kepano/obsidian-skills/pull/25"
 	},
+	"lackeyjb/playwright-skill": {
+		"packages": [
+			"marketplace:lackeyjb/playwright-skill,plugin:playwright-skill,type:claude-plugin"
+		],
+		"pr_url": "https://github.com/lackeyjb/playwright-skill/pull/26"
+	},
+	"MicrosoftDocs/mcp": {
+		"packages": [
+			"marketplace:MicrosoftDocs/mcp,plugin:microsoft-docs,type:claude-plugin"
+		],
+		"pr_url": "https://github.com/MicrosoftDocs/mcp/pull/102"
+	},
 	"mrexodia/ida-pro-mcp": {
 		"packages": ["gh:mrexodia/ida-pro-mcp,path:skills,type:github"],
 		"pr_url": "https://github.com/mrexodia/ida-pro-mcp/pull/230"
@@ -54,6 +66,10 @@
 	"snarktank/ralph": {
 		"packages": ["gh:snarktank/ralph,path:skills,type:github"],
 		"pr_url": "https://github.com/snarktank/ralph/pull/8"
+	},
+	"steipete/oracle": {
+		"packages": ["gh:steipete/oracle,path:skills,type:github"],
+		"pr_url": "https://github.com/steipete/oracle/pull/69"
 	},
 	"timescale/pg-aiguide": {
 		"packages": ["marketplace:timescale/pg-aiguide,plugin:pg,type:claude-plugin"],
