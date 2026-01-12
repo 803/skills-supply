@@ -9,7 +9,7 @@
 import path from "node:path"
 import type { AbsolutePath } from "@skills-supply/core"
 import { describe, expect, it } from "vitest"
-import { getAgentById, listAgents, resolveAgent } from "./registry"
+import { getAgentById, getAgentDetectionMap, listAgents, resolveAgent } from "./registry"
 
 // =============================================================================
 // resolveAgent TESTS
@@ -302,6 +302,39 @@ describe("listAgents", () => {
 			expect(agent.globalBasePath).toBeDefined()
 			expect(agent.skillsDir).toBeDefined()
 			expect(typeof agent.detect).toBe("function")
+		}
+	})
+})
+
+// =============================================================================
+// getAgentDetectionMap TESTS
+// =============================================================================
+
+describe("getAgentDetectionMap", () => {
+	it("returns a map with all 5 agents", async () => {
+		const result = await getAgentDetectionMap()
+
+		expect(result.ok).toBe(true)
+		if (!result.ok) return
+
+		const map = result.value
+		expect(Object.keys(map)).toHaveLength(5)
+		expect("amp" in map).toBe(true)
+		expect("claude-code" in map).toBe(true)
+		expect("codex" in map).toBe(true)
+		expect("factory" in map).toBe(true)
+		expect("opencode" in map).toBe(true)
+	})
+
+	it("returns boolean values for each agent", async () => {
+		const result = await getAgentDetectionMap()
+
+		expect(result.ok).toBe(true)
+		if (!result.ok) return
+
+		const map = result.value
+		for (const [, detected] of Object.entries(map)) {
+			expect(typeof detected).toBe("boolean")
 		}
 	})
 })

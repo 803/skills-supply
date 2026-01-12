@@ -100,7 +100,7 @@ Where `<installCommand>` is the exact value from the IndexedPackage data (e.g., 
 
 ### Include
 
-- The one-liner: `Install via [sk](https://github.com/803/skills-supply), the universal package manager for AI agent skills (supports Claude, Codex, OpenCode, etc...).`
+- The one-liner: `Install via [sk](https://github.com/803/skills-supply), the universal package manager for AI agent skills (supports Claude Code, Amp, Codex, OpenCode, Factory, etc...).`
 - The `installCommand` from the IndexedPackage data **verbatim** - do not invent or modify it
 - `sk sync` on the next line
 - Match the existing documentation style of the repo

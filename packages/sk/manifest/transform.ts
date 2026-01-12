@@ -67,3 +67,12 @@ export function getDependency(
 export function getAgent(manifest: Manifest, agentId: AgentId): boolean | undefined {
 	return manifest.agents.get(agentId)
 }
+
+/**
+ * Get all enabled agent IDs from the manifest.
+ */
+export function getEnabledAgents(manifest: Manifest): AgentId[] {
+	return [...manifest.agents.entries()]
+		.filter(([, enabled]) => enabled)
+		.map(([agentId]) => agentId)
+}

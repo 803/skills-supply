@@ -8,7 +8,7 @@ import {
 	SK_GLOBAL_DIR,
 } from "@skills-supply/core"
 import { consola } from "consola"
-import { detectInstalledAgents, getAgentById, listAgents } from "@/agents/registry"
+import { getAgentById, getAgentDetectionMap, listAgents } from "@/agents/registry"
 import { CommandResult, printOutcome } from "@/commands/types"
 import { ensureDir, safeStat } from "@/io/fs"
 import { createEmptyManifest, saveManifest } from "@/manifest/fs"
@@ -159,29 +159,25 @@ async function resolveAgentSelection(
 		return CommandResult.completed({ selected: new Set<AgentId>() })
 	}
 
-	const detected = await detectInstalledAgents()
-	if (!detected.ok) {
-		return CommandResult.failed(detected.error)
+	const agents = listAgents()
+	const detectionResult = await getAgentDetectionMap()
+	if (!detectionResult.ok) {
+		return CommandResult.failed(detectionResult.error)
 	}
+	const detectionMap = detectionResult.value
 
-	if (detected.value.length === 0) {
-		return CommandResult.completed({
-			selected: new Set<AgentId>(),
-			warning:
-				"No installed agents detected; created manifest with empty [agents].",
-		})
-	}
+	const agentOptions: { label: string; value: AgentId }[] = agents.map((agent) => ({
+		label: `${agent.displayName} (${agent.id})`,
+		value: agent.id,
+	}))
 
-	const agentOptions: { label: string; value: AgentId }[] = detected.value.map(
-		(agent) => ({
-			label: `${agent.displayName} (${agent.id})`,
-			value: agent.id,
-		}),
-	)
+	const detectedAgents = agents
+		.filter((agent) => detectionMap[agent.id])
+		.map((agent) => agent.id)
 
 	const selected = await multiselect<AgentId>({
-		initialValues: [],
-		message: "Select enabled agents",
+		initialValues: detectedAgents,
+		message: "Select agents to sync (detected agents are pre-selected)",
 		options: agentOptions,
 		required: false,
 	})

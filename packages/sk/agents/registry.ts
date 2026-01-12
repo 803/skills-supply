@@ -1,6 +1,6 @@
-import { stat } from "node:fs/promises"
-import { homedir } from "node:os"
+import { execFile } from "node:child_process"
 import path from "node:path"
+import { promisify } from "node:util"
 import type { AbsolutePath } from "@skills-supply/core"
 import { isAgentId } from "@skills-supply/core"
 import type {
@@ -13,19 +13,34 @@ import type {
 	ResolvedAgent,
 } from "@/agents/types"
 
+const execFileAsync = promisify(execFile)
+
+// =============================================================================
+// Agent Entry Configuration
+// =============================================================================
+
 interface AgentEntry {
 	id: AgentId
 	displayName: string
 	localBasePath: string
 	globalBasePath: string
 	skillsDir: string
-	detectPath: AbsolutePath
+	detectCommand: {
+		binary: string
+		args: string[]
+		timeoutMs: number
+	}
 }
 
-const HOME_DIR = homedir()
+const DEFAULT_TIMEOUT_MS = 5000
+
 const AGENT_ENTRIES: AgentEntry[] = [
 	{
-		detectPath: path.join(HOME_DIR, ".config", "agents") as AbsolutePath,
+		detectCommand: {
+			args: ["--version"],
+			binary: "amp",
+			timeoutMs: DEFAULT_TIMEOUT_MS,
+		},
 		displayName: "Amp",
 		globalBasePath: path.join(".config", "agents"),
 		id: "amp",
@@ -33,7 +48,11 @@ const AGENT_ENTRIES: AgentEntry[] = [
 		skillsDir: "skills",
 	},
 	{
-		detectPath: path.join(HOME_DIR, ".claude") as AbsolutePath,
+		detectCommand: {
+			args: ["--version"],
+			binary: "claude",
+			timeoutMs: DEFAULT_TIMEOUT_MS,
+		},
 		displayName: "Claude Code",
 		globalBasePath: ".claude",
 		id: "claude-code",
@@ -41,7 +60,11 @@ const AGENT_ENTRIES: AgentEntry[] = [
 		skillsDir: "skills",
 	},
 	{
-		detectPath: path.join(HOME_DIR, ".codex") as AbsolutePath,
+		detectCommand: {
+			args: ["--version"],
+			binary: "codex",
+			timeoutMs: DEFAULT_TIMEOUT_MS,
+		},
 		displayName: "Codex",
 		globalBasePath: ".codex",
 		id: "codex",
@@ -49,7 +72,11 @@ const AGENT_ENTRIES: AgentEntry[] = [
 		skillsDir: "skills",
 	},
 	{
-		detectPath: path.join(HOME_DIR, ".factory") as AbsolutePath,
+		detectCommand: {
+			args: ["--version"],
+			binary: "droid",
+			timeoutMs: DEFAULT_TIMEOUT_MS,
+		},
 		displayName: "Factory",
 		globalBasePath: ".factory",
 		id: "factory",
@@ -57,7 +84,11 @@ const AGENT_ENTRIES: AgentEntry[] = [
 		skillsDir: "skills",
 	},
 	{
-		detectPath: path.join(HOME_DIR, ".config", "opencode") as AbsolutePath,
+		detectCommand: {
+			args: ["--version"],
+			binary: "opencode",
+			timeoutMs: DEFAULT_TIMEOUT_MS,
+		},
 		displayName: "OpenCode",
 		globalBasePath: path.join(".config", "opencode"),
 		id: "opencode",
@@ -66,8 +97,12 @@ const AGENT_ENTRIES: AgentEntry[] = [
 	},
 ]
 
+// =============================================================================
+// Agent Registry
+// =============================================================================
+
 const AGENT_REGISTRY: AgentDefinition[] = AGENT_ENTRIES.map((entry) => ({
-	detect: () => detectAgent(entry.id, entry.detectPath),
+	detect: () => detectAgentCli(entry.id, entry.detectCommand),
 	displayName: entry.displayName,
 	globalBasePath: entry.globalBasePath,
 	id: entry.id,
@@ -75,28 +110,15 @@ const AGENT_REGISTRY: AgentDefinition[] = AGENT_ENTRIES.map((entry) => ({
 	skillsDir: entry.skillsDir,
 }))
 
-type StatResult =
-	| { ok: true; value: Awaited<ReturnType<typeof stat>> | null }
-	| { ok: false; error: AgentRegistryError }
-
 export function listAgents(): AgentDefinition[] {
 	return [...AGENT_REGISTRY]
 }
 
 export function getAgentById(agentId: string): AgentLookupResult {
-	if (!isAgentId(agentId)) {
-		return {
-			error: {
-				agentId,
-				message: `Unknown agent: ${agentId}`,
-				target: "agent",
-				type: "not_found",
-			},
-			ok: false,
-		}
-	}
+	const agent = isAgentId(agentId)
+		? AGENT_REGISTRY.find((entry) => entry.id === agentId)
+		: undefined
 
-	const agent = AGENT_REGISTRY.find((entry) => entry.id === agentId)
 	if (!agent) {
 		return {
 			error: {
@@ -111,6 +133,10 @@ export function getAgentById(agentId: string): AgentLookupResult {
 
 	return { ok: true, value: agent }
 }
+
+// =============================================================================
+// Agent Resolution
+// =============================================================================
 
 export type AgentScope =
 	| { type: "local"; projectRoot: AbsolutePath }
@@ -128,79 +154,90 @@ export function resolveAgent(agent: AgentDefinition, scope: AgentScope): Resolve
 	}
 }
 
+// =============================================================================
+// Agent Detection
+// =============================================================================
+
 export async function detectInstalledAgents(): Promise<AgentListResult> {
-	const installed: AgentDefinition[] = []
-
-	for (const agent of AGENT_REGISTRY) {
-		const detected = await agent.detect()
-		if (!detected.ok) {
-			return detected
-		}
-
-		if (detected.value) {
-			installed.push(agent)
-		}
+	const detectionMap = await getAgentDetectionMap()
+	if (!detectionMap.ok) {
+		return detectionMap
 	}
 
+	const installed = AGENT_REGISTRY.filter((agent) => detectionMap.value[agent.id])
 	return { ok: true, value: installed }
 }
 
-async function detectAgent(
-	agentId: AgentId,
-	detectPath: AbsolutePath,
-): Promise<AgentDetectionResult> {
-	const statsResult = await safeStat(detectPath)
-	if (!statsResult.ok) {
-		return statsResult
+export type AgentDetectionMap = Record<AgentId, boolean>
+export type AgentDetectionMapResult =
+	| { ok: true; value: AgentDetectionMap }
+	| { ok: false; error: AgentRegistryError }
+
+export async function getAgentDetectionMap(): Promise<AgentDetectionMapResult> {
+	// Run all detections in parallel
+	const detections = await Promise.all(
+		AGENT_REGISTRY.map(async (agent) => {
+			const result = await agent.detect()
+			return { agentId: agent.id, result }
+		}),
+	)
+
+	// Aggregate results - if any agent fails to detect, treat as not installed
+	const result: Partial<AgentDetectionMap> = {}
+	for (const { agentId, result: detection } of detections) {
+		result[agentId] = detection.ok ? detection.value : false
 	}
 
-	if (!statsResult.value) {
+	return { ok: true, value: result as AgentDetectionMap }
+}
+
+// =============================================================================
+// CLI Detection Implementation
+// =============================================================================
+
+type DetectCommand = AgentEntry["detectCommand"]
+
+async function detectAgentCli(
+	_agentId: AgentId,
+	command: DetectCommand,
+): Promise<AgentDetectionResult> {
+	try {
+		await execFileAsync(command.binary, command.args, {
+			timeout: command.timeoutMs,
+		})
+		return { ok: true, value: true }
+	} catch (error) {
+		// Command not found - agent CLI not installed
+		if (isCommandNotFound(error)) {
+			return { ok: true, value: false }
+		}
+
+		// Timeout - treat as not detected (CLI may be broken/hanging)
+		if (isTimeoutError(error)) {
+			return { ok: true, value: false }
+		}
+
+		// Non-zero exit code or any other error - treat as not detected
 		return { ok: true, value: false }
 	}
-
-	if (!statsResult.value.isDirectory()) {
-		return {
-			error: {
-				agentId,
-				message: `Expected directory at ${detectPath}.`,
-				operation: "stat",
-				path: detectPath,
-				type: "io",
-			},
-			ok: false,
-		}
-	}
-
-	return { ok: true, value: true }
 }
 
-async function safeStat(targetPath: AbsolutePath): Promise<StatResult> {
-	try {
-		const stats = await stat(targetPath)
-		return { ok: true, value: stats }
-	} catch (error) {
-		if (isNotFound(error)) {
-			return { ok: true, value: null }
-		}
-
-		return {
-			error: {
-				message: `Unable to access ${targetPath}.`,
-				operation: "stat",
-				path: targetPath,
-				rawError: error instanceof Error ? error : undefined,
-				type: "io",
-			},
-			ok: false,
-		}
-	}
-}
-
-function isNotFound(error: unknown): boolean {
+function isCommandNotFound(error: unknown): boolean {
 	return (
 		typeof error === "object" &&
 		error !== null &&
 		"code" in error &&
 		(error as { code?: string }).code === "ENOENT"
+	)
+}
+
+function isTimeoutError(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"killed" in error &&
+		(error as { killed?: boolean }).killed === true &&
+		"signal" in error &&
+		(error as { signal?: string }).signal === "SIGTERM"
 	)
 }

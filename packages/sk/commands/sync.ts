@@ -3,8 +3,9 @@ import type { AgentId } from "@skills-supply/core"
 import { consola } from "consola"
 import {
 	type AgentScope,
-	detectInstalledAgents,
 	getAgentById,
+	getAgentDetectionMap,
+	listAgents,
 	resolveAgent,
 } from "@/agents/registry"
 import type { ResolvedAgent } from "@/agents/types"
@@ -17,7 +18,7 @@ import {
 } from "@/commands/manifest-selection"
 import { CommandResult, printOutcome } from "@/commands/types"
 import { saveManifest } from "@/manifest/fs"
-import { setAgent } from "@/manifest/transform"
+import { getEnabledAgents, setAgent } from "@/manifest/transform"
 import type { Manifest } from "@/manifest/types"
 import { runSync } from "@/sync/sync"
 
@@ -126,25 +127,25 @@ async function resolveSyncAgents(
 			return CommandResult.unchanged(NO_AGENTS_CONFIGURED)
 		}
 
-		const detected = await detectInstalledAgents()
-		if (!detected.ok) {
-			return CommandResult.failed(detected.error)
+		const agents = listAgents()
+		const detectionResult = await getAgentDetectionMap()
+		if (!detectionResult.ok) {
+			return CommandResult.failed(detectionResult.error)
 		}
+		const detectionMap = detectionResult.value
 
-		if (detected.value.length === 0) {
-			return CommandResult.unchanged("No installed agents detected.")
-		}
+		const agentOptions: { label: string; value: AgentId }[] = agents.map((agent) => ({
+			label: `${agent.displayName} (${agent.id})`,
+			value: agent.id,
+		}))
 
-		const agentOptions: { label: string; value: AgentId }[] = detected.value.map(
-			(agent) => ({
-				label: `${agent.displayName} (${agent.id})`,
-				value: agent.id,
-			}),
-		)
+		const detectedAgents = agents
+			.filter((agent) => detectionMap[agent.id])
+			.map((agent) => agent.id)
 
 		const selected = await multiselect<AgentId>({
-			initialValues: [],
-			message: "Select enabled agents",
+			initialValues: detectedAgents,
+			message: "Select agents to sync (detected agents are pre-selected)",
 			options: agentOptions,
 			required: true,
 		})
@@ -180,9 +181,7 @@ async function resolveSyncAgents(
 		manifest = updated
 	}
 
-	const enabled = [...manifest.agents.entries()]
-		.filter(([, enabled]) => enabled)
-		.map(([agentId]) => agentId)
+	const enabled = getEnabledAgents(manifest)
 
 	if (enabled.length === 0) {
 		return CommandResult.unchanged(NO_AGENTS_ENABLED)
