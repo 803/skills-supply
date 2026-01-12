@@ -48,7 +48,7 @@ jobs:
             npm-${{ matrix.target }}-
       - run: ./npmrc.sh
         shell: bash
-      - run: npm ci
+      - run: npm ci --loglevel verbose
       - run: npm run build -- --filter=@skills-supply/sk
       - name: Package (Unix)
         if: runner.os != 'Windows'
