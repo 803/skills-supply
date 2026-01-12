@@ -43,9 +43,9 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          key: npm-${{ matrix.target }}-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            npm-${{ runner.os }}-
+            npm-${{ matrix.target }}-
       - run: ./npmrc.sh
         shell: bash
       - run: npm install
@@ -62,8 +62,14 @@ jobs:
           path: sk-${{ matrix.target }}.*
       - name: Publish to npm
         if: matrix.target == 'linux-x64'
-        run: npm publish --access public
         working-directory: packages/sk
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view @skills-supply/sk@$PKG_VERSION version 2>/dev/null; then
+            echo "Version $PKG_VERSION already published, skipping"
+          else
+            npm publish --access public
+          fi
 
   release:
     needs: build_and_npm
