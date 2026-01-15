@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 
 import { Command } from "commander"
-import { z } from "zod"
 import { cleanForksCommand } from "@/commands/clean-forks"
-import { draftCommand } from "@/commands/draft"
+import { DraftOptionsSchema, draftCommand } from "@/commands/draft"
 import { enqueueCommand } from "@/commands/enqueue"
 import { listCommand } from "@/commands/list"
 import { printError } from "@/commands/outcome"
+import { processCommand } from "@/commands/process"
 import { randomCommand } from "@/commands/random"
+import { redditActCommand, redditFindCommand } from "@/commands/reddit"
+import { statsCommand } from "@/commands/stats"
 import { updateDraftsCommand } from "@/commands/update-drafts"
 import { workerCommand } from "@/commands/worker"
 
@@ -74,6 +76,26 @@ async function main(): Promise<void> {
 		})
 
 	program
+		.command("process")
+		.description("Process a single repo: clone, scan, index, then draft PR")
+		.argument("<repo>", "GitHub repo (owner/repo)")
+		.option(
+			"--mode <mode>",
+			"link (default): print PR link | submit: create PR via API",
+		)
+		.option("--max-stars <count>", "Only consider repos with at most this many stars")
+		.action(async (repo: string, options: { mode?: string; maxStars?: string }) => {
+			const result = await processCommand({
+				maxStars: options.maxStars,
+				mode: options.mode,
+				repo,
+			})
+			if (!result.ok) {
+				printError(result.error)
+			}
+		})
+
+	program
 		.command("list")
 		.description("List indexed packages")
 		.option("--stars <count>", "Minimum GitHub stars")
@@ -98,11 +120,15 @@ async function main(): Promise<void> {
 			}
 		})
 
-	const DraftOptionsSchema = z.object({
-		id: z.coerce.number().int().positive().optional(),
-		maxStars: z.coerce.number().int().nonnegative().optional(),
-		mode: z.enum(["link", "submit"]).default("link"),
-	})
+	program
+		.command("stats")
+		.description("Show stars histogram of indexed packages")
+		.action(async () => {
+			const result = await statsCommand()
+			if (!result.ok) {
+				printError(result.error)
+			}
+		})
 
 	program
 		.command("draft")
@@ -162,6 +188,28 @@ async function main(): Promise<void> {
 		.description("Iterate through open PRs and refine with Claude")
 		.action(async () => {
 			const result = await updateDraftsCommand()
+			if (!result.ok) {
+				printError(result.error)
+			}
+		})
+
+	const reddit = program.command("reddit").description("Reddit reputation builder")
+
+	reddit
+		.command("find")
+		.description("Search Reddit for engagement opportunities")
+		.action(async () => {
+			const result = await redditFindCommand()
+			if (!result.ok) {
+				printError(result.error)
+			}
+		})
+
+	reddit
+		.command("act")
+		.description("Work through pending opportunities")
+		.action(async () => {
+			const result = await redditActCommand()
 			if (!result.ok) {
 				printError(result.error)
 			}

@@ -33,15 +33,15 @@ export async function upsertRepoPackages(
 	db: Kysely<Database>,
 	githubRepo: string,
 	packages: IndexedPackageInsertWithSkills[],
-): Promise<void> {
-	await db.transaction().execute(async (trx) => {
+): Promise<IndexedPackageId[]> {
+	return db.transaction().execute(async (trx) => {
 		await trx
 			.deleteFrom("indexed_packages")
 			.where("gh_repo", "=", githubRepo)
 			.execute()
 
 		if (packages.length === 0) {
-			return
+			return []
 		}
 
 		const inserted = await trx
@@ -77,6 +77,8 @@ export async function upsertRepoPackages(
 		if (skillRows.length > 0) {
 			await trx.insertInto("indexed_package_skills").values(skillRows).execute()
 		}
+
+		return inserted.map((row) => row.id)
 	})
 }
 

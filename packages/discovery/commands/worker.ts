@@ -24,7 +24,7 @@ interface WorkerOptions {
 	limit?: number
 }
 
-type RepoProcessResult =
+export type RepoProcessResult =
 	| {
 			ok: true
 			retryable: false
@@ -109,20 +109,21 @@ export async function workerCommand(options: WorkerOptions): Promise<void> {
 	)
 }
 
-async function persistRepoPackages(
+export async function persistRepoPackages(
 	githubRef: GithubRef,
 	packages: IndexedPackageInsertWithSkills[],
-): Promise<void> {
+): Promise<number[]> {
 	if (packages.length === 0) {
 		await upsertRepoPackages(db, githubRef, [])
 		consola.info(`${githubRef}: no installable packages found.`)
-		return
+		return []
 	}
-	await upsertRepoPackages(db, githubRef, packages)
+	const ids = await upsertRepoPackages(db, githubRef, packages)
 	consola.success(`${githubRef}: indexed ${packages.length} packages.`)
+	return ids
 }
 
-async function processRepo(githubRef: GithubRef): Promise<RepoProcessResult> {
+export async function processRepo(githubRef: GithubRef): Promise<RepoProcessResult> {
 	const tempDir = await mkdtemp(path.join(os.tmpdir(), "sk-scan-"))
 	const repoDir = path.join(tempDir, "repo")
 	consola.info(`${githubRef}: processing`)

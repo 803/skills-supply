@@ -78,6 +78,8 @@ export async function discover(
 	let currentPage = existingState?.resumeFromPage ?? 1
 	let totalPages = existingState?.totalPages ?? null
 
+	const MAX_PAGE_RETRIES = 5
+
 	try {
 		if (existingState) {
 			consola.info(
@@ -86,6 +88,7 @@ export async function discover(
 		}
 
 		let hasNext = true
+		let pageRetryCount = 0
 		while (hasNext) {
 			// Get a working page (creates or reuses browser session)
 			const pageResult = await browserManager.getPage()
@@ -100,14 +103,34 @@ export async function discover(
 			})
 			if (!fetchResult.ok) {
 				const err = fetchResult.error
-				if (err.type === "network" && err.retryable && err.retryAfterSeconds) {
-					const waitMs = (err.retryAfterSeconds + 1) * 1000 // +1s buffer
-					consola.info(`[skillsmp-bql] Waiting ${waitMs}ms before retry...`)
-					await sleep(waitMs)
-					continue // retry same page (browser may be recreated next iteration)
+				if (err.type === "network" && err.retryable) {
+					pageRetryCount += 1
+					if (pageRetryCount > MAX_PAGE_RETRIES) {
+						consola.error(
+							`[skillsmp-bql] Max retries (${MAX_PAGE_RETRIES}) exceeded for page ${currentPage}`,
+						)
+						return fetchResult
+					}
+					if (err.retryAfterSeconds) {
+						// Rate limit - wait before retry, browser disconnect handler will fire during wait
+						const waitMs = (err.retryAfterSeconds + 1) * 1000 // +1s buffer
+						consola.info(`[skillsmp-bql] Waiting ${waitMs}ms before retry...`)
+						await sleep(waitMs)
+					} else {
+						// Browser error - close immediately to force fresh session on next getPage()
+						// (disconnect handler is async and may not have fired yet)
+						consola.info(
+							`[skillsmp-bql] Browser error, recreating session (attempt ${pageRetryCount}/${MAX_PAGE_RETRIES})...`,
+						)
+						await browserManager.close()
+					}
+					continue // retry same page
 				}
 				return fetchResult
 			}
+
+			// Reset retry count on success
+			pageRetryCount = 0
 
 			totalPages = fetchResult.value.pagination.totalPages
 
@@ -332,10 +355,20 @@ async function fetchSkillsmpInternalPage(
 			},
 		)
 	} catch (error) {
+		// Browser disconnection errors are retryable - a new session will be created
+		const isBrowserDisconnected =
+			error instanceof Error &&
+			(error.message.includes("Execution context was destroyed") ||
+				error.message.includes("Target closed") ||
+				error.message.includes("Session closed") ||
+				error.message.includes("Protocol error"))
 		return {
 			error: {
-				message: "SkillsMP page evaluation failed.",
+				message: isBrowserDisconnected
+					? "Browser session disconnected during page evaluation."
+					: "SkillsMP page evaluation failed.",
 				rawError: error instanceof Error ? error : undefined,
+				retryable: isBrowserDisconnected,
 				source: SKILLSMP_INTERNAL_PATH,
 				type: "network",
 			},

@@ -58,13 +58,13 @@ type DraftState = Record<
 	}
 >
 
-type DraftMode = "link" | "submit"
+export const DraftOptionsSchema = z.object({
+	id: z.coerce.number().int().positive().optional(),
+	maxStars: z.coerce.number().int().nonnegative().optional(),
+	mode: z.enum(["link", "submit"]).default("link"),
+})
 
-type DraftOptions = {
-	id?: number
-	maxStars?: number
-	mode: DraftMode
-}
+export type DraftOptions = z.infer<typeof DraftOptionsSchema>
 
 const BRANCH_NAME = "sk-install-instructions"
 const COMMIT_MESSAGE = "docs: add sk installation instructions"
@@ -75,7 +75,7 @@ const COMMAND_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DISCOVERY_DIR = path.resolve(COMMAND_DIR, "..")
 const STATE_FILE_PATH = path.join(DISCOVERY_DIR, "drafted-prs.json")
 const PROMPT_FILE_PATH = path.join(DISCOVERY_DIR, "draft-prompt.md")
-const PR_BODY_FILE_PATH = path.join(DISCOVERY_DIR, "PR.md")
+const PR_BODY_FILE_PATH = path.join(DISCOVERY_DIR, "draft-pr.md")
 
 const execFileAsync = promisify(execFile)
 
@@ -604,7 +604,7 @@ async function buildPrompt(repo: TargetRepo): Promise<Result<string, DiscoveryEr
 async function finalizeChanges(
 	workdir: WorkingDir,
 	repo: TargetRepo,
-	mode: DraftMode,
+	mode: DraftOptions["mode"],
 ): Promise<Result<void, DiscoveryError>> {
 	// Read PR body from file if in submit mode
 	let prBody = ""

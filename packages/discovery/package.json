@@ -9,6 +9,7 @@
 		"kysely": "^0.28.9",
 		"pg-boss": "^12.5.4",
 		"playwright-core": "^1.57.0",
+		"table": "^6.9.0",
 		"zod": "^4.3.5"
 	},
 	"devDependencies": {
