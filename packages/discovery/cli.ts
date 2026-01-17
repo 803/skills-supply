@@ -8,7 +8,6 @@ import { listCommand } from "@/commands/list"
 import { printError } from "@/commands/outcome"
 import { processCommand } from "@/commands/process"
 import { randomCommand } from "@/commands/random"
-import { redditActCommand, redditFindCommand } from "@/commands/reddit"
 import { statsCommand } from "@/commands/stats"
 import { updateDraftsCommand } from "@/commands/update-drafts"
 import { workerCommand } from "@/commands/worker"
@@ -188,28 +187,6 @@ async function main(): Promise<void> {
 		.description("Iterate through open PRs and refine with Claude")
 		.action(async () => {
 			const result = await updateDraftsCommand()
-			if (!result.ok) {
-				printError(result.error)
-			}
-		})
-
-	const reddit = program.command("reddit").description("Reddit reputation builder")
-
-	reddit
-		.command("find")
-		.description("Search Reddit for engagement opportunities")
-		.action(async () => {
-			const result = await redditFindCommand()
-			if (!result.ok) {
-				printError(result.error)
-			}
-		})
-
-	reddit
-		.command("act")
-		.description("Work through pending opportunities")
-		.action(async () => {
-			const result = await redditActCommand()
 			if (!result.ok) {
 				printError(result.error)
 			}
